@@ -70,6 +70,7 @@ KernelFn FindCpuKernel(const std::string& op_type) {
         {"IsNaN", &IsNaN},
         {"Squeeze", &Squeeze},
         {"LayerNormalization", &LayerNormalization},
+        {"InstanceNormalization", &InstanceNormalization},
         {"ReduceSum", &ReduceSum},
         {"Range", &Range},
         {"Pad", &Pad},

@@ -2554,6 +2554,53 @@ TEST_F(EngineShapes, GridSampleOutputShape)
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 5, 7}));
 }
 
+// InstanceNormalization keeps the input's [N,C,H,W] shape.
+TEST_F(EngineShapes, InstanceNormalizationKeepsInputShape)
+{
+    engine::Graph graph;
+    graph.inputs.push_back(
+        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3, 5, 7}}});
+    graph.inputs.push_back(
+        {"s", engine::TensorInfo{engine::DataType::Float32, {3}}});
+    graph.inputs.push_back(
+        {"b", engine::TensorInfo{engine::DataType::Float32, {3}}});
+    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+    graph.nodes.push_back(make_graph_node(
+        "in0", "InstanceNormalization", {"x", "s", "b"}, {"y"}));
+
+    const engine::InferredShapes shapes = engine::InferShapes(
+        graph, {{"x", {2, 3, 5, 7}}, {"s", {3}}, {"b", {3}}});
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 5, 7}));
+    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Float32);
+}
+
+// InstanceNormalization with a scale of length != C fails, naming the node.
+TEST_F(EngineShapesNegative, InstanceNormalizationScaleLengthNamesNode)
+{
+    engine::Graph graph;
+    graph.inputs.push_back(
+        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 3, 4, 4}}});
+    graph.inputs.push_back(
+        {"s", engine::TensorInfo{engine::DataType::Float32, {4}}});
+    graph.inputs.push_back(
+        {"b", engine::TensorInfo{engine::DataType::Float32, {3}}});
+    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+    graph.nodes.push_back(make_graph_node(
+        "in_bad", "InstanceNormalization", {"x", "s", "b"}, {"y"}));
+
+    std::string message;
+    try {
+        engine::InferShapes(
+            graph, {{"x", {1, 3, 4, 4}}, {"s", {4}}, {"b", {3}}});
+    } catch (const engine::ModelLoadException& e) {
+        message = e.what();
+    }
+    EXPECT_FALSE(message.empty()) << "scale length mismatch did not throw";
+    EXPECT_NE(message.find("in_bad"), std::string::npos) << message;
+    EXPECT_NE(message.find("InstanceNormalization"), std::string::npos)
+        << message;
+}
+
 // Einsum "bchw,bnc->bnhw" derives its dims from the label sizes.
 TEST_F(EngineShapes, EinsumOutputShape)
 {

@@ -197,6 +197,11 @@ void Squeeze(const Node& node, const std::vector<TensorView>& inputs, const std:
 void LayerNormalization(const Node& node, const std::vector<TensorView>& inputs,
     const std::vector<TensorView>& outputs);
 
+// Normalize each (instance, channel) over its spatial elements, then apply the
+// per-channel scale and B.
+void InstanceNormalization(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
 // Sum over the given axes (or all axes when none are supplied); float32 or int64.
 void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 

@@ -2122,6 +2122,30 @@ TensorInfo squeeze_shape(const StaticContext& ctx, const Node& node,
     return TensorInfo{inputs[0]->dtype, out};
 }
 
+// InstanceNormalization: the output has the input's shape. The input is
+// [N, C, D1, ..., Dk] (rank >= 2); scale and B are rank-1 of length C when
+// their shapes are known.
+TensorInfo instancenorm_shape(const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    if (inputs.size() != 3 || inputs[0] == nullptr || inputs[1] == nullptr ||
+        inputs[2] == nullptr) {
+        fail(node, "InstanceNormalization requires input, scale, and B");
+    }
+    const std::vector<int64_t>& x = inputs[0]->dims;
+    if (x.size() < 2) {
+        fail(node, "InstanceNormalization input must have rank >= 2");
+    }
+    for (size_t i = 1; i < 3; ++i) {
+        const std::vector<int64_t>& p = inputs[i]->dims;
+        if (p.size() != 1 || (x[1] >= 0 && p[0] >= 0 && p[0] != x[1])) {
+            fail(node, "InstanceNormalization scale and B must be rank-1 of "
+                       "length C");
+        }
+    }
+    return TensorInfo{DataType::Float32, x};
+}
+
 // LayerNormalization: Y has X's shape; Mean and InvStdDev keep the leading
 // dims and set the normalized ones to 1.
 std::vector<TensorInfo> layernorm_shapes(const Node& node,
@@ -2443,6 +2467,9 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "LayerNormalization") {
         return layernorm_shapes(node, inputs);
+    }
+    if (op == "InstanceNormalization") {
+        return {instancenorm_shape(node, inputs)};
     }
     if (op == "GridSample") {
         return {gridsample_shape(node, inputs)};

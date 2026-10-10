@@ -2,9 +2,9 @@
 // Cast, Softmax, ReduceMax, Mod, Equal, Where, Concat, Split, Unsqueeze,
 // Expand, Transpose, Slice, Gather, GatherElements, Resize, Flatten, Shape,
 // ConstantOfShape, TopK, Floor, Identity, Pow, Tile, AveragePool,
-// ConvTranspose, Erf, Sqrt, Tanh, IsNaN, Squeeze, LayerNormalization, Abs,
-// Neg, Exp, Log, Cos, Sin, Clip, Greater, Less, And, Not, ReduceSum, Range,
-// Pad, GridSample, and Einsum.
+// ConvTranspose, Erf, Sqrt, Tanh, IsNaN, Squeeze, LayerNormalization,
+// InstanceNormalization, Abs, Neg, Exp, Log, Cos, Sin, Clip, Greater, Less,
+// And, Not, ReduceSum, Range, Pad, GridSample, and Einsum.
 //
 // Expected values are hand-computed small cases written inline, not captured
 // from another runtime. Kernels are reached through the CPU device's kernel
@@ -2956,6 +2956,63 @@ TEST(EngineKernels, LayerNormalizationLastAxis) {
     EXPECT_NEAR(mean[1], 2.0f, 1e-6f);
 }
 
+// InstanceNormalization on [2,2,2,2]: each (n, c) plane of four values is
+// normalized on its own (population variance, epsilon 1e-12 so the constant
+// plane stays finite), then scaled by
+// scale[c] and shifted by B[c]. Plane [1,2,3,4] has mean 2.5 and variance
+// 1.25, so it maps to [-3,-1,1,3]/sqrt(5); a constant plane maps to 0, giving
+// B[c]; plane [0,0,0,8] has mean 2 and variance 12, so it maps to
+// [-1,-1,-1,3]/sqrt(3).
+TEST(EngineKernels, InstanceNormalizationPerChannelPlanes) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("InstanceNormalization");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 5.0f, 5.0f, 5.0f,
+                            0.0f, 0.0f, 0.0f, 8.0f, 2.0f, 4.0f, 6.0f, 8.0f};
+    std::vector<float> scale = {2.0f, -1.0f};
+    std::vector<float> bias = {0.5f, 3.0f};
+    std::vector<float> y(16, 0.0f);
+    engine::Node node = MakeNode("in0", "InstanceNormalization");
+    node.attributes.emplace_back("epsilon", 1e-12f);
+    std::vector<engine::TensorView> inputs = {FloatView(x, {2, 2, 2, 2}), FloatView(scale, {2}),
+                                              FloatView(bias, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(y, {2, 2, 2, 2})};
+
+    kernel(node, inputs, outputs);
+
+    const float s5 = std::sqrt(5.0f);
+    const float s3 = std::sqrt(3.0f);
+    const std::vector<float> expected = {
+        0.5f - 6.0f / s5, 0.5f - 2.0f / s5, 0.5f + 2.0f / s5, 0.5f + 6.0f / s5, 3.0f, 3.0f, 3.0f, 3.0f,
+        0.5f - 2.0f / s3, 0.5f - 2.0f / s3, 0.5f - 2.0f / s3, 0.5f + 6.0f / s3, 3.0f + 3.0f / s5,
+        3.0f + 1.0f / s5, 3.0f - 1.0f / s5, 3.0f - 3.0f / s5};
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_NEAR(y[i], expected[i], 1e-5f) << "index " << i;
+    }
+}
+
+// InstanceNormalization defaults epsilon to 1e-5: plane [0, 2] has variance 1,
+// so it maps to [-1, 1] / sqrt(1 + 1e-5).
+TEST(EngineKernels, InstanceNormalizationDefaultEpsilon) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("InstanceNormalization");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {0.0f, 2.0f};
+    std::vector<float> scale = {1.0f};
+    std::vector<float> bias = {0.0f};
+    std::vector<float> y(2, 0.0f);
+    engine::Node node = MakeNode("in_eps", "InstanceNormalization");
+    std::vector<engine::TensorView> inputs = {FloatView(x, {1, 1, 2}), FloatView(scale, {1}), FloatView(bias, {1})};
+    std::vector<engine::TensorView> outputs = {FloatView(y, {1, 1, 2})};
+
+    kernel(node, inputs, outputs);
+
+    const double expected = 1.0 / std::sqrt(1.0 + 1e-5);
+    EXPECT_NEAR(y[0], -expected, 1e-7);
+    EXPECT_NEAR(y[1], expected, 1e-7);
+    EXPECT_NE(y[1], 1.0f);
+}
+
 // Shape with start/end emits only the selected dims; negatives count back.
 TEST(EngineKernels, ShapeStartEndSelectsDims) {
     engine::KernelFn kernel = engine::CpuDevice().kernels().find("Shape");
@@ -3057,6 +3114,28 @@ TEST(EngineKernelsNegative, LayerNormalizationRejectsScaleShape) {
         FAIL() << "expected InferenceException";
     } catch (const engine::InferenceException& error) {
         EXPECT_NE(std::string(error.what()).find("LayerNormalization"), std::string::npos) << error.what();
+    }
+}
+
+// InstanceNormalization rejects a scale whose length is not C.
+TEST(EngineKernelsNegative, InstanceNormalizationRejectsScaleLength) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("InstanceNormalization");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> scale = {1.0f, 1.0f, 1.0f};
+    std::vector<float> bias = {0.0f, 0.0f};
+    std::vector<float> y(4, 0.0f);
+    engine::Node node = MakeNode("in_bad", "InstanceNormalization");
+    std::vector<engine::TensorView> inputs = {FloatView(x, {1, 2, 2}), FloatView(scale, {3}), FloatView(bias, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(y, {1, 2, 2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("InstanceNormalization"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("in_bad"), std::string::npos) << error.what();
     }
 }
 
