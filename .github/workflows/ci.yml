@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libgtest-dev libgmock-dev python3-pip clang-format-18
+
+      - name: Install pinned CPU torch stack
+        run: |
+          python3 -m pip install --break-system-packages --quiet \
+            --index-url https://download.pytorch.org/whl/cpu \
+            "torch==2.12.0+cpu" "torchvision==0.27.0+cpu"
+          python3 -m pip install --break-system-packages --quiet \
+            "onnx==1.22.0" "onnxscript==0.7.0"
+
+      - name: Provision ResNet-18 fixture
+        run: python3 tools/provision_resnet18.py fixtures
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Test
+        run: NERT_FIXTURE="$PWD/fixtures/resnet18.onnx" ctest --test-dir build --output-on-failure
+
+      - name: Format check
+        run: ./scripts/format.sh --check

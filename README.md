@@ -1,6 +1,8 @@
 # NERT (Neuriplo Engine Runtime)
 
-The first-party ONNX inference engine, exposed as the `NERT` backend.
+NERT is a first-party ONNX inference runtime: a CPU reference interpreter for
+ONNX opset 18. It computes in float32, with int64/bool shape data and I/O, and
+depends on nothing beyond the C++ standard library (the tests use GoogleTest).
 
 It is an interpreter: each model load parses the ONNX graph, infers tensor
 shapes for the requested input, plans a single arena allocation, then executes
@@ -11,46 +13,82 @@ The device is chosen once per loaded graph. A graph that cannot run entirely
 on the requested device is rejected when it is loaded; there is no per-operator
 fallback to another device at run time.
 
-The CPU kernels are the executable correctness oracle for the future
-accelerated path. They are deliberately unoptimized and are not a performance
-target — they exist so later device layers can be checked for numerical
-agreement rather than re-derive operator semantics.
+The CPU kernels are the executable correctness oracle for a future accelerated
+path. They are deliberately unoptimized and are not a performance target; they
+exist so later device layers can be checked for numerical agreement rather than
+re-derive operator semantics.
 
-Nothing under `engine/` includes or links the backend abstraction
-(`include/neuriplo/`, `backends/src/`, `src/`). A build guard enforces this
-boundary; the adapter that exposes the engine through `InferenceInterface`
-lives in `backends/nert/` instead.
+## Status
+
+Version 0.1.0 (unreleased). NERT has been validated against ONNX Runtime
+through [Neuriplo](https://github.com/olibartfast/neuriplo) on the YOLO
+families, ViT, ViTPose, Depth Anything V2, VideoMAE, ViViT, TimeSformer, and
+the DETR family: RT-DETR v4, D-FINE/DEIM, DEIMv2, RF-DETR, and RF-DETR-Seg.
+RAFT and open-vocabulary models are in progress.
 
 ## Layout
 
-- `engine/include/engine/` — public headers: graph IR, model loader, shape
-  inference, memory plan, device seam, and executor.
-- `engine/src/` — implementation of the loader, shape inference, memory
-  planner, device, and executor.
-- `engine/src/kernels/` — the CPU operator kernels behind the device
-  kernel table.
-- `engine/test/` — unit tests for the loader, shapes, plan, device, kernels,
-  and executor.
+- `include/engine/`: public headers (namespace `engine`): graph IR, model
+  loader, shape inference, memory plan, device seam, and executor.
+- `src/`: implementation of the loader, shape inference, memory planner,
+  device, and executor.
+- `src/kernels/`: the CPU operator kernels behind the device kernel table.
+- `test/`: unit tests for the loader, shapes, plan, device, kernels, constant
+  folding, and executor.
+- `tools/provision_resnet18.py`: exports the ResNet-18 test fixture.
+- `scripts/format.sh`: clang-format check.
 
-## Build and test
-
-Configure with the NERT backend selected and engine tests enabled:
-
-```bash
-cmake -S . -B build-nert -DDEFAULT_BACKEND=NERT -DBUILD_INFERENCE_ENGINE_TESTS=ON \
-  && cmake --build build-nert \
-  && ctest --test-dir build-nert -R engine
-```
-
-Elementwise parity against ONNX Runtime uses a separate tree with both
-backends enabled, which provisions a deterministic ResNet-18 fixture and
-compares the two outputs:
+## Build
 
 ```bash
-cmake -S . -B build-parity -DDEFAULT_BACKEND=NERT -DNEURIPLO_BACKENDS=ONNX_RUNTIME \
-  -DBUILD_INFERENCE_ENGINE_TESTS=ON \
-  && cmake --build build-parity \
-  && ctest --test-dir build-parity -R parity
+cmake -S . -B build
+cmake --build build
 ```
 
-The engine links only the C++ standard library.
+The library target is `nert` (alias `nert::nert`). Tests are built when NERT is
+the top-level project; control them with `-DNERT_BUILD_TESTS=ON|OFF`
+(`BUILD_INFERENCE_ENGINE_TESTS` is still honoured when a parent project sets it).
+
+## Test
+
+The tests read an opset-18 ResNet-18 model from `NERT_FIXTURE` (environment
+variable or CMake cache variable). Provision it with torch and torchvision
+0.27.0 installed, then run ctest:
+
+```bash
+python3 tools/provision_resnet18.py fixtures
+NERT_FIXTURE=fixtures/resnet18.onnx ctest --test-dir build --output-on-failure
+```
+
+Check formatting with `scripts/format.sh --check` (or `--fix`).
+
+## Install and use
+
+```bash
+cmake --install build --prefix /path/to/prefix
+```
+
+This installs the headers, the static library, and the CMake package files. A
+consumer project:
+
+```cmake
+find_package(nert 0.1 REQUIRED)
+target_link_libraries(app PRIVATE nert::nert)
+```
+
+```cpp
+#include "engine/Engine.hpp"
+```
+
+For now, the old target name `neuriplo_engine` remains available as an alias of
+`nert` when NERT is built as a subproject.
+
+## Use from Neuriplo
+
+[Neuriplo](https://github.com/olibartfast/neuriplo) consumes NERT as its
+`NERT` inference backend, adapting it to Neuriplo's `InferenceInterface`. NERT
+itself has no knowledge of Neuriplo.
+
+## Licence
+
+MIT; see [LICENSE](LICENSE).
