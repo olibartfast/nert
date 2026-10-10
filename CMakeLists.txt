@@ -86,7 +86,8 @@ add_library(nert STATIC
     src/kernels/Sin.cpp
     src/kernels/Clip.cpp
     src/kernels/Squeeze.cpp
-    src/kernels/LayerNormalization.cpp)
+    src/kernels/LayerNormalization.cpp
+    src/kernels/InstanceNormalization.cpp)
 target_compile_features(nert PUBLIC cxx_std_17)
 target_include_directories(nert
     PUBLIC

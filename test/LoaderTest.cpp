@@ -1340,6 +1340,50 @@ TEST_F(EngineLoader, HermeticConstantOfShapeFloatBoolAndAbsentValueLoad)
     EXPECT_TRUE(graph.nodes[2].attributes.empty());
 }
 
+// InstanceNormalization loads with its float `epsilon` attribute.
+
+TEST_F(EngineLoader, HermeticInstanceNormalizationEpsilonLoads)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("s", {2}, {1.0F, 2.0F}));
+    put_sub(body, 5, encode_initializer("b", {2}, {0.0F, 0.5F}));
+    put_sub(body, 1, encode_node("in0", "InstanceNormalization",
+                      {"x", "s", "b"}, {"y"},
+                      {encode_attribute_float("epsilon", 1e-3F)}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 2, 3, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 3}));
+
+    const engine::Graph graph = engine::LoadGraphFromFile(
+        write_model_bytes("instancenorm.onnx", encode_model(body)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes[0].op_type, "InstanceNormalization");
+    ASSERT_EQ(graph.nodes[0].attributes.size(), 1U);
+    EXPECT_EQ(graph.nodes[0].attributes.front().name, "epsilon");
+    EXPECT_EQ(std::get<float>(graph.nodes[0].attributes.front().value), 1e-3F);
+}
+
+// InstanceNormalization rejects an attribute outside its allowlist.
+
+TEST_F(EngineLoaderNegative, InstanceNormalizationUnknownAttributeRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("s", {2}, {1.0F, 1.0F}));
+    put_sub(body, 5, encode_initializer("b", {2}, {0.0F, 0.0F}));
+    put_sub(body, 1, encode_node("in_bad", "InstanceNormalization",
+                      {"x", "s", "b"}, {"y"},
+                      {encode_attribute_int("axis", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 2, 3, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 3}));
+
+    const std::string message =
+        load_error_message(encode_model(body), "instancenorm_attr.onnx");
+    EXPECT_NE(message.find("in_bad"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("InstanceNormalization"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("axis"), std::string::npos) << "message: " << message;
+}
+
 // ConstantOfShape whose `value` is a DOUBLE tensor (outside FLOAT, INT64,
 // BOOL) rejects with node + op context.
 
