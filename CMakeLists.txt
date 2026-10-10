@@ -1,43 +1,24 @@
-# First-party inference engine (CPU reference spine).
-#
-# This directory is deliberately self-contained: it must not link or include
-# anything from the backend abstraction layer (include/neuriplo/,
-# backends/src/, src/). A configure-time guard below enforces that boundary.
+# NERT (Neuriplo Engine Runtime): first-party ONNX inference runtime (CPU
+# reference spine). Depends on nothing beyond the C++ standard library.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 
-# Standalone configure support: when consumed via add_subdirectory() from the
-# top-level project, the parent project() and CXX standard already apply.
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(neuriplo_engine LANGUAGES CXX)
+    set(NERT_IS_TOP_LEVEL ON)
+else()
+    set(NERT_IS_TOP_LEVEL OFF)
+endif()
+
+project(nert VERSION 0.1.0 LANGUAGES CXX)
+
+if(NERT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
-# --- Abstraction-boundary guard ----------------------------------------------
-# Engine translation units must not include backend abstraction headers. The
-# forbidden patterns are named here in CMake (allowed); the C++ sources
-# themselves must stay free of them.
-set(ENGINE_FORBIDDEN_PATTERNS
-    "include/neuriplo"
-    "InferenceInterface"
-)
-file(GLOB_RECURSE ENGINE_TUS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
-foreach(engine_tu IN LISTS ENGINE_TUS)
-    file(READ "${engine_tu}" engine_tu_content)
-    foreach(pattern IN LISTS ENGINE_FORBIDDEN_PATTERNS)
-        if(engine_tu_content MATCHES "${pattern}")
-            message(FATAL_ERROR
-                "engine/ boundary violation: ${engine_tu} references "
-                "'${pattern}'. The engine must not depend on the backend "
-                "abstraction layer.")
-        endif()
-    endforeach()
-endforeach()
+option(NERT_BUILD_TESTS "Build the NERT tests" ${NERT_IS_TOP_LEVEL})
 
-add_library(neuriplo_engine STATIC
+add_library(nert STATIC
     src/Engine.cpp
     src/WireReader.cpp
     src/ModelLoader.cpp
@@ -106,16 +87,45 @@ add_library(neuriplo_engine STATIC
     src/kernels/Clip.cpp
     src/kernels/Squeeze.cpp
     src/kernels/LayerNormalization.cpp)
-target_compile_features(neuriplo_engine PUBLIC cxx_std_17)
-target_include_directories(neuriplo_engine
+target_compile_features(nert PUBLIC cxx_std_17)
+target_include_directories(nert
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         "$<INSTALL_INTERFACE:include>")
 
-# Engine tests; GoogleTest stays scoped to engine/test/. The engine directory
-# is added during backend selection, before the top-level test setup runs, so
-# testing is enabled here for the tests below to register.
-if(BUILD_INFERENCE_ENGINE_TESTS)
+add_library(nert::nert ALIAS nert)
+# Compatibility alias for consumers that still link the old target name.
+add_library(neuriplo_engine ALIAS nert)
+
+# Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects
+# (Neuriplo) that set it.
+if(NERT_BUILD_TESTS OR BUILD_INFERENCE_ENGINE_TESTS)
     enable_testing()
     add_subdirectory(test)
+endif()
+
+# Install and package config.
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+if(NERT_IS_TOP_LEVEL)
+    install(TARGETS nert
+        EXPORT nertTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(DIRECTORY include/engine DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(EXPORT nertTargets
+        NAMESPACE nert::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nert)
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/nertConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/nertConfig.cmake"
+"include(\"\${CMAKE_CURRENT_LIST_DIR}/nertTargets.cmake\")
+")
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/nertConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/nertConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nert)
 endif()

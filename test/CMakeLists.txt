@@ -1,9 +1,5 @@
-# Engine model-loader tests.
-#
-# Wired via engine/CMakeLists.txt (a guarded add_subdirectory), not the
-# backend registry: the engine is standalone-capable and must not depend on
-# backends/** or the top-level test harness. GoogleTest is scoped to this
-# directory only, and the engine links nothing but the standard library.
+# NERT tests. GoogleTest is scoped to this directory; the library itself
+# links nothing but the standard library.
 
 find_package(GTest REQUIRED)
 
@@ -11,7 +7,7 @@ add_executable(engine_loader_test LoaderTest.cpp)
 target_compile_features(engine_loader_test PRIVATE cxx_std_17)
 target_compile_options(engine_loader_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_loader_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -19,7 +15,7 @@ target_link_libraries(engine_loader_test PRIVATE
 # When unset, fall back to the well-known local export location if it exists;
 # the tests themselves ASSERT (fail, never skip) when the fixture is absent.
 set(NERT_FIXTURE "" CACHE PATH
-    "Path to the opset-18 ResNet-18 ONNX fixture for the engine loader tests")
+    "Path to the opset-18 ResNet-18 ONNX fixture for the NERT tests")
 if(NOT NERT_FIXTURE AND EXISTS
     "/tmp/opencode/resnet18_export/resnet18.onnx")
     set(NERT_FIXTURE
@@ -35,7 +31,7 @@ add_executable(engine_shapes_test ShapeInferenceTest.cpp)
 target_compile_features(engine_shapes_test PRIVATE cxx_std_17)
 target_compile_options(engine_shapes_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_shapes_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -48,7 +44,7 @@ add_executable(engine_plan_test MemoryPlannerTest.cpp)
 target_compile_features(engine_plan_test PRIVATE cxx_std_17)
 target_compile_options(engine_plan_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_plan_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -61,7 +57,7 @@ add_executable(engine_device_test DeviceTest.cpp)
 target_compile_features(engine_device_test PRIVATE cxx_std_17)
 target_compile_options(engine_device_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_device_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -72,7 +68,7 @@ add_executable(engine_kernels_test KernelsTest.cpp)
 target_compile_features(engine_kernels_test PRIVATE cxx_std_17)
 target_compile_options(engine_kernels_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_kernels_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -85,7 +81,7 @@ add_executable(engine_executor_test ExecutorTest.cpp)
 target_compile_features(engine_executor_test PRIVATE cxx_std_17)
 target_compile_options(engine_executor_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_executor_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 
@@ -109,7 +105,7 @@ add_executable(engine_constant_folding_test ConstantFoldingTest.cpp)
 target_compile_features(engine_constant_folding_test PRIVATE cxx_std_17)
 target_compile_options(engine_constant_folding_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(engine_constant_folding_test PRIVATE
-    neuriplo_engine
+    nert
     GTest::gtest
     GTest::gtest_main)
 add_test(NAME engine_constant_folding COMMAND engine_constant_folding_test)
