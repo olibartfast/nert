@@ -4,15 +4,15 @@
 // table is owned by the device and delegates to the CPU operator table. Only
 // the C++17 standard library is used.
 
-#include "engine/Device.hpp"
+#include "nert/device.hpp"
 
 #include <cstddef>
 #include <cstring>
 #include <new>
 
-#include "kernels/Kernels.hpp"
+#include "kernels/kernels.hpp"
 
-namespace engine {
+namespace nert {
 namespace {
 
 // The planner lays tensors out on 64-byte boundaries, so the arena allocator
@@ -93,4 +93,4 @@ const Device& CpuDevice() {
     return device;
 }
 
-} // namespace engine
+} // namespace nert

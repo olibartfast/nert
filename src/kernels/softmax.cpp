@@ -3,14 +3,14 @@
 // The `axis` attribute defaults to -1; negative values count back from the
 // last axis.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -109,4 +109,4 @@ void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -5,7 +5,7 @@
 // nearest, default bilinear), padding_mode (zeros, border, reflection, default
 // zeros), align_corners (0 or 1, default 0). Nearest rounds half to even.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -14,7 +14,7 @@
 #include <variant>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -161,4 +161,4 @@ void GridSample(const Node& node, const std::vector<TensorView>& inputs, const s
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

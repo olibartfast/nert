@@ -2,14 +2,14 @@
 // absent). The element order is unchanged, so the kernel copies the buffer;
 // shape inference owns the output dims. Float32, int64, or bool data.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -63,4 +63,4 @@ void Squeeze(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -1,13 +1,13 @@
 // Abs: elementwise absolute value over float32 or int64 data.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -58,4 +58,4 @@ void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

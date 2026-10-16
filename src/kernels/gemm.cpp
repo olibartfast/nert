@@ -4,13 +4,13 @@
 // broadcast to the output from either [N] or [M,N]. Naive, float32 data with
 // double accumulation (each output rounds once to float32), single-threaded.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -137,4 +137,4 @@ void Gemm(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

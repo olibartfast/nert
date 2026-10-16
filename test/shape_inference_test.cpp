@@ -27,10 +27,10 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/Graph.hpp"
-#include "engine/ModelLoader.hpp"
-#include "engine/Plan.hpp"
-#include "engine/Shapes.hpp"
+#include "nert/graph.hpp"
+#include "nert/model_loader.hpp"
+#include "nert/plan.hpp"
+#include "nert/shapes.hpp"
 
 namespace {
 
@@ -253,9 +253,9 @@ std::string write_model_bytes(const std::string& name, const std::string& bytes)
     return path;
 }
 
-engine::Graph load_graph(const std::string& name, const std::string& bytes)
+nert::Graph load_graph(const std::string& name, const std::string& bytes)
 {
-    return engine::LoadGraphFromFile(write_model_bytes(name, bytes));
+    return nert::LoadGraphFromFile(write_model_bytes(name, bytes));
 }
 
 std::vector<float> zeros(size_t count)
@@ -263,10 +263,10 @@ std::vector<float> zeros(size_t count)
     return std::vector<float>(count, 0.0F);
 }
 
-std::string first_output_of(const engine::Graph& graph,
+std::string first_output_of(const nert::Graph& graph,
     const std::string& op_type)
 {
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         if (node.op_type == op_type && !node.outputs.empty()) {
             return node.outputs.front();
         }
@@ -301,13 +301,13 @@ TEST_F(EngineShapes, AddBroadcast)
     put_sub(body, 11, encode_value_info("y", 1, {3, 1, 1}));
     put_sub(body, 12, encode_value_info("z", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("add_broadcast.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
     ASSERT_EQ(shapes.tensors.count("z"), 1U);
     EXPECT_EQ(shapes.tensors.at("z").dims, (std::vector<int64_t>{1, 3, 4, 4}));
-    EXPECT_EQ(shapes.tensors.at("z").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("z").dtype, nert::DataType::Float32);
 }
 
 // Relu: output shape equals input shape.
@@ -319,9 +319,9 @@ TEST_F(EngineShapes, ReluCopiesInputShape)
     put_sub(body, 11, encode_value_info("x", 1, {2, 5, 6, 7}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 5, 6, 7}));
 
-    const engine::Graph graph = load_graph("relu_copy.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 5, 6, 7}}});
+    const nert::Graph graph = load_graph("relu_copy.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 5, 6, 7}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 5, 6, 7}));
 }
@@ -336,10 +336,10 @@ TEST_F(EngineShapes, MatMulBroadcastAndPromotion)
         put_sub(body, 11, encode_value_info("a", 1, {2, 3, 4}));
         put_sub(body, 11, encode_value_info("b", 1, {4, 5}));
         put_sub(body, 12, encode_value_info("y", 1, {2, 3, 5}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("matmul_batch.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"a", {2, 3, 4}}, {"b", {4, 5}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"a", {2, 3, 4}}, {"b", {4, 5}}});
         ASSERT_EQ(shapes.tensors.count("y"), 1U);
         EXPECT_EQ(shapes.tensors.at("y").dims,
             (std::vector<int64_t>{2, 3, 5}));
@@ -351,10 +351,10 @@ TEST_F(EngineShapes, MatMulBroadcastAndPromotion)
         put_sub(body, 11, encode_value_info("a", 1, {4}));
         put_sub(body, 11, encode_value_info("b", 1, {4}));
         put_sub(body, 12, encode_value_info("y", 1, {}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("matmul_vec.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"a", {4}}, {"b", {4}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"a", {4}}, {"b", {4}}});
         ASSERT_EQ(shapes.tensors.count("y"), 1U);
         EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{}));
     }
@@ -365,10 +365,10 @@ TEST_F(EngineShapes, MatMulBroadcastAndPromotion)
         put_sub(body, 11, encode_value_info("a", 1, {2, 3}));
         put_sub(body, 11, encode_value_info("b", 1, {3}));
         put_sub(body, 12, encode_value_info("y", 1, {2}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("matmul_rhs_vec.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"a", {2, 3}}, {"b", {3}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"a", {2, 3}}, {"b", {3}}});
         ASSERT_EQ(shapes.tensors.count("y"), 1U);
         EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2}));
     }
@@ -385,10 +385,10 @@ TEST_F(EngineShapes, ReshapeZeroAndInferred)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 48}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("reshape_zero.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 4, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 4, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 48}));
 }
@@ -404,10 +404,10 @@ TEST_F(EngineShapes, ReshapeIncreasesRank)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("reshape_rank.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 2, 3}));
 }
@@ -423,10 +423,10 @@ TEST_F(EngineShapes, ReduceMeanKeepdimsOn)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 1, 1}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("mean_keep.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 1, 1}));
 }
@@ -440,10 +440,10 @@ TEST_F(EngineShapes, ReduceMeanKeepdimsOff)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("mean_drop.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
 }
@@ -460,9 +460,9 @@ TEST_F(EngineShapes, ConvStrideAndPad)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 4, 4, 4}));
 
-    const engine::Graph graph = load_graph("conv_stride.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    const nert::Graph graph = load_graph("conv_stride.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 4, 4, 4}));
 }
@@ -480,10 +480,10 @@ TEST_F(EngineShapes, ConvSameUpper)
     put_sub(body, 11, encode_value_info("x", 1, {1, 1, 7, 7}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("conv_same.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 1, 7, 7}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 1, 7, 7}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 2, 4, 4}));
 }
@@ -500,9 +500,9 @@ TEST_F(EngineShapes, MaxPoolCeilMode)
     put_sub(body, 11, encode_value_info("x", 1, {1, 2, 5, 5}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 3}));
 
-    const engine::Graph graph = load_graph("pool_ceil.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 2, 5, 5}}});
+    const nert::Graph graph = load_graph("pool_ceil.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 2, 5, 5}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 2, 3, 3}));
 }
@@ -518,9 +518,9 @@ TEST_F(EngineShapes, MaxPoolFloorDefault)
     put_sub(body, 11, encode_value_info("x", 1, {1, 2, 5, 5}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 2, 2}));
 
-    const engine::Graph graph = load_graph("pool_floor.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 2, 5, 5}}});
+    const nert::Graph graph = load_graph("pool_floor.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 2, 5, 5}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 2, 2, 2}));
 }
@@ -537,9 +537,9 @@ TEST_F(EngineShapes, GemmTransposes)
     put_sub(body, 11, encode_value_info("a", 1, {3, 2}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
 
-    const engine::Graph graph = load_graph("gemm_t.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"a", {3, 2}}});
+    const nert::Graph graph = load_graph("gemm_t.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"a", {3, 2}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4}));
 }
@@ -554,10 +554,10 @@ TEST_F(EngineShapes, GemmDefaults)
     put_sub(body, 11, encode_value_info("a", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("gemm_default.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"a", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"a", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4}));
 }
@@ -576,16 +576,16 @@ TEST_F(EngineShapes, NewElementwiseBroadcast)
     put_sub(body, 11, encode_value_info("y", 1, {3, 1, 1}));
     put_sub(body, 12, encode_value_info("z", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("new_elem.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
     for (const std::string& name : {"m", "d", "s", "z"}) {
         ASSERT_EQ(shapes.tensors.count(name), 1U) << name;
         EXPECT_EQ(shapes.tensors.at(name).dims,
             (std::vector<int64_t>{1, 3, 4, 4}))
             << name;
-        EXPECT_EQ(shapes.tensors.at(name).dtype, engine::DataType::Float32)
+        EXPECT_EQ(shapes.tensors.at(name).dtype, nert::DataType::Float32)
             << name;
     }
 }
@@ -604,13 +604,13 @@ TEST_F(EngineShapes, ModInt64PropagatesDtype)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("z", 1, {2, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("mod_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("z"), 1U);
     EXPECT_EQ(shapes.tensors.at("z").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("z").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("z").dtype, nert::DataType::Int64);
 }
 
 // Sigmoid/Softmax: output shape equals input shape.
@@ -624,10 +624,10 @@ TEST_F(EngineShapes, SigmoidSoftmaxCopyInputShape)
     put_sub(body, 11, encode_value_info("x", 1, {2, 5}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 5}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("sig_sm.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 5}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 5}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 5}));
     EXPECT_EQ(shapes.tensors.at("s").dims, (std::vector<int64_t>{2, 5}));
@@ -644,9 +644,9 @@ TEST_F(EngineShapes, ConcatAxis)
         put_sub(body, 11, encode_value_info("a", 1, {1, 2, 4}));
         put_sub(body, 11, encode_value_info("b", 1, {1, 3, 4}));
         put_sub(body, 12, encode_value_info("y", 1, {1, 5, 4}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("concat1.onnx", encode_model(body));
-        const engine::InferredShapes shapes = engine::InferShapes(graph,
+        const nert::InferredShapes shapes = nert::InferShapes(graph,
             {{"a", {1, 2, 4}}, {"b", {1, 3, 4}}});
         ASSERT_EQ(shapes.tensors.count("y"), 1U);
         EXPECT_EQ(shapes.tensors.at("y").dims,
@@ -659,10 +659,10 @@ TEST_F(EngineShapes, ConcatAxis)
         put_sub(body, 11, encode_value_info("a", 1, {2, 3}));
         put_sub(body, 11, encode_value_info("b", 1, {2, 5}));
         put_sub(body, 12, encode_value_info("y", 1, {2, 8}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("concat_neg.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"a", {2, 3}}, {"b", {2, 5}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"a", {2, 3}}, {"b", {2, 5}}});
         ASSERT_EQ(shapes.tensors.count("y"), 1U);
         EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 8}));
     }
@@ -679,10 +679,10 @@ TEST_F(EngineShapes, SplitSizedAndEqual)
                           {"a", "b"}, {encode_attribute_int("axis", 1)}));
         put_sub(body, 11, encode_value_info("x", 1, {1, 5}));
         put_sub(body, 12, encode_value_info("a", 1, {1, 2}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("split_sized.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"x", {1, 5}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"x", {1, 5}}});
         ASSERT_EQ(shapes.tensors.count("a"), 1U);
         EXPECT_EQ(shapes.tensors.at("a").dims, (std::vector<int64_t>{1, 2}));
         ASSERT_EQ(shapes.tensors.count("b"), 1U);
@@ -694,10 +694,10 @@ TEST_F(EngineShapes, SplitSizedAndEqual)
                           {encode_attribute_int("axis", 1)}));
         put_sub(body, 11, encode_value_info("x", 1, {1, 6}));
         put_sub(body, 12, encode_value_info("a", 1, {1, 3}));
-        const engine::Graph graph =
+        const nert::Graph graph =
             load_graph("split_equal.onnx", encode_model(body));
-        const engine::InferredShapes shapes =
-            engine::InferShapes(graph, {{"x", {1, 6}}});
+        const nert::InferredShapes shapes =
+            nert::InferShapes(graph, {{"x", {1, 6}}});
         EXPECT_EQ(shapes.tensors.at("a").dims, (std::vector<int64_t>{1, 3}));
         EXPECT_EQ(shapes.tensors.at("b").dims, (std::vector<int64_t>{1, 3}));
     }
@@ -714,10 +714,10 @@ TEST_F(EngineShapes, UnsqueezeInsertsOnes)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 1}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("unsqueeze.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims,
         (std::vector<int64_t>{1, 2, 3, 1}));
@@ -734,9 +734,9 @@ TEST_F(EngineShapes, ExpandBroadcastsToShape)
     put_sub(body, 11, encode_value_info("x", 1, {3, 1}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
 
-    const engine::Graph graph = load_graph("expand.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {3, 1}}});
+    const nert::Graph graph = load_graph("expand.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {3, 1}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 4}));
 }
@@ -753,10 +753,10 @@ TEST_F(EngineShapes, ExpandMaxBroadcastsDataAndTarget)
     put_sub(body, 11, encode_value_info("x", 1, {1, 300, 1}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 300, 80}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("expand_max.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 300, 1}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 300, 1}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims,
         (std::vector<int64_t>{1, 300, 80}));
@@ -772,10 +772,10 @@ TEST_F(EngineShapes, TransposePermutes)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("transpose.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4, 3}));
 }
@@ -791,13 +791,13 @@ TEST_F(EngineShapes, GatherElementsMatchesIndices)
     put_sub(body, 11, encode_value_info("idx", 1, {2, 1, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("gelem.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}, {"idx", {2, 1, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}, {"idx", {2, 1, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 1, 4}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Float32);
 }
 
 // Gather: [4,5,6] along axis 1 with [2] indices -> [4,2,6].
@@ -811,12 +811,12 @@ TEST_F(EngineShapes, GatherInsertsIndices)
     put_sub(body, 11, encode_value_info("x", 1, {4, 5, 6}));
     put_sub(body, 12, encode_value_info("y", 1, {4, 1, 6}));
 
-    const engine::Graph graph = load_graph("gather.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {4, 5, 6}}});
+    const nert::Graph graph = load_graph("gather.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {4, 5, 6}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{4, 1, 6}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Float32);
 }
 
 // Cast: same dims, dtype follows `to` (7 -> int64).
@@ -829,12 +829,12 @@ TEST_F(EngineShapes, CastChangesDtype)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
 
-    const engine::Graph graph = load_graph("cast.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::Graph graph = load_graph("cast.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 // Resize (nearest): [1,3,8,8] with scales [1,1,2,2] -> [1,3,16,16].
@@ -849,9 +849,9 @@ TEST_F(EngineShapes, ResizeScalesNearest)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 16, 16}));
 
-    const engine::Graph graph = load_graph("resize.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    const nert::Graph graph = load_graph("resize.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims,
         (std::vector<int64_t>{1, 3, 16, 16}));
@@ -870,9 +870,9 @@ TEST_F(EngineShapes, SliceExtractsWindow)
     put_sub(body, 11, encode_value_info("x", 1, {1, 10}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 5}));
 
-    const engine::Graph graph = load_graph("slice.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 10}}});
+    const nert::Graph graph = load_graph("slice.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 10}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 5}));
 }
@@ -896,10 +896,10 @@ TEST_F(EngineShapes, SliceNegativeSteps)
     put_sub(body, 11, encode_value_info("x", 1, {3, 10, 6}));
     put_sub(body, 12, encode_value_info("y", 1, {3, 3, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("slice_neg.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {3, 10, 6}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {3, 10, 6}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{3, 3, 3}));
 }
@@ -921,10 +921,10 @@ TEST_F(EngineShapes, SliceNegativeStepEmpty)
     put_sub(body, 11, encode_value_info("x", 1, {2, 5}));
     put_sub(body, 12, encode_value_info("s", 7, {2}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("slice_neg_empty.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 5}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 5}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 0}));
 }
@@ -942,15 +942,15 @@ TEST_F(EngineShapes, TopKSelectsK)
     put_sub(body, 11, encode_value_info("x", 1, {2, 5}));
     put_sub(body, 12, encode_value_info("v", 1, {2, 2}));
 
-    const engine::Graph graph = load_graph("topk.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 5}}});
+    const nert::Graph graph = load_graph("topk.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 5}}});
     ASSERT_EQ(shapes.tensors.count("v"), 1U);
     EXPECT_EQ(shapes.tensors.at("v").dims, (std::vector<int64_t>{2, 2}));
-    EXPECT_EQ(shapes.tensors.at("v").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("v").dtype, nert::DataType::Float32);
     ASSERT_EQ(shapes.tensors.count("i"), 1U);
     EXPECT_EQ(shapes.tensors.at("i").dims, (std::vector<int64_t>{2, 2}));
-    EXPECT_EQ(shapes.tensors.at("i").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("i").dtype, nert::DataType::Int64);
 }
 
 // ConstantOfShape: the shape input's values become the int64 output dims.
@@ -968,12 +968,12 @@ TEST_F(EngineShapes, ConstantOfShapeUsesShapeInput)
     put_sub(body, 11, encode_value_info("x", 1, {2}));
     put_sub(body, 12, encode_value_info("o", 1, {3}));
 
-    const engine::Graph graph = load_graph("cos.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2}}});
+    const nert::Graph graph = load_graph("cos.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2}}});
     ASSERT_EQ(shapes.tensors.count("o"), 1U);
     EXPECT_EQ(shapes.tensors.at("o").dims, (std::vector<int64_t>{3}));
-    EXPECT_EQ(shapes.tensors.at("o").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("o").dtype, nert::DataType::Int64);
 }
 
 // Equal: broadcast inputs, bool output.
@@ -986,13 +986,13 @@ TEST_F(EngineShapes, EqualBroadcastsToBool)
     put_sub(body, 11, encode_value_info("y", 1, {3, 1, 1}));
     put_sub(body, 12, encode_value_info("e", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph = load_graph("equal.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
+    const nert::Graph graph = load_graph("equal.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 4, 4}}, {"y", {3, 1, 1}}});
     ASSERT_EQ(shapes.tensors.count("e"), 1U);
     EXPECT_EQ(shapes.tensors.at("e").dims,
         (std::vector<int64_t>{1, 3, 4, 4}));
-    EXPECT_EQ(shapes.tensors.at("e").dtype, engine::DataType::Bool);
+    EXPECT_EQ(shapes.tensors.at("e").dtype, nert::DataType::Bool);
 }
 
 // Where: three-way broadcast of condition, X, and Y.
@@ -1007,12 +1007,12 @@ TEST_F(EngineShapes, WhereBroadcastsThree)
     put_sub(body, 11, encode_value_info("y", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("z", 1, {2, 3, 4}));
 
-    const engine::Graph graph = load_graph("where.onnx", encode_model(body));
-    const engine::InferredShapes shapes = engine::InferShapes(graph,
+    const nert::Graph graph = load_graph("where.onnx", encode_model(body));
+    const nert::InferredShapes shapes = nert::InferShapes(graph,
         {{"c", {1, 3, 1}}, {"x", {2, 1, 4}}, {"y", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("z"), 1U);
     EXPECT_EQ(shapes.tensors.at("z").dims, (std::vector<int64_t>{2, 3, 4}));
-    EXPECT_EQ(shapes.tensors.at("z").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("z").dtype, nert::DataType::Float32);
 }
 
 // Shape: a rank-3 input yields int64 [3].
@@ -1024,12 +1024,12 @@ TEST_F(EngineShapes, ShapeOutputsRank)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("r", 1, {3}));
 
-    const engine::Graph graph = load_graph("shape.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::Graph graph = load_graph("shape.onnx", encode_model(body));
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("r"), 1U);
     EXPECT_EQ(shapes.tensors.at("r").dims, (std::vector<int64_t>{3}));
-    EXPECT_EQ(shapes.tensors.at("r").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("r").dtype, nert::DataType::Int64);
 }
 
 // ReduceMax: keepdims=0 drops axis 1 ([2,3,4] -> [2,4]).
@@ -1043,10 +1043,10 @@ TEST_F(EngineShapes, ReduceMaxDropsAxes)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("rmax.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4}));
 }
@@ -1061,10 +1061,10 @@ TEST_F(EngineShapes, FlattenAxis)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 5}));
     put_sub(body, 12, encode_value_info("y", 1, {6, 20}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("flatten.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 5}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 5}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{6, 20}));
 }
@@ -1087,13 +1087,13 @@ TEST_F(EngineShapes, ConcatInt64PropagatesDtype)
     put_sub(body, 11, encode_value_info("a", 1, {1, 2, 4}));
     put_sub(body, 11, encode_value_info("b", 1, {1, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 5, 4}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("concat_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes = engine::InferShapes(graph,
+    const nert::InferredShapes shapes = nert::InferShapes(graph,
         {{"a", {1, 2, 4}}, {"b", {1, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 5, 4}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, SplitInt64PropagatesDtype)
@@ -1105,15 +1105,15 @@ TEST_F(EngineShapes, SplitInt64PropagatesDtype)
                       {encode_attribute_int("axis", 1)}));
     put_sub(body, 11, encode_value_info("x", 1, {1, 6}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("split_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 6}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 6}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 3}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
     ASSERT_EQ(shapes.tensors.count("z"), 1U);
-    EXPECT_EQ(shapes.tensors.at("z").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("z").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, UnsqueezeInt64PropagatesDtype)
@@ -1126,14 +1126,14 @@ TEST_F(EngineShapes, UnsqueezeInt64PropagatesDtype)
                       {}));
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 1}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("unsqueeze_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims,
         (std::vector<int64_t>{1, 2, 3, 1}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, ExpandInt64PropagatesDtype)
@@ -1146,13 +1146,13 @@ TEST_F(EngineShapes, ExpandInt64PropagatesDtype)
                       {}));
     put_sub(body, 11, encode_value_info("x", 1, {3, 1}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("expand_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {3, 1}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {3, 1}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 4}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, TransposeInt64PropagatesDtype)
@@ -1164,13 +1164,13 @@ TEST_F(EngineShapes, TransposeInt64PropagatesDtype)
                       {encode_attribute_ints("perm", {0, 2, 1})}));
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4, 3}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("transpose_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4, 3}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, SliceInt64PropagatesDtype)
@@ -1185,13 +1185,13 @@ TEST_F(EngineShapes, SliceInt64PropagatesDtype)
                       {"a", "starts", "ends", "axes"}, {"y"}, {}));
     put_sub(body, 11, encode_value_info("x", 1, {1, 10}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 5}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("slice_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 10}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 10}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 5}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, GatherInt64PropagatesDtype)
@@ -1204,13 +1204,13 @@ TEST_F(EngineShapes, GatherInt64PropagatesDtype)
                       {encode_attribute_int("axis", 1)}));
     put_sub(body, 11, encode_value_info("x", 1, {4, 5, 6}));
     put_sub(body, 12, encode_value_info("y", 1, {4, 1, 6}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("gather_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {4, 5, 6}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {4, 5, 6}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{4, 1, 6}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, GatherElementsInt64PropagatesDtype)
@@ -1223,13 +1223,13 @@ TEST_F(EngineShapes, GatherElementsInt64PropagatesDtype)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 11, encode_value_info("idx", 1, {2, 1, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("gelem_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}, {"idx", {2, 1, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}, {"idx", {2, 1, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 1, 4}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, ResizeInt64PropagatesDtype)
@@ -1243,14 +1243,14 @@ TEST_F(EngineShapes, ResizeInt64PropagatesDtype)
                       {encode_attribute_string("mode", "nearest")}));
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 16, 16}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("resize_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims,
         (std::vector<int64_t>{1, 3, 16, 16}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineShapes, FlattenInt64PropagatesDtype)
@@ -1262,13 +1262,13 @@ TEST_F(EngineShapes, FlattenInt64PropagatesDtype)
                       {encode_attribute_int("axis", 1)}));
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 12}));
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("flatten_int64.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 12}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
 // --- Fixture cases ---------------------------------------------------------
@@ -1284,16 +1284,16 @@ TEST_F(EngineShapes, FixtureInferShapes)
         << "fixture path from " << fixture_env_name()
         << " does not exist: " << fixture;
 
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
 
     const std::string conv_out = first_output_of(graph, "Conv");
     ASSERT_FALSE(conv_out.empty());
     ASSERT_EQ(shapes.tensors.count(conv_out), 1U);
     EXPECT_EQ(shapes.tensors.at(conv_out).dims,
         (std::vector<int64_t>{1, 64, 112, 112}));
-    EXPECT_EQ(shapes.tensors.at(conv_out).dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at(conv_out).dtype, nert::DataType::Float32);
 
     ASSERT_EQ(graph.outputs.size(), 1U);
     const std::string out_name = graph.outputs.front().first;
@@ -1302,7 +1302,7 @@ TEST_F(EngineShapes, FixtureInferShapes)
         (std::vector<int64_t>{1, 1000}));
 
     // Every tensor a node consumes or produces must resolve.
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         for (const std::string& input : node.inputs) {
             if (!input.empty()) {
                 EXPECT_EQ(shapes.tensors.count(input), 1U) << input;
@@ -1327,10 +1327,10 @@ TEST_F(EngineShapes, FixtureBatchTwoPinnedReshapeRejected)
         << "fixture path from " << fixture_env_name()
         << " does not exist: " << fixture;
 
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
 
     std::string reshape_name;
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         if (node.op_type == "Reshape") {
             reshape_name = node.name;
             break;
@@ -1340,8 +1340,8 @@ TEST_F(EngineShapes, FixtureBatchTwoPinnedReshapeRejected)
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"input", {2, 3, 224, 224}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"input", {2, 3, 224, 224}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty())
@@ -1361,16 +1361,16 @@ TEST_F(EngineShapes, PerShapeSeamWithoutReload)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("per_shape_seam.onnx", encode_model(body));
 
-    const engine::InferredShapes first =
-        engine::InferShapes(graph, {{"x", {1, 3, 4, 4}}});
+    const nert::InferredShapes first =
+        nert::InferShapes(graph, {{"x", {1, 3, 4, 4}}});
     ASSERT_EQ(first.tensors.count("y"), 1U);
     EXPECT_EQ(first.tensors.at("y").dims, (std::vector<int64_t>{1, 3, 4, 4}));
 
-    const engine::InferredShapes second =
-        engine::InferShapes(graph, {{"x", {4, 3, 4, 4}}});
+    const nert::InferredShapes second =
+        nert::InferShapes(graph, {{"x", {4, 3, 4, 4}}});
     ASSERT_EQ(second.tensors.count("y"), 1U);
     EXPECT_EQ(second.tensors.at("y").dims, (std::vector<int64_t>{4, 3, 4, 4}));
 }
@@ -1393,12 +1393,12 @@ TEST_F(EngineShapesNegative, ReshapeProductMismatchNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {5, 5}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("reshape_mismatch.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "reshape product mismatch did not throw";
@@ -1419,12 +1419,12 @@ TEST_F(EngineShapesNegative, ReduceMeanAxisOutOfRangeNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("mean_oor.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "out-of-range axis did not throw";
@@ -1445,12 +1445,12 @@ TEST_F(EngineShapesNegative, ReduceMeanDuplicateAxisNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("mean_dup.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "duplicate axis did not throw";
@@ -1469,12 +1469,12 @@ TEST_F(EngineShapesNegative, InputAbsentFromInputDimsNamesInput)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("missing_dims.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "missing input dims did not throw";
@@ -1487,20 +1487,20 @@ TEST_F(EngineShapesNegative, InputAbsentFromInputDimsNamesInput)
 
 TEST_F(EngineShapesNegative, UnresolvedNodeInputNamesNode)
 {
-    engine::Graph graph;
-    engine::Node node;
+    nert::Graph graph;
+    nert::Node node;
     node.name = "relu_bad";
     node.op_type = "Relu";
     node.inputs = {"missing"};
     node.outputs = {"y"};
     graph.nodes.push_back(node);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 2}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 2}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 2}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 2}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "unresolved node input did not throw";
@@ -1514,20 +1514,20 @@ TEST_F(EngineShapesNegative, UnresolvedNodeInputNamesNode)
 
 TEST_F(EngineShapesNegative, UnknownOpNamesNodeAndOpType)
 {
-    engine::Graph graph;
-    engine::Node node;
+    nert::Graph graph;
+    nert::Node node;
     node.name = "weird_node";
     node.op_type = "Fancy";
     node.inputs = {"x"};
     node.outputs = {"y"};
     graph.nodes.push_back(node);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 2}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 2}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 2}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 2}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "unknown op did not throw";
@@ -1542,29 +1542,29 @@ TEST_F(EngineShapesNegative, UnknownOpNamesNodeAndOpType)
 
 TEST_F(EngineShapesNegative, TopKNonConstantKNamesNode)
 {
-    engine::Graph graph;
-    engine::Node add;
+    nert::Graph graph;
+    nert::Node add;
     add.name = "k_src";
     add.op_type = "Add";
     add.inputs = {"x", "x"};
     add.outputs = {"k"};
-    engine::Node topk;
+    nert::Node topk;
     topk.name = "tk_bad";
     topk.op_type = "TopK";
     topk.inputs = {"x", "k"};
     topk.outputs = {"v", "i"};
-    topk.attributes.push_back(engine::Attribute("axis", int64_t(-1)));
-    topk.attributes.push_back(engine::Attribute("largest", int64_t(1)));
-    topk.attributes.push_back(engine::Attribute("sorted", int64_t(1)));
+    topk.attributes.push_back(nert::Attribute("axis", int64_t(-1)));
+    topk.attributes.push_back(nert::Attribute("largest", int64_t(1)));
+    topk.attributes.push_back(nert::Attribute("sorted", int64_t(1)));
     graph.nodes.push_back(add);
     graph.nodes.push_back(topk);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 5}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 5}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 5}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 5}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "non-constant TopK K did not throw";
@@ -1578,13 +1578,13 @@ TEST_F(EngineShapesNegative, TopKNonConstantKNamesNode)
 
 TEST_F(EngineShapesNegative, SliceDynamicStartsNamesNode)
 {
-    engine::Graph graph;
-    engine::Node add;
+    nert::Graph graph;
+    nert::Node add;
     add.name = "starts_src";
     add.op_type = "Add";
     add.inputs = {"x", "x"};
     add.outputs = {"starts"};
-    engine::Node slice;
+    nert::Node slice;
     slice.name = "sl_bad";
     slice.op_type = "Slice";
     slice.inputs = {"x", "starts", "ends"};
@@ -1592,17 +1592,17 @@ TEST_F(EngineShapesNegative, SliceDynamicStartsNamesNode)
     graph.nodes.push_back(add);
     graph.nodes.push_back(slice);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 10}}});
-    engine::Initializer ends;
-    ends.dtype = engine::DataType::Int64;
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 10}}});
+    nert::Initializer ends;
+    ends.dtype = nert::DataType::Int64;
     ends.dims = {1};
     ends.values = std::vector<int64_t>{5};
     graph.initializers["ends"] = ends;
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 10}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 10}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "dynamic Slice starts did not throw";
@@ -1623,12 +1623,12 @@ TEST_F(EngineShapesNegative, SplitSizeMismatchNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {1, 5}));
     put_sub(body, 12, encode_value_info("a", 1, {1, 2}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("split_mismatch.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 5}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 5}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "split size mismatch did not throw";
@@ -1647,12 +1647,12 @@ TEST_F(EngineShapesNegative, ResizeMissingInputsNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 16, 16}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("resize_noscale.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "scaleless Resize did not throw";
@@ -1673,12 +1673,12 @@ TEST_F(EngineShapesNegative, ResizeSizesInputNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 16, 16}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("resize_sizes.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "rank-3 sizes Resize did not throw";
@@ -1699,12 +1699,12 @@ TEST_F(EngineShapesNegative, ConcatRankMismatchNamesNode)
     put_sub(body, 11, encode_value_info("b", 1, {1, 3, 5}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 5, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("concat_mismatch.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"a", {1, 2, 4}}, {"b", {1, 3, 5}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"a", {1, 2, 4}}, {"b", {1, 3, 5}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "concat mismatch did not throw";
@@ -1719,28 +1719,28 @@ TEST_F(EngineShapesNegative, ConcatRankMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, ModDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node mod;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node mod;
     mod.name = "mod_bad";
     mod.op_type = "Mod";
     mod.inputs = {"a", "x"};
     mod.outputs = {"z"};
-    mod.attributes.push_back(engine::Attribute("fmod", int64_t(0)));
+    mod.attributes.push_back(nert::Attribute("fmod", int64_t(0)));
     graph.nodes.push_back(cast);
     graph.nodes.push_back(mod);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Mod dtype mismatch did not throw";
@@ -1755,28 +1755,28 @@ TEST_F(EngineShapesNegative, ModDtypeMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, ConcatDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node concat;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node concat;
     concat.name = "cc_bad";
     concat.op_type = "Concat";
     concat.inputs = {"a", "x"};
     concat.outputs = {"z"};
-    concat.attributes.push_back(engine::Attribute("axis", int64_t(1)));
+    concat.attributes.push_back(nert::Attribute("axis", int64_t(1)));
     graph.nodes.push_back(cast);
     graph.nodes.push_back(concat);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 2}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 2}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 2}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 2}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Concat dtype mismatch did not throw";
@@ -1821,10 +1821,10 @@ TEST_F(EngineShapes, EvaluatorSliceEndsChains)
     put_sub(body, 12, encode_value_info("y", 1, {1, 2}));
     put_sub(body, 12, encode_value_info("y2", 1, {1, 2}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("eval_slice_ends.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 10}}, {"feat", {2, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 10}}, {"feat", {2, 4}}});
     // Gather picks dim 1 (4); (4 + 1) / 2 truncates to 2; the ends are
     // 2 * 1 and 2 * 2.
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
@@ -1832,9 +1832,9 @@ TEST_F(EngineShapes, EvaluatorSliceEndsChains)
     ASSERT_EQ(shapes.tensors.count("y2"), 1U);
     EXPECT_EQ(shapes.tensors.at("y2").dims, (std::vector<int64_t>{1, 2}));
     ASSERT_EQ(shapes.tensors.count("e"), 1U);
-    EXPECT_EQ(shapes.tensors.at("e").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("e").dtype, nert::DataType::Int64);
     ASSERT_EQ(shapes.tensors.count("e2"), 1U);
-    EXPECT_EQ(shapes.tensors.at("e2").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("e2").dtype, nert::DataType::Int64);
 }
 
 // Static evaluator: Slice of a shape vector with a negative step. Shape(x)
@@ -1857,10 +1857,10 @@ TEST_F(EngineShapes, EvaluatorSliceNegativeStep)
     put_sub(body, 11, encode_value_info("w", 1, {15}));
     put_sub(body, 12, encode_value_info("y", 1, {5, 3}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("eval_slice_neg.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4, 5}}, {"w", {15}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4, 5}}, {"w", {15}}});
     ASSERT_EQ(shapes.tensors.count("tgt"), 1U);
     EXPECT_EQ(shapes.tensors.at("tgt").dims, (std::vector<int64_t>{2}));
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
@@ -1897,16 +1897,16 @@ TEST_F(EngineShapes, EvaluatorWhereExpandShape)
     put_sub(body, 11, encode_value_info("x", 1, {80}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 1, 80}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("eval_where_expand.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {80}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {80}}});
     ASSERT_EQ(shapes.tensors.count("w"), 1U);
     EXPECT_EQ(shapes.tensors.at("w").dims, (std::vector<int64_t>{3}));
-    EXPECT_EQ(shapes.tensors.at("w").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("w").dtype, nert::DataType::Int64);
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 1, 80}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Float32);
 }
 
 // Add/Sub/Mul/Div over int64 inputs propagate int64 (the Mod precedent:
@@ -1914,39 +1914,39 @@ TEST_F(EngineShapes, EvaluatorWhereExpandShape)
 
 TEST_F(EngineShapes, Int64ArithmeticPropagatesDtype)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
     graph.nodes.push_back(cast);
     const std::vector<std::pair<std::string, std::string>> ops = {
         {"Add", "ad"}, {"Sub", "su"}, {"Mul", "mu"}, {"Div", "di"}};
     for (const auto& entry : ops) {
-        engine::Node node;
+        nert::Node node;
         node.name = entry.first + "_op";
         node.op_type = entry.first;
         node.inputs = {"a", "k"};
         node.outputs = {entry.second};
         graph.nodes.push_back(node);
     }
-    engine::Initializer k;
-    k.dtype = engine::DataType::Int64;
+    nert::Initializer k;
+    k.dtype = nert::DataType::Int64;
     k.dims = {3};
     k.values = std::vector<int64_t>{10, 20, 30};
     graph.initializers["k"] = k;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     for (const std::string& name : {"ad", "su", "mu", "di"}) {
         ASSERT_EQ(shapes.tensors.count(name), 1U) << name;
         EXPECT_EQ(shapes.tensors.at(name).dims, (std::vector<int64_t>{2, 3}))
             << name;
-        EXPECT_EQ(shapes.tensors.at(name).dtype, engine::DataType::Int64)
+        EXPECT_EQ(shapes.tensors.at(name).dtype, nert::DataType::Int64)
             << name;
     }
 }
@@ -1955,55 +1955,55 @@ TEST_F(EngineShapes, Int64ArithmeticPropagatesDtype)
 
 TEST_F(EngineShapes, WhereInt64PropagatesDtype)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
     graph.nodes.push_back(cast);
-    engine::Node equal;
+    nert::Node equal;
     equal.name = "eq0";
     equal.op_type = "Equal";
     equal.inputs = {"a", "k"};
     equal.outputs = {"e"};
     graph.nodes.push_back(equal);
-    engine::Node where;
+    nert::Node where;
     where.name = "w0";
     where.op_type = "Where";
     where.inputs = {"e", "a", "k"};
     where.outputs = {"z"};
     graph.nodes.push_back(where);
-    engine::Initializer k;
-    k.dtype = engine::DataType::Int64;
+    nert::Initializer k;
+    k.dtype = nert::DataType::Int64;
     k.dims = {3};
     k.values = std::vector<int64_t>{1, 2, 3};
     graph.initializers["k"] = k;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3}}});
     ASSERT_EQ(shapes.tensors.count("e"), 1U);
-    EXPECT_EQ(shapes.tensors.at("e").dtype, engine::DataType::Bool);
+    EXPECT_EQ(shapes.tensors.at("e").dtype, nert::DataType::Bool);
     ASSERT_EQ(shapes.tensors.count("z"), 1U);
     EXPECT_EQ(shapes.tensors.at("z").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("z").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("z").dtype, nert::DataType::Int64);
 }
 
 // Add with disagreeing input dtypes names the node.
 
 TEST_F(EngineShapesNegative, AddDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node add;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node add;
     add.name = "add_bad";
     add.op_type = "Add";
     add.inputs = {"a", "x"};
@@ -2011,12 +2011,12 @@ TEST_F(EngineShapesNegative, AddDtypeMismatchNamesNode)
     graph.nodes.push_back(cast);
     graph.nodes.push_back(add);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Add dtype mismatch did not throw";
@@ -2030,14 +2030,14 @@ TEST_F(EngineShapesNegative, AddDtypeMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, SubDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node sub;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node sub;
     sub.name = "sub_bad";
     sub.op_type = "Sub";
     sub.inputs = {"a", "x"};
@@ -2045,12 +2045,12 @@ TEST_F(EngineShapesNegative, SubDtypeMismatchNamesNode)
     graph.nodes.push_back(cast);
     graph.nodes.push_back(sub);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Sub dtype mismatch did not throw";
@@ -2064,14 +2064,14 @@ TEST_F(EngineShapesNegative, SubDtypeMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, MulDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node mul;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node mul;
     mul.name = "mul_bad";
     mul.op_type = "Mul";
     mul.inputs = {"a", "x"};
@@ -2079,12 +2079,12 @@ TEST_F(EngineShapesNegative, MulDtypeMismatchNamesNode)
     graph.nodes.push_back(cast);
     graph.nodes.push_back(mul);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Mul dtype mismatch did not throw";
@@ -2098,14 +2098,14 @@ TEST_F(EngineShapesNegative, MulDtypeMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, DivDtypeMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node cast;
+    nert::Graph graph;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node div;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node div;
     div.name = "div_bad";
     div.op_type = "Div";
     div.inputs = {"a", "x"};
@@ -2113,12 +2113,12 @@ TEST_F(EngineShapesNegative, DivDtypeMismatchNamesNode)
     graph.nodes.push_back(cast);
     graph.nodes.push_back(div);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Div dtype mismatch did not throw";
@@ -2132,19 +2132,19 @@ TEST_F(EngineShapesNegative, DivDtypeMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, WhereXYMismatchNamesNode)
 {
-    engine::Graph graph;
-    engine::Node equal;
+    nert::Graph graph;
+    nert::Node equal;
     equal.name = "eq0";
     equal.op_type = "Equal";
     equal.inputs = {"x", "x"};
     equal.outputs = {"c"};
-    engine::Node cast;
+    nert::Node cast;
     cast.name = "c0";
     cast.op_type = "Cast";
     cast.inputs = {"x"};
     cast.outputs = {"a"};
-    cast.attributes.push_back(engine::Attribute("to", int64_t(7)));
-    engine::Node where;
+    cast.attributes.push_back(nert::Attribute("to", int64_t(7)));
+    nert::Node where;
     where.name = "where_bad";
     where.op_type = "Where";
     where.inputs = {"c", "x", "a"};
@@ -2153,12 +2153,12 @@ TEST_F(EngineShapesNegative, WhereXYMismatchNamesNode)
     graph.nodes.push_back(cast);
     graph.nodes.push_back(where);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Where X/Y mismatch did not throw";
@@ -2173,18 +2173,18 @@ TEST_F(EngineShapesNegative, WhereXYMismatchNamesNode)
 
 TEST_F(EngineShapesNegative, SliceSigmoidRootedStartsNamesNode)
 {
-    engine::Graph graph;
-    engine::Node sigmoid;
+    nert::Graph graph;
+    nert::Node sigmoid;
     sigmoid.name = "sig_src";
     sigmoid.op_type = "Sigmoid";
     sigmoid.inputs = {"x"};
     sigmoid.outputs = {"s"};
-    engine::Node add;
+    nert::Node add;
     add.name = "starts_src";
     add.op_type = "Add";
     add.inputs = {"s", "f"};
     add.outputs = {"starts"};
-    engine::Node slice;
+    nert::Node slice;
     slice.name = "sl_wl";
     slice.op_type = "Slice";
     slice.inputs = {"x", "starts", "ends"};
@@ -2193,22 +2193,22 @@ TEST_F(EngineShapesNegative, SliceSigmoidRootedStartsNamesNode)
     graph.nodes.push_back(add);
     graph.nodes.push_back(slice);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 10}}});
-    engine::Initializer ends;
-    ends.dtype = engine::DataType::Int64;
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 10}}});
+    nert::Initializer ends;
+    ends.dtype = nert::DataType::Int64;
     ends.dims = {1};
     ends.values = std::vector<int64_t>{5};
     graph.initializers["ends"] = ends;
-    engine::Initializer f;
-    f.dtype = engine::DataType::Float32;
+    nert::Initializer f;
+    f.dtype = nert::DataType::Float32;
     f.dims = {1};
     f.values = std::vector<float>{0.5F};
     graph.initializers["f"] = f;
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 10}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 10}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Sigmoid-rooted Slice starts did not throw";
@@ -2229,12 +2229,12 @@ TEST_F(EngineShapesNegative, ExpandIncompatibleDimsNamesNode)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("expand_bad.onnx", encode_model(body));
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2, 3}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2, 3}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "Expand incompatible dims did not throw";
@@ -2251,7 +2251,7 @@ TEST_F(EngineShapes, ConcatOfShapePiecesFeedsReshape)
 {
     auto node = [](std::string name, std::string op,
                     std::vector<std::string> in, std::vector<std::string> out) {
-        engine::Node n;
+        nert::Node n;
         n.name = std::move(name);
         n.op_type = std::move(op);
         n.inputs = std::move(in);
@@ -2259,16 +2259,16 @@ TEST_F(EngineShapes, ConcatOfShapePiecesFeedsReshape)
         return n;
     };
     auto int64_init = [](std::vector<int64_t> dims, std::vector<int64_t> values) {
-        engine::Initializer init;
-        init.dtype = engine::DataType::Int64;
+        nert::Initializer init;
+        init.dtype = nert::DataType::Int64;
         init.dims = std::move(dims);
         init.values = std::move(values);
         return init;
     };
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {-1, 6, 4}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {-1, 6, 4}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["zero"] = int64_init({}, {0});
     graph.initializers["axes0"] = int64_init({1}, {0});
     graph.initializers["minus_one"] = int64_init({1}, {-1});
@@ -2281,9 +2281,9 @@ TEST_F(EngineShapes, ConcatOfShapePiecesFeedsReshape)
     graph.nodes.back().attributes.emplace_back("axis", int64_t{0});
     graph.nodes.push_back(node("reshape", "Reshape", {"x", "target"}, {"y"}));
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 6, 4}}});
-    EXPECT_EQ(shapes.tensors.at("target").dtype, engine::DataType::Int64);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 6, 4}}});
+    EXPECT_EQ(shapes.tensors.at("target").dtype, nert::DataType::Int64);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 6, 4}));
 }
 
@@ -2291,30 +2291,30 @@ TEST_F(EngineShapes, ConcatOfShapePiecesFeedsReshape)
 // absent, so the sizes input decides the output shape.
 TEST_F(EngineShapes, ResizeEmptyScalesWithSizes)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 1, 2, 2}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
-    engine::Initializer empty;
-    empty.dtype = engine::DataType::Float32;
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 1, 2, 2}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
+    nert::Initializer empty;
+    empty.dtype = nert::DataType::Float32;
     empty.dims = {0};
     empty.values = std::vector<float>{};
     graph.initializers["roi"] = empty;
     graph.initializers["scales"] = empty;
-    engine::Initializer sizes;
-    sizes.dtype = engine::DataType::Int64;
+    nert::Initializer sizes;
+    sizes.dtype = nert::DataType::Int64;
     sizes.dims = {4};
     sizes.values = std::vector<int64_t>{1, 1, 4, 4};
     graph.initializers["sizes"] = sizes;
-    engine::Node resize;
+    nert::Node resize;
     resize.name = "resize_sizes";
     resize.op_type = "Resize";
     resize.inputs = {"x", "roi", "scales", "sizes"};
     resize.outputs = {"y"};
     graph.nodes.push_back(resize);
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 1, 2, 2}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 1, 2, 2}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 1, 4, 4}));
 }
 
@@ -2324,7 +2324,7 @@ TEST_F(EngineShapes, GreaterWhereFeedsReshape)
 {
     auto node = [](std::string name, std::string op,
                     std::vector<std::string> in, std::vector<std::string> out) {
-        engine::Node n;
+        nert::Node n;
         n.name = std::move(name);
         n.op_type = std::move(op);
         n.inputs = std::move(in);
@@ -2332,16 +2332,16 @@ TEST_F(EngineShapes, GreaterWhereFeedsReshape)
         return n;
     };
     auto int64_init = [](std::vector<int64_t> dims, std::vector<int64_t> values) {
-        engine::Initializer init;
-        init.dtype = engine::DataType::Int64;
+        nert::Initializer init;
+        init.dtype = nert::DataType::Int64;
         init.dims = std::move(dims);
         init.values = std::move(values);
         return init;
     };
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {-1, 6, 4}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {-1, 6, 4}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["threshold"] = int64_init({3}, {1, 1, 100});
     graph.initializers["flat"] = int64_init({3}, {-1, 6, 4});
     graph.initializers["keep"] = int64_init({3}, {3, 8, 1});
@@ -2351,19 +2351,19 @@ TEST_F(EngineShapes, GreaterWhereFeedsReshape)
     graph.nodes.push_back(node("where", "Where", {"big2", "flat", "keep"}, {"target"}));
     graph.nodes.push_back(node("reshape", "Reshape", {"x", "target"}, {"y"}));
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 6, 4}}});
-    EXPECT_EQ(shapes.tensors.at("big").dtype, engine::DataType::Bool);
-    EXPECT_EQ(shapes.tensors.at("target").dtype, engine::DataType::Int64);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 6, 4}}});
+    EXPECT_EQ(shapes.tensors.at("big").dtype, nert::DataType::Bool);
+    EXPECT_EQ(shapes.tensors.at("target").dtype, nert::DataType::Int64);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{8, 6, 1}));
 }
 
 namespace {
 
-engine::Node make_graph_node(std::string name, std::string op,
+nert::Node make_graph_node(std::string name, std::string op,
     std::vector<std::string> in, std::vector<std::string> out)
 {
-    engine::Node n;
+    nert::Node n;
     n.name = std::move(name);
     n.op_type = std::move(op);
     n.inputs = std::move(in);
@@ -2371,33 +2371,33 @@ engine::Node make_graph_node(std::string name, std::string op,
     return n;
 }
 
-engine::Initializer make_int64_init(
+nert::Initializer make_int64_init(
     std::vector<int64_t> dims, std::vector<int64_t> values)
 {
-    engine::Initializer init;
-    init.dtype = engine::DataType::Int64;
+    nert::Initializer init;
+    init.dtype = nert::DataType::Int64;
     init.dims = std::move(dims);
     init.values = std::move(values);
     return init;
 }
 
-engine::Initializer make_float_init(
+nert::Initializer make_float_init(
     std::vector<int64_t> dims, std::vector<float> values)
 {
-    engine::Initializer init;
-    init.dtype = engine::DataType::Float32;
+    nert::Initializer init;
+    init.dtype = nert::DataType::Float32;
     init.dims = std::move(dims);
     init.values = std::move(values);
     return init;
 }
 
 // Graph with a Range whose limit is Cast(FLOAT)(Cast(INT64)(Gather(Shape(x), 2) / 16)).
-engine::Graph make_float_range_graph(float start, float delta)
+nert::Graph make_float_range_graph(float start, float delta)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 3, 64, 64}}});
-    graph.outputs.push_back({"r", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 3, 64, 64}}});
+    graph.outputs.push_back({"r", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["two"] = make_int64_init({}, {2});
     graph.initializers["sixteen"] = make_int64_init({}, {16});
     graph.initializers["start"] = make_float_init({}, {start});
@@ -2419,29 +2419,29 @@ engine::Graph make_float_range_graph(float start, float delta)
 // The float Range chain of the DETR exporters resolves at load: 64 / 16 = 4.
 TEST_F(EngineShapes, FloatRangeChainFromShapeResolves)
 {
-    const engine::Graph graph = make_float_range_graph(0.0f, 1.0f);
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 64, 64}}});
-    EXPECT_EQ(shapes.tensors.at("r").dtype, engine::DataType::Float32);
+    const nert::Graph graph = make_float_range_graph(0.0f, 1.0f);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 64, 64}}});
+    EXPECT_EQ(shapes.tensors.at("r").dtype, nert::DataType::Float32);
     EXPECT_EQ(shapes.tensors.at("r").dims, (std::vector<int64_t>{4}));
 }
 
 // A Range with start above limit is empty: the rule reports length 0.
 TEST_F(EngineShapes, RangeStartAboveLimitIsEmpty)
 {
-    const engine::Graph graph = make_float_range_graph(9.0f, 1.0f);
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 64, 64}}});
+    const nert::Graph graph = make_float_range_graph(9.0f, 1.0f);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 64, 64}}});
     EXPECT_EQ(shapes.tensors.at("r").dims, (std::vector<int64_t>{0}));
 }
 
 // Pads assembled from a Shape-derived int64 chain resolve statically.
 TEST_F(EngineShapes, PadWithShapeDerivedPads)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 3, 8}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 3, 8}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["zeros"] = make_int64_init({2}, {0, 0});
     graph.initializers["one"] = make_int64_init({1}, {1});
     graph.initializers["idx"] = make_int64_init({1}, {1});
@@ -2452,62 +2452,62 @@ TEST_F(EngineShapes, PadWithShapeDerivedPads)
     graph.nodes.back().attributes.emplace_back("axis", int64_t{0});
     graph.nodes.push_back(make_graph_node("pad", "Pad", {"x", "pads", ""}, {"y"}));
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {1, 3, 8}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {1, 3, 8}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 3, 12}));
 }
 
 // An int64 ReduceSum over a Shape vector is evaluated statically and feeds Reshape.
 TEST_F(EngineShapes, Int64ReduceSumFeedsReshape)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3, 4}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3, 4}}});
     graph.inputs.push_back(
-        {"z", engine::TensorInfo{engine::DataType::Float32, {3, 3}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"z", nert::TensorInfo{nert::DataType::Float32, {3, 3}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["axes0"] = make_int64_init({1}, {0});
     graph.nodes.push_back(make_graph_node("shape", "Shape", {"x"}, {"s"}));
     graph.nodes.push_back(make_graph_node("sum", "ReduceSum", {"s", "axes0"}, {"total"}));
     graph.nodes.push_back(make_graph_node("reshape", "Reshape", {"z", "total"}, {"y"}));
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}, {"z", {3, 3}}});
-    EXPECT_EQ(shapes.tensors.at("total").dtype, engine::DataType::Int64);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}, {"z", {3, 3}}});
+    EXPECT_EQ(shapes.tensors.at("total").dtype, nert::DataType::Int64);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{9}));
 }
 
 // ReduceSum on float data with keepdims 0 drops the reduced axis.
 TEST_F(EngineShapes, ReduceSumFloatKeepdimsOff)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3, 4}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3, 4}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["axes"] = make_int64_init({1}, {-1});
     graph.nodes.push_back(make_graph_node("sum", "ReduceSum", {"x", "axes"}, {"y"}));
     graph.nodes.back().attributes.emplace_back("keepdims", int64_t{0});
 
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 3, 4}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 3, 4}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
 }
 
 // Pad mode "wrap" is rejected, naming the node and the op.
 TEST_F(EngineShapesNegative, PadWrapModeNamesNode)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 4}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 4}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["pads"] = make_int64_init({4}, {0, 1, 0, 1});
     graph.nodes.push_back(make_graph_node("pad_wrap", "Pad", {"x", "pads"}, {"y"}));
     graph.nodes.back().attributes.emplace_back("mode", std::string("wrap"));
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 4}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 4}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "wrap mode did not throw";
@@ -2518,10 +2518,10 @@ TEST_F(EngineShapesNegative, PadWrapModeNamesNode)
 // A Range with an unresolvable (graph-input-derived) float limit fails at load.
 TEST_F(EngineShapesNegative, RangeFloatLimitNotConstantNamesNode)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {}}});
-    graph.outputs.push_back({"r", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {}}});
+    graph.outputs.push_back({"r", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.initializers["start"] = make_float_init({}, {0.0f});
     graph.initializers["delta"] = make_float_init({}, {1.0f});
     graph.nodes.push_back(
@@ -2529,8 +2529,8 @@ TEST_F(EngineShapesNegative, RangeFloatLimitNotConstantNamesNode)
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "unresolved limit did not throw";
@@ -2540,16 +2540,16 @@ TEST_F(EngineShapesNegative, RangeFloatLimitNotConstantNamesNode)
 // GridSample output is [N,C,Ho,Wo] from X and the grid.
 TEST_F(EngineShapes, GridSampleOutputShape)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3, 8, 8}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3, 8, 8}}});
     graph.inputs.push_back(
-        {"g", engine::TensorInfo{engine::DataType::Float32, {2, 5, 7, 2}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"g", nert::TensorInfo{nert::DataType::Float32, {2, 5, 7, 2}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node("gs", "GridSample", {"x", "g"}, {"y"}));
     graph.nodes.back().attributes.emplace_back("mode", std::string("bilinear"));
 
-    const engine::InferredShapes shapes = engine::InferShapes(
+    const nert::InferredShapes shapes = nert::InferShapes(
         graph, {{"x", {2, 3, 8, 8}}, {"g", {2, 5, 7, 2}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 5, 7}));
 }
@@ -2557,42 +2557,42 @@ TEST_F(EngineShapes, GridSampleOutputShape)
 // InstanceNormalization keeps the input's [N,C,H,W] shape.
 TEST_F(EngineShapes, InstanceNormalizationKeepsInputShape)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2, 3, 5, 7}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2, 3, 5, 7}}});
     graph.inputs.push_back(
-        {"s", engine::TensorInfo{engine::DataType::Float32, {3}}});
+        {"s", nert::TensorInfo{nert::DataType::Float32, {3}}});
     graph.inputs.push_back(
-        {"b", engine::TensorInfo{engine::DataType::Float32, {3}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"b", nert::TensorInfo{nert::DataType::Float32, {3}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node(
         "in0", "InstanceNormalization", {"x", "s", "b"}, {"y"}));
 
-    const engine::InferredShapes shapes = engine::InferShapes(
+    const nert::InferredShapes shapes = nert::InferShapes(
         graph, {{"x", {2, 3, 5, 7}}, {"s", {3}}, {"b", {3}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 5, 7}));
-    EXPECT_EQ(shapes.tensors.at("y").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Float32);
 }
 
 // InstanceNormalization with a scale of length != C fails, naming the node.
 TEST_F(EngineShapesNegative, InstanceNormalizationScaleLengthNamesNode)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 3, 4, 4}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 3, 4, 4}}});
     graph.inputs.push_back(
-        {"s", engine::TensorInfo{engine::DataType::Float32, {4}}});
+        {"s", nert::TensorInfo{nert::DataType::Float32, {4}}});
     graph.inputs.push_back(
-        {"b", engine::TensorInfo{engine::DataType::Float32, {3}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"b", nert::TensorInfo{nert::DataType::Float32, {3}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node(
         "in_bad", "InstanceNormalization", {"x", "s", "b"}, {"y"}));
 
     std::string message;
     try {
-        engine::InferShapes(
+        nert::InferShapes(
             graph, {{"x", {1, 3, 4, 4}}, {"s", {4}}, {"b", {3}}});
-    } catch (const engine::ModelLoadException& e) {
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "scale length mismatch did not throw";
@@ -2604,17 +2604,17 @@ TEST_F(EngineShapesNegative, InstanceNormalizationScaleLengthNamesNode)
 // Einsum "bchw,bnc->bnhw" derives its dims from the label sizes.
 TEST_F(EngineShapes, EinsumOutputShape)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"a", engine::TensorInfo{engine::DataType::Float32, {2, 3, 4, 5}}});
+        {"a", nert::TensorInfo{nert::DataType::Float32, {2, 3, 4, 5}}});
     graph.inputs.push_back(
-        {"b", engine::TensorInfo{engine::DataType::Float32, {2, 6, 3}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"b", nert::TensorInfo{nert::DataType::Float32, {2, 6, 3}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node("es", "Einsum", {"a", "b"}, {"y"}));
     graph.nodes.back().attributes.emplace_back(
         "equation", std::string("bchw,bnc->bnhw"));
 
-    const engine::InferredShapes shapes = engine::InferShapes(
+    const nert::InferredShapes shapes = nert::InferShapes(
         graph, {{"a", {2, 3, 4, 5}}, {"b", {2, 6, 3}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 6, 4, 5}));
 }
@@ -2622,19 +2622,19 @@ TEST_F(EngineShapes, EinsumOutputShape)
 // An Einsum label bound to two different sizes fails, naming the node.
 TEST_F(EngineShapesNegative, EinsumLabelSizeMismatchNamesNode)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"a", engine::TensorInfo{engine::DataType::Float32, {2, 3}}});
+        {"a", nert::TensorInfo{nert::DataType::Float32, {2, 3}}});
     graph.inputs.push_back(
-        {"b", engine::TensorInfo{engine::DataType::Float32, {4, 5}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"b", nert::TensorInfo{nert::DataType::Float32, {4, 5}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node("es_bad", "Einsum", {"a", "b"}, {"y"}));
     graph.nodes.back().attributes.emplace_back("equation", std::string("ij,jk->ik"));
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"a", {2, 3}}, {"b", {4, 5}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"a", {2, 3}}, {"b", {4, 5}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "label mismatch did not throw";
@@ -2645,19 +2645,19 @@ TEST_F(EngineShapesNegative, EinsumLabelSizeMismatchNamesNode)
 // GridSample mode "bicubic" fails shape inference, naming the node and op.
 TEST_F(EngineShapesNegative, GridSampleBicubicNamesNode)
 {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {1, 1, 4, 4}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {1, 1, 4, 4}}});
     graph.inputs.push_back(
-        {"g", engine::TensorInfo{engine::DataType::Float32, {1, 2, 2, 2}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {}}});
+        {"g", nert::TensorInfo{nert::DataType::Float32, {1, 2, 2, 2}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
     graph.nodes.push_back(make_graph_node("gs_bad", "GridSample", {"x", "g"}, {"y"}));
     graph.nodes.back().attributes.emplace_back("mode", std::string("bicubic"));
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {1, 1, 4, 4}}, {"g", {1, 2, 2, 2}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {1, 1, 4, 4}}, {"g", {1, 2, 2, 2}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "bicubic did not throw";
@@ -2691,16 +2691,16 @@ TEST_F(EngineShapes, ConstantOfShapeDtypeFollowsValue)
     put_sub(body, 11, encode_value_info("x", 1, {2}));
     put_sub(body, 12, encode_value_info("y", 1, {2}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("cos_dtypes.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2}}});
     EXPECT_EQ(shapes.tensors.at("of").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("of").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("of").dtype, nert::DataType::Float32);
     EXPECT_EQ(shapes.tensors.at("ob").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("ob").dtype, engine::DataType::Bool);
+    EXPECT_EQ(shapes.tensors.at("ob").dtype, nert::DataType::Bool);
     EXPECT_EQ(shapes.tensors.at("od").dims, (std::vector<int64_t>{2, 3}));
-    EXPECT_EQ(shapes.tensors.at("od").dtype, engine::DataType::Float32);
+    EXPECT_EQ(shapes.tensors.at("od").dtype, nert::DataType::Float32);
 }
 
 // Static evaluator: a FLOAT-valued ConstantOfShape (2.0 over [2]) cast to
@@ -2724,11 +2724,11 @@ TEST_F(EngineShapes, EvalFloatConstantOfShapeCastDrivesReshape)
     put_sub(body, 11, encode_value_info("x", 1, {4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 2}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("eval_cos_float.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {4}}});
-    EXPECT_EQ(shapes.tensors.at("cf").dtype, engine::DataType::Float32);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {4}}});
+    EXPECT_EQ(shapes.tensors.at("cf").dtype, nert::DataType::Float32);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 2}));
 }
 
@@ -2751,11 +2751,11 @@ TEST_F(EngineShapes, EvalBoolConstantOfShapeDrivesWhere)
     put_sub(body, 11, encode_value_info("x", 1, {12}));
     put_sub(body, 12, encode_value_info("y", 1, {3, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("eval_cos_bool.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {12}}});
-    EXPECT_EQ(shapes.tensors.at("cb").dtype, engine::DataType::Bool);
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {12}}});
+    EXPECT_EQ(shapes.tensors.at("cb").dtype, nert::DataType::Bool);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{3, 4}));
 }
 
@@ -2776,12 +2776,12 @@ TEST_F(EngineShapes, CastToBoolDrivesWhere)
     put_sub(body, 11, encode_value_info("x", 1, {18}));
     put_sub(body, 12, encode_value_info("y", 1, {3, 6}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("cast_bool_where.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {18}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {18}}});
     EXPECT_EQ(shapes.tensors.at("fb").dims, (std::vector<int64_t>{2}));
-    EXPECT_EQ(shapes.tensors.at("fb").dtype, engine::DataType::Bool);
+    EXPECT_EQ(shapes.tensors.at("fb").dtype, nert::DataType::Bool);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{3, 6}));
 }
 
@@ -2804,16 +2804,16 @@ TEST_F(EngineShapes, EmptySliceConcatsIntoReshapeAndPlansZeroBytes)
     put_sub(body, 11, encode_value_info("x", 1, {2, 6}));
     put_sub(body, 12, encode_value_info("y", 1, {3, 4}));
 
-    const engine::Graph graph =
+    const nert::Graph graph =
         load_graph("empty_slice.onnx", encode_model(body));
-    const engine::InferredShapes shapes =
-        engine::InferShapes(graph, {{"x", {2, 6}}});
+    const nert::InferredShapes shapes =
+        nert::InferShapes(graph, {{"x", {2, 6}}});
     EXPECT_EQ(shapes.tensors.at("e").dims, (std::vector<int64_t>{0}));
-    EXPECT_EQ(shapes.tensors.at("e").dtype, engine::DataType::Int64);
+    EXPECT_EQ(shapes.tensors.at("e").dtype, nert::DataType::Int64);
     EXPECT_EQ(shapes.tensors.at("c").dims, (std::vector<int64_t>{2}));
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{3, 4}));
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.count("e"), 1U);
     EXPECT_EQ(plan.buffers.at("e").size, 0);
     ASSERT_EQ(plan.buffers.count("s"), 1U);
@@ -2826,19 +2826,19 @@ TEST_F(EngineShapes, EmptySliceConcatsIntoReshapeAndPlansZeroBytes)
 
 TEST_F(EngineShapesNegative, ConstantOfShapeStringValueNamesNode)
 {
-    engine::Graph graph;
-    engine::Initializer cshape;
-    cshape.dtype = engine::DataType::Int64;
+    nert::Graph graph;
+    nert::Initializer cshape;
+    cshape.dtype = nert::DataType::Int64;
     cshape.dims = {1};
     cshape.values = std::vector<int64_t>{3};
     graph.initializers["cshape"] = cshape;
-    engine::Node cos;
+    nert::Node cos;
     cos.name = "cos_str";
     cos.op_type = "ConstantOfShape";
     cos.inputs = {"cshape"};
     cos.outputs = {"o"};
-    cos.attributes.push_back(engine::Attribute("value", std::string("one")));
-    engine::Node relu;
+    cos.attributes.push_back(nert::Attribute("value", std::string("one")));
+    nert::Node relu;
     relu.name = "relu0";
     relu.op_type = "Relu";
     relu.inputs = {"x"};
@@ -2846,12 +2846,12 @@ TEST_F(EngineShapesNegative, ConstantOfShapeStringValueNamesNode)
     graph.nodes.push_back(cos);
     graph.nodes.push_back(relu);
     graph.inputs.push_back(
-        {"x", engine::TensorInfo{engine::DataType::Float32, {2}}});
+        {"x", nert::TensorInfo{nert::DataType::Float32, {2}}});
 
     std::string message;
     try {
-        engine::InferShapes(graph, {{"x", {2}}});
-    } catch (const engine::ModelLoadException& e) {
+        nert::InferShapes(graph, {{"x", {2}}});
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "string ConstantOfShape value did not throw";

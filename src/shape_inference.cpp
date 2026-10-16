@@ -10,7 +10,7 @@
 // evaluator below over Shape, Gather, Add, Sub, Mul, Div, Equal, Where, and
 // ConstantOfShape.
 
-#include "engine/Shapes.hpp"
+#include "nert/shapes.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace {
 
 std::string quote(const std::string& s) { return "'" + s + "'"; }
@@ -2783,4 +2783,4 @@ InferredShapes InferShapes(const Graph& graph, const ShapeMap& input_dims)
     return result;
 }
 
-} // namespace engine
+} // namespace nert

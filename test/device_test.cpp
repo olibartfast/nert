@@ -5,7 +5,7 @@
 // release (including null), memcpy transfers in both directions with a
 // zero-byte no-op, and an empty kernel table that resolves unknown ops to null.
 
-#include "engine/Device.hpp"
+#include "nert/device.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -17,17 +17,17 @@
 namespace {
 
 // Two calls return the same object, and the device names itself "cpu".
-TEST(EngineDevice, ReferenceIsStableAndNamedCpu) {
-    const engine::Device& first = engine::CpuDevice();
-    const engine::Device& second = engine::CpuDevice();
+TEST(NertDevice, ReferenceIsStableAndNamedCpu) {
+    const nert::Device& first = nert::CpuDevice();
+    const nert::Device& second = nert::CpuDevice();
     EXPECT_EQ(&first, &second);
     EXPECT_STREQ(first.name(), "cpu");
 }
 
 // allocate(128) returns non-null storage aligned to a 64-byte boundary, and the
 // block is writable then readable.
-TEST(EngineDevice, AllocateIsAlignedAndUsable) {
-    engine::Allocator& allocator = const_cast<engine::Device&>(engine::CpuDevice()).allocator();
+TEST(NertDevice, AllocateIsAlignedAndUsable) {
+    nert::Allocator& allocator = const_cast<nert::Device&>(nert::CpuDevice()).allocator();
     void* block = allocator.allocate(128);
     ASSERT_NE(block, nullptr);
     EXPECT_EQ(reinterpret_cast<std::uintptr_t>(block) % 64, 0U);
@@ -43,17 +43,17 @@ TEST(EngineDevice, AllocateIsAlignedAndUsable) {
 }
 
 // A non-positive request is refused with null rather than a partial buffer.
-TEST(EngineDevice, NonPositiveAllocationReturnsNull) {
-    engine::Allocator& allocator = const_cast<engine::Device&>(engine::CpuDevice()).allocator();
+TEST(NertDevice, NonPositiveAllocationReturnsNull) {
+    nert::Allocator& allocator = const_cast<nert::Device&>(nert::CpuDevice()).allocator();
     EXPECT_EQ(allocator.allocate(0), nullptr);
     EXPECT_EQ(allocator.allocate(-1), nullptr);
 }
 
 // host_to_device then device_to_host round-trips an arbitrary byte pattern.
-TEST(EngineDevice, TransferRoundTripsBytePattern) {
-    engine::Device& device = const_cast<engine::Device&>(engine::CpuDevice());
-    engine::Allocator& allocator = device.allocator();
-    engine::Transfer& transfer = device.transfer();
+TEST(NertDevice, TransferRoundTripsBytePattern) {
+    nert::Device& device = const_cast<nert::Device&>(nert::CpuDevice());
+    nert::Allocator& allocator = device.allocator();
+    nert::Transfer& transfer = device.transfer();
 
     const std::vector<std::uint8_t> source = {0x00, 0x01, 0x7F, 0x80, 0xFE, 0xFF, 0x5A, 0xA5};
     void* device_block = allocator.allocate(static_cast<int64_t>(source.size()));
@@ -69,15 +69,15 @@ TEST(EngineDevice, TransferRoundTripsBytePattern) {
 }
 
 // A zero-byte copy is a no-op even when both pointers are null.
-TEST(EngineDevice, ZeroByteTransferIsNoOp) {
-    engine::Transfer& transfer = const_cast<engine::Device&>(engine::CpuDevice()).transfer();
+TEST(NertDevice, ZeroByteTransferIsNoOp) {
+    nert::Transfer& transfer = const_cast<nert::Device&>(nert::CpuDevice()).transfer();
     transfer.host_to_device(nullptr, nullptr, 0);
     transfer.device_to_host(nullptr, nullptr, 0);
 }
 
 // The kernel table owns no known op in this layer: an unknown op resolves null.
-TEST(EngineDevice, UnknownOpResolvesNull) {
-    const engine::KernelTable& kernels = engine::CpuDevice().kernels();
+TEST(NertDevice, UnknownOpResolvesNull) {
+    const nert::KernelTable& kernels = nert::CpuDevice().kernels();
     EXPECT_EQ(kernels.find("NoSuchOp"), nullptr);
 }
 

@@ -28,7 +28,7 @@ RAFT and open-vocabulary models are in progress.
 
 ## Layout
 
-- `include/engine/`: public headers (namespace `engine`): graph IR, model
+- `include/nert/`: public headers (namespace `nert`): graph IR, model
   loader, shape inference, memory plan, device seam, and executor.
 - `src/`: implementation of the loader, shape inference, memory planner,
   device, and executor.
@@ -90,7 +90,7 @@ target_link_libraries(app PRIVATE nert::nert)
 ```
 
 ```cpp
-#include "engine/Engine.hpp"
+#include "nert/engine.hpp"
 ```
 
 For now, the old target name `neuriplo_engine` remains available as an alias of

@@ -6,14 +6,14 @@
 // indices throw; duplicate indices apply in order. Data is float32, int64,
 // or bool; all three tensors share the data dtype for data/updates.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -120,4 +120,4 @@ void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const st
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

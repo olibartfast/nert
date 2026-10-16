@@ -1,6 +1,6 @@
 // Load-time constant folding: hand-built graphs, folded with the CPU device.
 
-#include "engine/ConstantFolding.hpp"
+#include "nert/constant_folding.hpp"
 
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -9,9 +9,9 @@
 
 namespace {
 
-engine::Node MakeNode(const std::string& name, const std::string& op_type, std::vector<std::string> inputs,
-                      std::vector<std::string> outputs) {
-    engine::Node node;
+nert::Node MakeNode(const std::string& name, const std::string& op_type, std::vector<std::string> inputs,
+                    std::vector<std::string> outputs) {
+    nert::Node node;
     node.name = name;
     node.op_type = op_type;
     node.inputs = std::move(inputs);
@@ -19,9 +19,9 @@ engine::Node MakeNode(const std::string& name, const std::string& op_type, std::
     return node;
 }
 
-engine::Initializer FloatInit(std::vector<int64_t> dims, std::vector<float> values) {
-    engine::Initializer init;
-    init.dtype = engine::DataType::Float32;
+nert::Initializer FloatInit(std::vector<int64_t> dims, std::vector<float> values) {
+    nert::Initializer init;
+    init.dtype = nert::DataType::Float32;
     init.dims = std::move(dims);
     init.values = std::move(values);
     return init;
@@ -31,16 +31,16 @@ engine::Initializer FloatInit(std::vector<int64_t> dims, std::vector<float> valu
 
 // A constant-only chain folds into initializers; the node fed by a graph
 // input stays.
-TEST(EngineConstantFolding, FoldsConstantChainKeepsLiveNodes) {
-    engine::Graph graph;
-    graph.inputs.push_back({"x", engine::TensorInfo{engine::DataType::Float32, {2}}});
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {2}}});
+TEST(NertConstantFolding, FoldsConstantChainKeepsLiveNodes) {
+    nert::Graph graph;
+    graph.inputs.push_back({"x", nert::TensorInfo{nert::DataType::Float32, {2}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {2}}});
     graph.initializers["a"] = FloatInit({2}, {1.5F, -0.5F});
     graph.nodes.push_back(MakeNode("floor0", "Floor", {"a"}, {"b"}));
     graph.nodes.push_back(MakeNode("neg_scale", "Mul", {"b", "b"}, {"c"}));
     graph.nodes.push_back(MakeNode("add0", "Add", {"x", "c"}, {"y"}));
 
-    EXPECT_EQ(engine::FoldConstants(graph, engine::CpuDevice()), 2);
+    EXPECT_EQ(nert::FoldConstants(graph, nert::CpuDevice()), 2);
 
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().name, "add0");
@@ -51,22 +51,22 @@ TEST(EngineConstantFolding, FoldsConstantChainKeepsLiveNodes) {
 
 // A constant-only node that produces a graph output is left for the executor,
 // which reads graph outputs from the arena.
-TEST(EngineConstantFolding, LeavesGraphOutputProducers) {
-    engine::Graph graph;
-    graph.outputs.push_back({"y", engine::TensorInfo{engine::DataType::Float32, {1}}});
+TEST(NertConstantFolding, LeavesGraphOutputProducers) {
+    nert::Graph graph;
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {1}}});
     graph.initializers["a"] = FloatInit({1}, {2.5F});
     graph.nodes.push_back(MakeNode("floor0", "Floor", {"a"}, {"y"}));
 
-    EXPECT_EQ(engine::FoldConstants(graph, engine::CpuDevice()), 0);
+    EXPECT_EQ(nert::FoldConstants(graph, nert::CpuDevice()), 0);
     EXPECT_EQ(graph.nodes.size(), 1U);
 }
 
 // A node with no CPU kernel is left in place for the loader's usual rejection.
-TEST(EngineConstantFolding, LeavesUnknownOps) {
-    engine::Graph graph;
+TEST(NertConstantFolding, LeavesUnknownOps) {
+    nert::Graph graph;
     graph.initializers["a"] = FloatInit({1}, {2.5F});
     graph.nodes.push_back(MakeNode("mystery", "NotAnOp", {"a"}, {"b"}));
 
-    EXPECT_EQ(engine::FoldConstants(graph, engine::CpuDevice()), 0);
+    EXPECT_EQ(nert::FoldConstants(graph, nert::CpuDevice()), 0);
     EXPECT_EQ(graph.nodes.size(), 1U);
 }

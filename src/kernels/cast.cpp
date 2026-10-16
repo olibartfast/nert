@@ -3,13 +3,13 @@
 // ONNX element-type codes: 1 = FLOAT, 7 = INT64, 9 = BOOL. Float-to-integer
 // truncates toward zero; any nonzero value converts to boolean true.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -139,4 +139,4 @@ void Cast(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

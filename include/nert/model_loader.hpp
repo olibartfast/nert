@@ -9,9 +9,9 @@
 
 #include <string>
 
-#include "engine/Graph.hpp"
+#include "nert/graph.hpp"
 
-namespace engine {
+namespace nert {
 
 // Parse the ONNX model at `path` into the Graph IR.
 //
@@ -21,4 +21,4 @@ namespace engine {
 // offending node and op type in the message.
 Graph LoadGraphFromFile(const std::string& path);
 
-} // namespace engine
+} // namespace nert

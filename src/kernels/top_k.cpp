@@ -4,7 +4,7 @@
 // dim (a larger K throws, matching the shape rule). Only largest=1 and
 // sorted=1 are accepted here. Values are float32, indices are int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -142,4 +142,4 @@ void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -1,13 +1,13 @@
 // Elu: elementwise x >= 0 ? x : alpha * (exp(x) - 1), `alpha` defaults to 1.0.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -67,4 +67,4 @@ void Elu(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -22,11 +22,11 @@
 #include <variant>
 #include <vector>
 
-#include "WireReader.hpp" // private src-local reader
+#include "wire_reader.hpp" // private src-local reader
 
-#include "engine/ModelLoader.hpp"
+#include "nert/model_loader.hpp"
 
-namespace engine {
+namespace nert {
 namespace {
 
 using Field = WireReader::Field;
@@ -1902,9 +1902,9 @@ void verify_topological_order(const Graph& graph)
 } // namespace
 } // namespace (top-level anonymous)
 
-} // namespace engine
+} // namespace nert
 
-namespace engine {
+namespace nert {
 
 Graph LoadGraphFromFile(const std::string& path)
 {
@@ -1915,4 +1915,4 @@ Graph LoadGraphFromFile(const std::string& path)
     return graph;
 }
 
-} // namespace engine
+} // namespace nert

@@ -5,14 +5,14 @@
 // rank-2 input has a single spatial element per (n, c). Statistics accumulate
 // in double; data is float32.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -103,4 +103,4 @@ void InstanceNormalization(const Node& node, const std::vector<TensorView>& inpu
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

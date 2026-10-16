@@ -6,14 +6,14 @@
 // max only sees the in-bounds window. Only the primary output is written.
 // Naive, float32, single-threaded.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -239,4 +239,4 @@ void MaxPool(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

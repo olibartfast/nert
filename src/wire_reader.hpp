@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace engine {
+namespace nert {
 
 // Protobuf wire types (format constants, not message-specific tags).
 enum class WireType : uint8_t {
@@ -68,4 +68,4 @@ private:
     const uint8_t* end_; // one past the last valid byte
 };
 
-} // namespace engine
+} // namespace nert

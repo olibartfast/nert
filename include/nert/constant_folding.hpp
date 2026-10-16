@@ -9,10 +9,10 @@
 //
 // Must not include anything from the backend abstraction layer.
 
-#include "engine/Device.hpp"
-#include "engine/Graph.hpp"
+#include "nert/device.hpp"
+#include "nert/graph.hpp"
 
-namespace engine {
+namespace nert {
 
 // Folds, in execution order, every node whose inputs are all initializers and
 // whose outputs are float32, int64, or bool tensors that are not graph outputs. A node
@@ -21,4 +21,4 @@ namespace engine {
 // nodes.
 int FoldConstants(Graph& graph, const Device& device);
 
-} // namespace engine
+} // namespace nert

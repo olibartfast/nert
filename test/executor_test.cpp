@@ -13,11 +13,10 @@
 // carries any. The fixture is resolved via NERT_FIXTURE; a missing
 // fixture FAILS, never skips.
 
-#include "engine/Executor.hpp"
-
-#include "engine/Device.hpp"
-#include "engine/Graph.hpp"
-#include "engine/ModelLoader.hpp"
+#include "nert/device.hpp"
+#include "nert/executor.hpp"
+#include "nert/graph.hpp"
+#include "nert/model_loader.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -158,7 +157,7 @@ std::string write_model_bytes(const std::string& name, const std::string& bytes)
 // A hermetic Add(x, c) -> y followed by Relu(y) -> z, with the float constant
 // `c` supplied as an initializer. The graph input x has one element per entry
 // in `constant`; the graph output is z.
-engine::Graph load_hermetic_add_relu(const std::vector<float>& constant) {
+nert::Graph load_hermetic_add_relu(const std::vector<float>& constant) {
     const int64_t width = static_cast<int64_t>(constant.size());
     std::string body;
     put_sub(body, 5, encode_initializer("c", {width}, constant));
@@ -166,14 +165,14 @@ engine::Graph load_hermetic_add_relu(const std::vector<float>& constant) {
     put_sub(body, 1, encode_node("relu0", "Relu", {"y"}, {"z"}));
     put_sub(body, 11, encode_value_info("x", 1, {width}));
     put_sub(body, 12, encode_value_info("z", 1, {width}));
-    return engine::LoadGraphFromFile(write_model_bytes("add_relu.onnx", encode_model(body)));
+    return nert::LoadGraphFromFile(write_model_bytes("add_relu.onnx", encode_model(body)));
 }
 
 // Add(x, c) -> t0 followed by `relu_links` Relu links, output tN. Under
 // inclusive liveness the links touch at their boundaries, so only alternating
 // tensors can reuse; a chain of at least three links makes the 64-byte-aligned
 // arena strictly smaller than the sum of the intermediate buffers.
-engine::Graph load_hermetic_chain(const std::vector<float>& constant, int relu_links) {
+nert::Graph load_hermetic_chain(const std::vector<float>& constant, int relu_links) {
     const int64_t width = static_cast<int64_t>(constant.size());
     std::string body;
     put_sub(body, 5, encode_initializer("c", {width}, constant));
@@ -186,13 +185,13 @@ engine::Graph load_hermetic_chain(const std::vector<float>& constant, int relu_l
     }
     put_sub(body, 11, encode_value_info("x", 1, {width}));
     put_sub(body, 12, encode_value_info(previous, 1, {width}));
-    return engine::LoadGraphFromFile(write_model_bytes("chain.onnx", encode_model(body)));
+    return nert::LoadGraphFromFile(write_model_bytes("chain.onnx", encode_model(body)));
 }
 
 // A hermetic typed-I/O graph: int64 graph input `ids` [4] and int64 constant
 // `c`; Add(ids, c) -> `sum` (int64 graph output) and Greater(ids, c) -> `flag`
 // (bool graph output).
-engine::Graph load_hermetic_int64_bool(const std::vector<int64_t>& constant) {
+nert::Graph load_hermetic_int64_bool(const std::vector<int64_t>& constant) {
     const int64_t width = static_cast<int64_t>(constant.size());
     std::string body;
     put_sub(body, 5, encode_int64_initializer("c", {width}, constant));
@@ -201,12 +200,12 @@ engine::Graph load_hermetic_int64_bool(const std::vector<int64_t>& constant) {
     put_sub(body, 11, encode_value_info("ids", 7 /*INT64*/, {width}));
     put_sub(body, 12, encode_value_info("sum", 7 /*INT64*/, {width}));
     put_sub(body, 12, encode_value_info("flag", 9 /*BOOL*/, {width}));
-    return engine::LoadGraphFromFile(write_model_bytes("int64_bool.onnx", encode_model(body)));
+    return nert::LoadGraphFromFile(write_model_bytes("int64_bool.onnx", encode_model(body)));
 }
 
-engine::HostTensor int64_host_tensor(const std::vector<int64_t>& values) {
-    engine::HostTensor host;
-    host.dtype = engine::DataType::Int64;
+nert::HostTensor int64_host_tensor(const std::vector<int64_t>& values) {
+    nert::HostTensor host;
+    host.dtype = nert::DataType::Int64;
     host.dims = {static_cast<int64_t>(values.size())};
     host.bytes.resize(values.size() * sizeof(int64_t));
     std::memcpy(host.bytes.data(), values.data(), host.bytes.size());
@@ -222,10 +221,10 @@ std::string fixture_path() {
 
 // The process-lifetime CPU device as a mutable reference, so the non-const
 // allocator and transfer accessors are usable.
-engine::Device& cpu_device() { return const_cast<engine::Device&>(engine::CpuDevice()); }
+nert::Device& cpu_device() { return const_cast<nert::Device&>(nert::CpuDevice()); }
 
 // Counts allocator calls while delegating to the CPU allocator.
-class CountingAllocator final : public engine::Allocator {
+class CountingAllocator final : public nert::Allocator {
   public:
     int allocate_calls = 0;
     int release_calls = 0;
@@ -243,27 +242,27 @@ class CountingAllocator final : public engine::Allocator {
 
 // A kernel table with no entries, used to prove the executor reports a missing
 // kernel rather than silently doing nothing.
-class EmptyKernelTable final : public engine::KernelTable {
+class EmptyKernelTable final : public nert::KernelTable {
   public:
-    engine::KernelFn find(const std::string&) const override { return nullptr; }
+    nert::KernelFn find(const std::string&) const override { return nullptr; }
 };
 
 // A test device whose allocator counts calls. When `empty_kernels` is true it
 // advertises no kernels; otherwise it forwards to the CPU device's table.
-class TestDevice final : public engine::Device {
+class TestDevice final : public nert::Device {
   public:
-    explicit TestDevice(bool empty_kernels) : kernels_(empty_kernels ? nullptr : &engine::CpuDevice().kernels()) {}
+    explicit TestDevice(bool empty_kernels) : kernels_(empty_kernels ? nullptr : &nert::CpuDevice().kernels()) {}
 
     const char* name() const override { return "test-cpu"; }
-    engine::Allocator& allocator() override { return allocator_; }
-    engine::Transfer& transfer() override { return cpu_device().transfer(); }
-    const engine::KernelTable& kernels() const override { return kernels_ != nullptr ? *kernels_ : empty_table_; }
+    nert::Allocator& allocator() override { return allocator_; }
+    nert::Transfer& transfer() override { return cpu_device().transfer(); }
+    const nert::KernelTable& kernels() const override { return kernels_ != nullptr ? *kernels_ : empty_table_; }
 
     const CountingAllocator& counting() const { return allocator_; }
 
   private:
     CountingAllocator allocator_;
-    const engine::KernelTable* kernels_;
+    const nert::KernelTable* kernels_;
     EmptyKernelTable empty_table_;
 };
 
@@ -272,27 +271,27 @@ class TestDevice final : public engine::Device {
 // ===========================================================================
 // EngineExecutor.* — positive cases
 // ===========================================================================
-TEST(EngineExecutor, HermeticAddReluMatchesHandComputed) {
-    const engine::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
-    engine::Model model(graph, {{"x", {2}}}, engine::CpuDevice());
+TEST(NertExecutor, HermeticAddReluMatchesHandComputed) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    nert::Model model(graph, {{"x", {2}}}, nert::CpuDevice());
 
-    const engine::InferenceResult result = model.Run({{"x", {1.0F, -2.0F}}});
+    const nert::InferenceResult result = model.Run({{"x", {1.0F, -2.0F}}});
     ASSERT_EQ(result.outputs.count("z"), 1U);
     EXPECT_EQ(result.outputs.at("z"), (std::vector<float>{0.5F, 0.0F}));
 }
 
-TEST(EngineExecutor, ArenaAllocatedOnceAndReused) {
+TEST(NertExecutor, ArenaAllocatedOnceAndReused) {
     // A three-link chain under inclusive liveness: only alternating tensors can
     // share, so the 64-byte-aligned arena stays strictly smaller than the sum of
     // the intermediate buffers and the reuse proof is not swamped by alignment.
     const std::vector<float> constant(16, 0.0F);
-    const engine::Graph graph = load_hermetic_chain(constant, 2);
+    const nert::Graph graph = load_hermetic_chain(constant, 2);
     TestDevice device(false);
     {
-        engine::Model model(graph, {{"x", {16}}}, device);
+        nert::Model model(graph, {{"x", {16}}}, device);
         const std::vector<float> input(16, 1.0F);
-        const engine::InferenceResult first = model.Run({{"x", input}});
-        const engine::InferenceResult second = model.Run({{"x", input}});
+        const nert::InferenceResult first = model.Run({{"x", input}});
+        const nert::InferenceResult second = model.Run({{"x", input}});
         EXPECT_EQ(first.outputs.at("t2"), second.outputs.at("t2"));
         EXPECT_EQ(device.counting().allocate_calls, 1);
         EXPECT_EQ(device.counting().release_calls, 0);
@@ -307,69 +306,69 @@ TEST(EngineExecutor, ArenaAllocatedOnceAndReused) {
     EXPECT_EQ(device.counting().release_calls, 1);
 }
 
-TEST(EngineExecutor, TypedRunInt64InputBoolOutput) {
-    const engine::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
-    engine::Model model(graph, {{"ids", {4}}}, engine::CpuDevice());
-    EXPECT_EQ(model.shapes().tensors.at("ids").dtype, engine::DataType::Int64);
+TEST(NertExecutor, TypedRunInt64InputBoolOutput) {
+    const nert::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
+    nert::Model model(graph, {{"ids", {4}}}, nert::CpuDevice());
+    EXPECT_EQ(model.shapes().tensors.at("ids").dtype, nert::DataType::Int64);
 
-    const engine::HostTensorMap result = model.RunTyped({{"ids", int64_host_tensor({1, 2, 3, -7})}});
+    const nert::HostTensorMap result = model.RunTyped({{"ids", int64_host_tensor({1, 2, 3, -7})}});
     ASSERT_EQ(result.size(), 2U);
 
-    const engine::HostTensor& sum = result.at("sum");
-    EXPECT_EQ(sum.dtype, engine::DataType::Int64);
+    const nert::HostTensor& sum = result.at("sum");
+    EXPECT_EQ(sum.dtype, nert::DataType::Int64);
     EXPECT_EQ(sum.dims, (std::vector<int64_t>{4}));
     ASSERT_EQ(sum.bytes.size(), 4U * sizeof(int64_t));
     std::vector<int64_t> sums(4);
     std::memcpy(sums.data(), sum.bytes.data(), sum.bytes.size());
     EXPECT_EQ(sums, (std::vector<int64_t>{3, 4, 5, -5}));
 
-    const engine::HostTensor& flag = result.at("flag");
-    EXPECT_EQ(flag.dtype, engine::DataType::Bool);
+    const nert::HostTensor& flag = result.at("flag");
+    EXPECT_EQ(flag.dtype, nert::DataType::Bool);
     EXPECT_EQ(flag.dims, (std::vector<int64_t>{4}));
     EXPECT_EQ(flag.bytes, (std::vector<uint8_t>{0, 0, 1, 0}));
 
     // A second run reuses the arena and sees the new input.
-    const engine::HostTensorMap again = model.RunTyped({{"ids", int64_host_tensor({5, 0, 2, 9})}});
+    const nert::HostTensorMap again = model.RunTyped({{"ids", int64_host_tensor({5, 0, 2, 9})}});
     EXPECT_EQ(again.at("flag").bytes, (std::vector<uint8_t>{1, 0, 0, 1}));
 }
 
-TEST(EngineExecutor, TypedRunMatchesFloatRun) {
-    const engine::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
-    engine::Model model(graph, {{"x", {2}}}, engine::CpuDevice());
+TEST(NertExecutor, TypedRunMatchesFloatRun) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    nert::Model model(graph, {{"x", {2}}}, nert::CpuDevice());
 
     const std::vector<float> input{1.0F, -2.0F};
-    engine::HostTensor host;
-    host.dtype = engine::DataType::Float32;
+    nert::HostTensor host;
+    host.dtype = nert::DataType::Float32;
     host.dims = {2};
     host.bytes.resize(input.size() * sizeof(float));
     std::memcpy(host.bytes.data(), input.data(), host.bytes.size());
 
-    const engine::HostTensorMap typed = model.RunTyped({{"x", host}});
-    const engine::HostTensor& z = typed.at("z");
-    EXPECT_EQ(z.dtype, engine::DataType::Float32);
+    const nert::HostTensorMap typed = model.RunTyped({{"x", host}});
+    const nert::HostTensor& z = typed.at("z");
+    EXPECT_EQ(z.dtype, nert::DataType::Float32);
     std::vector<float> values(2);
     ASSERT_EQ(z.bytes.size(), values.size() * sizeof(float));
     std::memcpy(values.data(), z.bytes.data(), z.bytes.size());
     EXPECT_EQ(values, model.Run({{"x", input}}).outputs.at("z"));
 }
 
-TEST(EngineExecutor, FixtureResNet18RunsAndIsFinite) {
+TEST(NertExecutor, FixtureResNet18RunsAndIsFinite) {
     const std::string fixture = fixture_path();
     ASSERT_FALSE(fixture.empty()) << "missing fixture: set " << fixture_env_name()
                                   << " to the opset-18 ResNet-18 ONNX model; a missing fixture must fail, never skip";
     ASSERT_TRUE(std::filesystem::exists(fixture)) << "fixture does not exist: " << fixture;
 
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
     ASSERT_FALSE(graph.inputs.empty());
     ASSERT_FALSE(graph.outputs.empty());
     ASSERT_EQ(graph.inputs.front().second.dims, (std::vector<int64_t>{1, 3, 224, 224}));
 
     const std::string input_name = graph.inputs.front().first;
     const std::string output_name = graph.outputs.front().first;
-    engine::Model model(graph, {{input_name, {1, 3, 224, 224}}}, engine::CpuDevice());
+    nert::Model model(graph, {{input_name, {1, 3, 224, 224}}}, nert::CpuDevice());
 
     const std::vector<float> input(static_cast<std::size_t>(1 * 3 * 224 * 224), 0.01F);
-    const engine::InferenceResult result = model.Run({{input_name, input}});
+    const nert::InferenceResult result = model.Run({{input_name, input}});
 
     ASSERT_EQ(result.outputs.count(output_name), 1U);
     const std::vector<float>& output = result.outputs.at(output_name);
@@ -383,62 +382,62 @@ TEST(EngineExecutor, FixtureResNet18RunsAndIsFinite) {
 // EngineExecutorNegative.* — rejections
 // ===========================================================================
 
-TEST(EngineExecutorNegative, MissingInputThrows) {
-    const engine::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
-    engine::Model model(graph, {{"x", {2}}}, engine::CpuDevice());
-    EXPECT_THROW(model.Run({}), engine::InferenceException);
+TEST(NertExecutorNegative, MissingInputThrows) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    nert::Model model(graph, {{"x", {2}}}, nert::CpuDevice());
+    EXPECT_THROW(model.Run({}), nert::InferenceException);
 }
 
-TEST(EngineExecutorNegative, WrongInputSizeThrows) {
-    const engine::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
-    engine::Model model(graph, {{"x", {2}}}, engine::CpuDevice());
-    EXPECT_THROW(model.Run({{"x", {1.0F}}}), engine::InferenceException);
+TEST(NertExecutorNegative, WrongInputSizeThrows) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    nert::Model model(graph, {{"x", {2}}}, nert::CpuDevice());
+    EXPECT_THROW(model.Run({{"x", {1.0F}}}), nert::InferenceException);
 }
 
-TEST(EngineExecutorNegative, OpWithoutKernelThrows) {
-    const engine::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+TEST(NertExecutorNegative, OpWithoutKernelThrows) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
     ASSERT_FALSE(graph.nodes.empty());
     TestDevice device(true); // advertises no kernels
-    engine::Model model(graph, {{"x", {2}}}, device);
+    nert::Model model(graph, {{"x", {2}}}, device);
 
     try {
         model.Run({{"x", {1.0F, -2.0F}}});
         FAIL() << "expected InferenceException for an op with no kernel";
-    } catch (const engine::InferenceException& e) {
+    } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
         EXPECT_NE(message.find(graph.nodes.front().name), std::string::npos) << message;
         EXPECT_NE(message.find(graph.nodes.front().op_type), std::string::npos) << message;
     }
 }
 
-TEST(EngineExecutorNegative, FloatRunRejectsNonFloatGraphInput) {
-    const engine::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
-    engine::Model model(graph, {{"ids", {4}}}, engine::CpuDevice());
+TEST(NertExecutorNegative, FloatRunRejectsNonFloatGraphInput) {
+    const nert::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
+    nert::Model model(graph, {{"ids", {4}}}, nert::CpuDevice());
     try {
         model.Run({{"ids", {1.0F, 2.0F, 3.0F, 4.0F}}});
         FAIL() << "expected InferenceException for a non-float graph input";
-    } catch (const engine::InferenceException& e) {
+    } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
         EXPECT_NE(message.find("ids"), std::string::npos) << message;
         EXPECT_NE(message.find("int64"), std::string::npos) << message;
     }
 }
 
-TEST(EngineExecutorNegative, TypedRunRejectsMistypedOrMissizedInput) {
-    const engine::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
-    engine::Model model(graph, {{"ids", {4}}}, engine::CpuDevice());
+TEST(NertExecutorNegative, TypedRunRejectsMistypedOrMissizedInput) {
+    const nert::Graph graph = load_hermetic_int64_bool({2, 2, 2, 2});
+    nert::Model model(graph, {{"ids", {4}}}, nert::CpuDevice());
 
-    EXPECT_THROW(model.RunTyped({}), engine::InferenceException);
+    EXPECT_THROW(model.RunTyped({}), nert::InferenceException);
 
-    engine::HostTensor wrong_dtype = int64_host_tensor({1, 2, 3, 4});
-    wrong_dtype.dtype = engine::DataType::Float32;
-    EXPECT_THROW(model.RunTyped({{"ids", wrong_dtype}}), engine::InferenceException);
+    nert::HostTensor wrong_dtype = int64_host_tensor({1, 2, 3, 4});
+    wrong_dtype.dtype = nert::DataType::Float32;
+    EXPECT_THROW(model.RunTyped({{"ids", wrong_dtype}}), nert::InferenceException);
 
-    engine::HostTensor short_bytes = int64_host_tensor({1, 2, 3, 4});
+    nert::HostTensor short_bytes = int64_host_tensor({1, 2, 3, 4});
     short_bytes.bytes.resize(3 * sizeof(int64_t));
-    EXPECT_THROW(model.RunTyped({{"ids", short_bytes}}), engine::InferenceException);
+    EXPECT_THROW(model.RunTyped({{"ids", short_bytes}}), nert::InferenceException);
 
-    engine::HostTensor wrong_dims = int64_host_tensor({1, 2, 3, 4});
+    nert::HostTensor wrong_dims = int64_host_tensor({1, 2, 3, 4});
     wrong_dims.dims = {2, 2};
-    EXPECT_THROW(model.RunTyped({{"ids", wrong_dims}}), engine::InferenceException);
+    EXPECT_THROW(model.RunTyped({{"ids", wrong_dims}}), nert::InferenceException);
 }

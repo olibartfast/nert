@@ -3,13 +3,13 @@
 // downward (negative). Data is float32, int64, or bool; the output dtype is
 // fixed by shape inference from the `dtype` attribute or the input dtype.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -84,4 +84,4 @@ void EyeLike(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

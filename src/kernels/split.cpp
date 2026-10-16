@@ -4,14 +4,14 @@
 // dim divides evenly across the outputs. Unequal parts are allowed when the
 // sizes input is present. Data is float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -150,4 +150,4 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

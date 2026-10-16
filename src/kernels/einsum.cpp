@@ -7,7 +7,7 @@
 // selects its diagonal. Ellipsis is rejected. Spaces are ignored. Naive,
 // single-threaded; products and sums accumulate in double.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -208,4 +208,4 @@ void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

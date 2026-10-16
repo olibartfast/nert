@@ -7,14 +7,14 @@
 // the begin clamps to [0, dim - 1] and the end to [-1, dim - 1], exactly as
 // the shape rule does. Data is float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -173,4 +173,4 @@ void Slice(const Node& node, const std::vector<TensorView>& inputs, const std::v
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

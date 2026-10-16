@@ -3,13 +3,13 @@
 // The int64 pads input lists every begin then every end for the padded axes
 // (all axes, or those named by the optional axes input). Negative pads crop.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -197,4 +197,4 @@ void Pad(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

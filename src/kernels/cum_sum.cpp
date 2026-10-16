@@ -4,13 +4,13 @@
 // accumulates from the end. Data is float32 or int64; the output shares the
 // input dtype and shape.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -142,4 +142,4 @@ void CumSum(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

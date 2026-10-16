@@ -4,13 +4,13 @@
 // the input at coordinate modulo the input dim. Data is float32, int64, or
 // bool.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -93,4 +93,4 @@ void Tile(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

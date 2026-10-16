@@ -3,14 +3,14 @@
 // An absent `perm` reverses the axes. A present `perm` must be a permutation
 // of [0, rank). Data is float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -120,4 +120,4 @@ void Transpose(const Node& node, const std::vector<TensorView>& inputs, const st
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

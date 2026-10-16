@@ -8,12 +8,12 @@
 
 | Area | Choice | Boundary |
 | --- | --- | --- |
-| Library | C++17 static library `nert` (alias `nert::nert`, compat alias `neuriplo_engine`) | Do not raise the standard without an explicit decision. Public headers: `include/engine/` (namespace `engine`; rename tracked as [Q-5]). |
+| Library | C++17 static library `nert` (alias `nert::nert`, compat alias `neuriplo_engine`) | Do not raise the standard without an explicit decision. Public headers: `include/nert/` (namespace `nert` since 0.2). All C++ filenames lowercase `snake_case` `.hpp`/`.cpp`. |
 | Build | CMake ≥ 3.16 | `cmake -S . -B build && cmake --build build`. Tests on when top-level (`NERT_BUILD_TESTS`, default ON top-level / OFF when consumed; `BUILD_INFERENCE_ENGINE_TESTS` still honoured for Neuriplo). |
 | Required libraries | C++ standard library only | No new runtime dependency without explicit approval. Tests: GoogleTest. Fixture provisioning: torch + torchvision 0.27.0 (tooling only, never linked). |
 | ONNX | opset 18, ONNX domain only; hand-written protobuf wire reader | Loader targets opset 18. Other opsets convert with `onnx.version_converter` for validation ([Q-1] open: accept natively or require 18 + conversion note). |
 | Compute | float32 compute; int64/bool shape data and graph I/O | Reductions accumulate in double, round once per output ([D-15]). DOUBLE constants/value-info narrow to float32 ([D-5]). BOOL constants/initializers load ([D-10]). |
-| Tests | GoogleTest + CTest, suites `engine_*` | Fixture: opset-18 ResNet-18 via `tools/provision_resnet18.py`, selected by `NERT_FIXTURE`. |
+| Tests | GoogleTest + CTest, suites `nert_*` (renamed from `engine_*` in 0.2) | Fixture: opset-18 ResNet-18 via `tools/provision_resnet18.py`, selected by `NERT_FIXTURE`. |
 | Quality | clang-format (check `scripts/format.sh --check`) | Keep the checked-in script scope; CI pins clang-format 18. |
 
 ## Architecture (binding)
@@ -87,6 +87,7 @@ Decided 2026-10-16 (Phase 4):
   `.github/workflows/ci.yml` via `tools/provision_resnet18.py`). The
   model zoo stays out of CI; parity runs live in Neuriplo
   (`NertInferTest`, `nert_model_zoo_parity_test`).
-- [Q-5] Rename namespace `engine` + include prefix `engine/` to `nert`?
-  Open — Phase 5 (one breaking 0.2 release with the matching adapter
-  change). Owner: maintainer.
+- [Q-5] Decided 2026-10-16 (Phase 5, breaking 0.2.0): namespace `nert`,
+  `include/nert/`, all C++ filenames lowercase `snake_case`. Neuriplo
+  adapter change: includes + namespace (CMake alias `neuriplo_engine`
+  kept).

@@ -1,10 +1,10 @@
-#include "WireReader.hpp"
+#include "wire_reader.hpp"
 
 #include <string>
 
-#include "engine/Graph.hpp" // ModelLoadException
+#include "nert/graph.hpp" // ModelLoadException
 
-namespace engine {
+namespace nert {
 
 namespace {
 
@@ -120,4 +120,4 @@ void WireReader::skip_length_delimited_message(const uint8_t* data,
     }
 }
 
-} // namespace engine
+} // namespace nert

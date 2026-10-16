@@ -5,14 +5,14 @@
 // attribute the loader pinned: an int64, float32, or bool scalar, which also
 // fixes the output dtype. An absent `value` fills float32 zero (opset 18).
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -107,4 +107,4 @@ void ConstantOfShape(const Node& node, const std::vector<TensorView>& inputs, co
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

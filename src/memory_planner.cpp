@@ -16,7 +16,7 @@
 // avoids every already-placed tensor whose live range overlaps its own.
 // arena_size is the smallest 64-byte multiple covering every assignment.
 
-#include "engine/Plan.hpp"
+#include "nert/plan.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace {
 
 constexpr int64_t kAlignment = 64;
@@ -212,4 +212,4 @@ MemoryPlan PlanMemory(const Graph& graph, const InferredShapes& shapes) {
     return plan;
 }
 
-} // namespace engine
+} // namespace nert

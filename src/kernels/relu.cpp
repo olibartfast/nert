@@ -1,13 +1,13 @@
 // Relu: elementwise max(0, x) over the output element count.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -54,4 +54,4 @@ void Relu(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

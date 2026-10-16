@@ -10,7 +10,7 @@
 // Antialiasing and cubic mode are rejected at load. Data is float32, or
 // int64 for nearest.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -255,4 +255,4 @@ void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

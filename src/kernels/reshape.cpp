@@ -5,14 +5,14 @@
 // at the same position unless `allowzero` is set, at most one -1 is inferred
 // from the element count, and the final product must equal the element count.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -131,4 +131,4 @@ void Reshape(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert
