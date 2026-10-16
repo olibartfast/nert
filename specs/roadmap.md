@@ -71,6 +71,13 @@ device chosen once at load. Depends on the vendor-kernel decision (first-party
 vs opt-in cuBLAS/cuDNN baseline) — recorded in Neuriplo, decision needed here
 before any accelerated kernel.
 
+Measurement note (2026-10-16, `specs/2026-10-16-kernel-bench-harness/`,
+branch `feature/bench-playground-layout`): the opt-in `bench/` harness now
+exists — per-kernel CPU-oracle-vs-device harnesses with timings, starting
+with `gemm` on CUDA + OpenCL C/C++ (RTX 3060: exact match, 5/5 seeds). This
+is tooling only: the runtime stays stdlib-only and the device seam is still
+CPU-only. N1 wires the device layer; it does not re-prove the harness.
+
 ## Specification Rule
 
 Non-trivial work gets a dated `specs/YYYY-MM-DD-feature-name/` packet with
