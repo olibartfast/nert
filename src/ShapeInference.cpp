@@ -2327,7 +2327,7 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "Relu" || op == "Sigmoid" || op == "Softmax" || op == "Floor" ||
         op == "Erf" || op == "Sqrt" || op == "Tanh" || op == "Exp" ||
-        op == "Log" || op == "Cos" || op == "Sin" || op == "Clip") {
+        op == "Log" || op == "Cos" || op == "Sin" || op == "Clip" || op == "Elu") {
         return {TensorInfo{DataType::Float32, need(0).dims}};
     }
     if (op == "Abs" || op == "Neg") {
@@ -2473,6 +2473,24 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "GridSample") {
         return {gridsample_shape(node, inputs)};
+    }
+    if (op == "Max" || op == "Min") {
+        if (inputs.empty()) {
+            fail(node, op + " requires at least one input");
+        }
+        const TensorInfo& first = need(0);
+        if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64) {
+            fail(node, op + " inputs must share dtype");
+        }
+        std::vector<int64_t> dims = first.dims;
+        for (size_t i = 1; i < inputs.size(); ++i) {
+            const TensorInfo& info = need(i);
+            if (info.dtype != first.dtype) {
+                fail(node, op + " inputs must share dtype");
+            }
+            dims = broadcast_shape(dims, info.dims, node);
+        }
+        return {TensorInfo{first.dtype, dims}};
     }
     if (op == "Einsum") {
         return {einsum_shape(node, inputs)};
