@@ -58,5 +58,28 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 6 | B3 ScatterND | `../nert-w-b3` / `wip/nert-b3` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: Tier-5 11/11 kernels landed; OWLv2/DINO parity = integration gate (Neuriplo) |
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |
 | 7 | Phase 4 hardening | — (docs-only, main) | format clean; scope docs-only | committed | done 2026-10-16: Q-1/Q-3/Q-4 decided |
-| — | Phase 5 rename+filenames | one breaking commit | — | — | queued, maintainer gate |
+| 8 | Phase 5 rename+filenames | `../nert-w-phase5` / `wip/nert-phase5` | 8/8 non-fixture (`nert_*`); format clean; V-4 identifiers-only | merged | done 2026-10-16: M1 pure moves + M2/M3; 0.2.0 |
+| — | N1 CUDA layer | packet next | — | — | vendor decision RECEIVED (hybrid, libraries-first) |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
+
+## N1 backend decision (2026-10-16, maintainer)
+
+Hybrid, leaning heavily on libraries; first-party kernels only where
+libraries don't help or fusion buys something real:
+
+- NVIDIA servers: CUDA with cuDNN (convs) + cuBLAS/cuBLASLt (GEMMs).
+  cuDNN v9 frontend/graph API, heuristics + per-shape autotune, cache
+  engine plans at startup. NHWC FP16/BF16 tensor-core paths. Throughput
+  from dynamic batching across cameras, multi-stream, CUDA Graphs.
+- AMD ROCm-supported discrete: HIP via hipify from the CUDA code.
+- Mali/Adreno/Intel iGPU/unsupported AMD: one portable backend —
+  Vulkan compute first (cooperative matrix on RDNA3 + NVIDIA), OpenCL
+  as fallback.
+- First-party kernels pay off: device pre-processing fuse
+  (remap/undistort/resize/normalize/pack), post (decode/threshold/NMS/
+  argmax on GPU, avoid full-res D2H), elementwise/activation fusion the
+  cuDNN graph API can't express, odd ops (custom attention, deformable
+  sampling). CUTLASS as middle ground for fused GEMM/conv + epilogue.
+- Cost: packaging (100s MB, CUDA/driver pins; cuDNN 9 split sub-libs
+  help). Open: what pushes away from TensorRT (dynamic shapes?
+  preprocessing control? plugin pain?) — confirm before committing.
