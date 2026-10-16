@@ -1,12 +1,9 @@
 // The CUDA device: allocator, transfers, and the kernel table behind the
 // per-device seam.
 //
-// M1 scaffold: device memory management and host<->device transfers only.
-// The kernel table resolves to null for every op until N1a-M2 lands the
-// pilot kernels (Gemm via cuBLAS, first-party Relu/Add); a null entry makes
-// the executor reject the node naming op + node, so CUDA graphs stay
-// load-safe while coverage grows. Only the C++17 standard library plus the
-// CUDA runtime API is used.
+// M1 scaffold grew into the N1a pilot table: the kernel lookup lives in
+// src/cuda/table.cu (Gemm via cuBLAS, first-party Relu/Add). Only the C++17
+// standard library plus the CUDA runtime API is used here.
 
 #include "nert/device.hpp"
 
@@ -15,6 +12,9 @@
 #include <string>
 
 namespace nert {
+namespace cuda_kernels {
+KernelFn FindCudaKernel(const std::string& op_type);
+} // namespace cuda_kernels
 namespace {
 
 // CUDA errors carry the call site: every runtime call is checked, and a
@@ -71,14 +71,12 @@ class CudaTransfer final : public Transfer {
     }
 };
 
-// The operator lookup for the CUDA device. M1 scaffold: every op resolves
-// to null; M2 fills the pilot rows (Gemm/Relu/Add).
+// The operator lookup for the CUDA device. It forwards to the CUDA kernel
+// table in src/cuda/table.cu; ops without a CUDA row resolve to null so the
+// executor rejects the node naming op + node.
 class CudaKernelTable final : public KernelTable {
   public:
-    KernelFn find(const std::string& op_type) const override {
-        (void)op_type;
-        return nullptr;
-    }
+    KernelFn find(const std::string& op_type) const override { return cuda_kernels::FindCudaKernel(op_type); }
 };
 
 class CudaDeviceImpl final : public Device {
@@ -87,6 +85,7 @@ class CudaDeviceImpl final : public Device {
     Allocator& allocator() override { return allocator_; }
     Transfer& transfer() override { return transfer_; }
     const KernelTable& kernels() const override { return kernels_; }
+    bool is_host() const override { return false; }
 
   private:
     CudaAllocator allocator_;
