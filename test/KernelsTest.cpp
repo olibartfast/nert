@@ -4299,3 +4299,63 @@ TEST(EngineKernelsNegative, OrRejectsNonBoolInput) {
         EXPECT_NE(std::string(error.what()).find("or_bad"), std::string::npos) << error.what();
     }
 }
+
+// ReduceL2 over axis 1 keepdims: rows [3,4] -> 5, [0,0] -> 0, [1,1] -> sqrt(2).
+// sqrt(2) = 1.41421356...
+TEST(EngineKernels, ReduceL2AxisKeepdims) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ReduceL2");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {3.0f, 4.0f, 0.0f, 0.0f, 1.0f, 1.0f};
+    std::vector<int64_t> axes = {1};
+    std::vector<float> out(3, -1.0f);
+    engine::Node node = MakeNode("rl2_0", "ReduceL2");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {3, 2}), Int64View(axes, {1})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {3, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_FLOAT_EQ(out[0], 5.0f);
+    EXPECT_FLOAT_EQ(out[1], 0.0f);
+    EXPECT_NEAR(out[2], static_cast<float>(std::sqrt(2.0)), 1e-6f);
+}
+
+// ReduceL2 over all axes no-keepdims with double accumulation:
+// {1e8, 1, -1e8} squares sum to 2e16 + 1; float32 sum of squares loses the 1
+// (2e16 ulp is 4), the double path keeps it: sqrt(2e16+1) = 141421356.24...
+TEST(EngineKernels, ReduceL2AccumulatesInDouble) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ReduceL2");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0e8f, 1.0f, -1.0e8f};
+    std::vector<float> out(1, 0.0f);
+    engine::Node node = MakeNode("rl2_acc", "ReduceL2");
+    node.attributes.emplace_back("keepdims", int64_t{0});
+    std::vector<engine::TensorView> inputs = {FloatView(in, {3})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out[0], static_cast<float>(std::sqrt(2.0e16 + 1.0)));
+    EXPECT_GT(out[0], 1.4142135e8f);
+}
+
+// ReduceL2 rejects int64 data, naming op and node.
+TEST(EngineKernelsNegative, ReduceL2RejectsInt64) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ReduceL2");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> in = {1, 2, 3};
+    std::vector<int64_t> out(1, 0);
+    engine::Node node = MakeNode("rl2_bad", "ReduceL2");
+    std::vector<engine::TensorView> inputs = {Int64View(in, {3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {1})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("ReduceL2"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("rl2_bad"), std::string::npos) << error.what();
+    }
+}

@@ -93,7 +93,8 @@ add_library(nert STATIC
     src/kernels/Min.cpp
     src/kernels/LessOrEqual.cpp
     src/kernels/GreaterOrEqual.cpp
-    src/kernels/Or.cpp)
+    src/kernels/Or.cpp
+    src/kernels/ReduceL2.cpp)
 target_compile_features(nert PUBLIC cxx_std_17)
 target_include_directories(nert
     PUBLIC
