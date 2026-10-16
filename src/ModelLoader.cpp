@@ -796,6 +796,34 @@ const std::unordered_map<std::string, AttrSlot>& instancenorm_attrs()
     return k;
 }
 
+const std::unordered_map<std::string, AttrSlot>& argmax_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        { "axis", AttrSlot::Int },
+        { "keepdims", AttrSlot::Int },
+        { "select_last_index", AttrSlot::Int },
+    };
+    return k;
+}
+
+const std::unordered_map<std::string, AttrSlot>& eyelike_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        { "dtype", AttrSlot::Int },
+        { "k", AttrSlot::Int },
+    };
+    return k;
+}
+
+const std::unordered_map<std::string, AttrSlot>& cumsum_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        { "exclusive", AttrSlot::Int },
+        { "reverse", AttrSlot::Int },
+    };
+    return k;
+}
+
 const std::unordered_map<std::string, AttrSlot>& elu_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
@@ -880,6 +908,9 @@ allowed_attributes()
             { "GreaterOrEqual", &kNoAttrs },
             { "Or", &kNoAttrs },
             { "ReduceL2", &reducemean_attrs() },
+            { "ArgMax", &argmax_attrs() },
+            { "CumSum", &cumsum_attrs() },
+            { "EyeLike", &eyelike_attrs() },
         };
     return kOps;
 }
@@ -1248,6 +1279,19 @@ void validate_attr_policy(Node& node)
         }
         return;
     }
+    if (node.op_type == "EyeLike") {
+        const Attribute* dtype = lookup("dtype");
+        if (dtype != nullptr) {
+            const int64_t v = need_int(dtype);
+            if (v != kElemType_OnnxFloat && v != kElemType_OnnxInt64 &&
+                v != kElemType_OnnxBool) {
+                throw ModelLoadException(prefix +
+                    ": attribute 'dtype' must be 1 (FLOAT), 7 (INT64), or 9 (BOOL)"
+                    " here (found " + std::to_string(v) + ")");
+            }
+        }
+        return;
+    }
     if (node.op_type == "Mod") {
         // Surveyed fixture: integer remainder (fmod=0, trunc-based, result
         // takes the dividend's sign), never float fmod.
@@ -1319,7 +1363,7 @@ Node decode_node(const uint8_t* data, size_t size)
             "GatherElements/Mod/ReduceMax/Resize/Softmax/Split/TopK/Transpose/"
             "Floor/Identity/Pow/Tile/AveragePool/ConvTranspose/Erf/Sqrt/Tanh/"
             "IsNaN/Squeeze/LayerNormalization/InstanceNormalization/Abs/Neg/Exp/Log/Cos/Sin/Clip/"
-            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min/LessOrEqual/GreaterOrEqual/Or/ReduceL2 only)");
+            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min/LessOrEqual/GreaterOrEqual/Or/ReduceL2/ArgMax/CumSum/EyeLike only)");
     }
 
     const std::unordered_map<std::string, AttrSlot>& allowed = *op_it->second;

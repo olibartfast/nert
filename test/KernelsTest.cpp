@@ -4359,3 +4359,172 @@ TEST(EngineKernelsNegative, ReduceL2RejectsInt64) {
         EXPECT_NE(std::string(error.what()).find("rl2_bad"), std::string::npos) << error.what();
     }
 }
+
+// ArgMax over axis 1 keepdims: rows [1,4,2] -> 1, [3,3,5] -> 2 (first max).
+TEST(EngineKernels, ArgMaxAxisKeepdimsFirstMax) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 4.0f, 2.0f, 3.0f, 3.0f, 5.0f};
+    std::vector<int64_t> out(2, -1);
+    engine::Node node = MakeNode("argmax0", "ArgMax");
+    node.attributes.emplace_back("axis", int64_t{1});
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2, 3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {2, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{1, 2}));
+}
+
+// ArgMax with select_last_index 1 and keepdims 0: [2, 5, 5] -> 2 (last tie),
+// output rank drops to scalar shape {}.
+TEST(EngineKernels, ArgMaxLastIndexNoKeepdims) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> in = {2, 5, 5};
+    std::vector<int64_t> out(1, -1);
+    engine::Node node = MakeNode("argmax_last", "ArgMax");
+    node.attributes.emplace_back("axis", int64_t{0});
+    node.attributes.emplace_back("keepdims", int64_t{0});
+    node.attributes.emplace_back("select_last_index", int64_t{1});
+    std::vector<engine::TensorView> inputs = {Int64View(in, {3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{2}));
+}
+
+// ArgMax rejects a float32 output, naming op and node.
+TEST(EngineKernelsNegative, ArgMaxRejectsNonInt64Output) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("argmax_bad", "ArgMax");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("ArgMax"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("argmax_bad"), std::string::npos) << error.what();
+    }
+}
+
+// CumSum along axis 1 inclusive: rows [1,2,3] -> [1,3,6], [4,0,1] -> [4,4,5].
+TEST(EngineKernels, CumSumAxisInclusive) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("CumSum");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 0.0f, 1.0f};
+    std::vector<int64_t> axis = {1};
+    std::vector<float> out(6, -1.0f);
+    engine::Node node = MakeNode("cs0", "CumSum");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2, 3}), Int64View(axis, {1})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{1.0f, 3.0f, 6.0f, 4.0f, 4.0f, 5.0f}));
+}
+
+// CumSum exclusive + reverse over int64: [5,1,4] reversed-exclusive
+// -> [5,4,0] (suffix sums excluding self, from the end).
+TEST(EngineKernels, CumSumExclusiveReverseInt64) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("CumSum");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> in = {5, 1, 4};
+    std::vector<int64_t> axis = {0};
+    std::vector<int64_t> out(3, -1);
+    engine::Node node = MakeNode("cs_rev", "CumSum");
+    node.attributes.emplace_back("exclusive", int64_t{1});
+    node.attributes.emplace_back("reverse", int64_t{1});
+    std::vector<engine::TensorView> inputs = {Int64View(in, {3}), Int64View(axis, {1})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{5, 4, 0}));
+}
+
+// CumSum rejects an axis out of range, naming op and node.
+TEST(EngineKernelsNegative, CumSumRejectsAxisOutOfRange) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("CumSum");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f};
+    std::vector<int64_t> axis = {5};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("cs_bad", "CumSum");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2}), Int64View(axis, {1})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("CumSum"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("cs_bad"), std::string::npos) << error.what();
+    }
+}
+
+// EyeLike default: 2x3 float input shape gives [[1,0,0],[0,1,0]].
+TEST(EngineKernels, EyeLikeDefaultDiagonal) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("EyeLike");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in(6, 7.0f);
+    std::vector<float> out(6, -1.0f);
+    engine::Node node = MakeNode("eye0", "EyeLike");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2, 3})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}));
+}
+
+// EyeLike with k=1 and int64 output: 3x3 superdiagonal
+// [[0,1,0],[0,0,1],[0,0,0]].
+TEST(EngineKernels, EyeLikeSuperdiagonalInt64) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("EyeLike");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in(9, 0.0f);
+    std::vector<int64_t> out(9, -1);
+    engine::Node node = MakeNode("eye_k", "EyeLike");
+    node.attributes.emplace_back("k", int64_t{1});
+    std::vector<engine::TensorView> inputs = {FloatView(in, {3, 3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {3, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{0, 1, 0, 0, 0, 1, 0, 0, 0}));
+}
+
+// EyeLike rejects a rank-3 input, naming op and node.
+TEST(EngineKernelsNegative, EyeLikeRejectsRank3) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("EyeLike");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in(8, 0.0f);
+    std::vector<float> out(8, 0.0f);
+    engine::Node node = MakeNode("eye_bad", "EyeLike");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2, 2, 2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2, 2, 2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("EyeLike"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("eye_bad"), std::string::npos) << error.what();
+    }
+}

@@ -238,5 +238,20 @@ void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vect
 void ReduceL2(const Node& node, const std::vector<TensorView>& inputs,
     const std::vector<TensorView>& outputs);
 
+// Index of the maximum element along `axis`; float32 or int64 data, int64
+// indices.
+void ArgMax(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
+// Cumulative sum along the int64 scalar `axis` input; float32 (double
+// accumulation) or int64 data, same shape and dtype out.
+void CumSum(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
+// 2-D output with the input shape, ones on the k-th diagonal; float32,
+// int64, or bool data.
+void EyeLike(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
 } // namespace kernels
 } // namespace engine
