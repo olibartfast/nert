@@ -1293,6 +1293,71 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
     return TensorInfo{dtype, out};
 }
 
+TensorInfo eyelike_shape(const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    if (inputs.empty() || inputs[0] == nullptr) {
+        fail(node, "EyeLike requires an input");
+    }
+    const std::vector<int64_t>& in = inputs[0]->dims;
+    if (in.size() != 2) {
+        fail(node, "EyeLike input must be rank 2");
+    }
+    const int64_t dtype_attr = attr_int(node, "dtype", -1);
+    DataType dtype;
+    if (dtype_attr == -1) {
+        dtype = inputs[0]->dtype;
+    } else if (dtype_attr == 1) {
+        dtype = DataType::Float32;
+    } else if (dtype_attr == 7) {
+        dtype = DataType::Int64;
+    } else if (dtype_attr == 9) {
+        dtype = DataType::Bool;
+    } else {
+        fail(node, "EyeLike dtype must be 1 (FLOAT), 7 (INT64), or 9 (BOOL) here");
+    }
+    if (dtype != DataType::Float32 && dtype != DataType::Int64 &&
+        dtype != DataType::Bool) {
+        fail(node, "EyeLike dtype must be 1 (FLOAT), 7 (INT64), or 9 (BOOL) here");
+    }
+    return TensorInfo{dtype, in};
+}
+
+TensorInfo cumsum_shape(const StaticContext& ctx, const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    if (inputs.empty() || inputs[0] == nullptr) {
+        fail(node, "CumSum requires a data input");
+    }
+    if (inputs[0]->dtype != DataType::Float32 &&
+        inputs[0]->dtype != DataType::Int64) {
+        fail(node, "CumSum data must be Float32 or Int64");
+    }
+    if (node.inputs.size() < 2 || node.inputs[1].empty()) {
+        fail(node, "CumSum requires an axis input");
+    }
+    const std::vector<int64_t> axis_vals =
+        int64_constant(ctx, node, node.inputs[1]);
+    if (axis_vals.size() != 1) {
+        fail(node, "CumSum axis input must be a scalar Int64 constant");
+    }
+    const std::vector<int64_t>& in = inputs[0]->dims;
+    const int64_t rank = static_cast<int64_t>(in.size());
+    if (rank == 0) {
+        fail(node, "CumSum input must have rank >= 1");
+    }
+    (void)normalize_axis(node, axis_vals.front(), rank, "CumSum");
+    const int64_t exclusive = attr_int(node, "exclusive", 0);
+    if (exclusive != 0 && exclusive != 1) {
+        fail(node, "CumSum exclusive must be 0 or 1 here");
+    }
+    const int64_t reverse = attr_int(node, "reverse", 0);
+    if (reverse != 0 && reverse != 1) {
+        fail(node, "CumSum reverse must be 0 or 1 here");
+    }
+    return TensorInfo{inputs[0]->dtype, in};
+}
+
 TensorInfo argmax_shape(const Node& node,
     const std::vector<const TensorInfo*>& inputs)
 {
@@ -2445,6 +2510,12 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "ArgMax") {
         return {argmax_shape(node, inputs)};
+    }
+    if (op == "CumSum") {
+        return {cumsum_shape(ctx, node, inputs)};
+    }
+    if (op == "EyeLike") {
+        return {eyelike_shape(node, inputs)};
     }
     if (op == "Range") {
         return {range_shape(ctx, node, inputs)};
