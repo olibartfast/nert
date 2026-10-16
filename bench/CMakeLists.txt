@@ -8,3 +8,4 @@ endif()
 
 add_subdirectory(utils)
 add_subdirectory(gemm)
+add_subdirectory(matmul)
