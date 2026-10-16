@@ -9,3 +9,6 @@ endif()
 add_subdirectory(utils)
 add_subdirectory(gemm)
 add_subdirectory(matmul)
+# Runtime-backed parity + timing (N1f): drives the shipped kernel tables, no
+# vendored kernel copies. Builds only with the CUDA device layer on.
+add_subdirectory(runtime)

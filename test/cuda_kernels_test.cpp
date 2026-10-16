@@ -4,6 +4,7 @@
 // fails). Kernel-level tests run the CPU oracle table and the CUDA table on
 // identical inputs; the model test runs one micro-graph on both devices.
 
+#include "cuda_test_helpers.hpp"
 #include "nert/device.hpp"
 #include "nert/executor.hpp"
 #include "nert/graph.hpp"
@@ -14,72 +15,6 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
-
-namespace {
-
-// GTEST_SKIP must fire in the test body (it only returns from its own
-// function), so helpers report readiness and each TEST skips explicitly.
-bool HasCudaDevice() {
-    int count = 0;
-    return cudaGetDeviceCount(&count) == cudaSuccess && count >= 1;
-}
-
-nert::TensorView HostFloat(std::vector<float>& data, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = data.empty() ? nullptr : data.data();
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::TensorView HostInt64(std::vector<int64_t>& data, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = data.empty() ? nullptr : data.data();
-    view.dtype = nert::DataType::Int64;
-    view.dims = std::move(dims);
-    return view;
-}
-
-// A device copy of a host float buffer, released by the caller.
-void* Upload(nert::Device& cuda, const std::vector<float>& host) {
-    void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(float)));
-    if (device == nullptr) {
-        throw std::runtime_error("Upload: device allocate failed");
-    }
-    cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(float)));
-    return device;
-}
-
-std::vector<float> Download(nert::Device& cuda, void* device, std::size_t count) {
-    std::vector<float> host(count, 0.0F);
-    cuda.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(float)));
-    return host;
-}
-
-nert::TensorView DeviceFloat(void* device, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = device;
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::Node MakeNode(const std::string& name, const std::string& op) {
-    nert::Node node;
-    node.name = name;
-    node.op_type = op;
-    return node;
-}
-
-// |a - b| <= 1e-3 * (1 + |b|) elementwise, the bench tolerance.
-void ExpectNear(const std::vector<float>& got, const std::vector<float>& ref) {
-    ASSERT_EQ(got.size(), ref.size());
-    for (std::size_t i = 0; i < got.size(); ++i) {
-        EXPECT_NEAR(got[i], ref[i], 1e-3F * (1.0F + std::fabs(ref[i]))) << "index " << i;
-    }
-}
-
-} // namespace
 
 // Gemm small exact: [[1,2,3],[4,5,6]] x [[7,8],[9,10],[11,12]] =
 // [[58,64],[139,154]] on both tables, bit-exact here.
@@ -189,30 +124,13 @@ TEST(NertCudaKernels, AddBroadcastInt64Exact) {
                                             {HostInt64(cpuOut, {2, 3})});
     EXPECT_EQ(cpuOut, (std::vector<int64_t>{11, 21, 31, 12, 22, 32}));
 
-    auto uploadI64 = [&](const std::vector<int64_t>& host) {
-        void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        EXPECT_NE(device, nullptr);
-        cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        return device;
-    };
-    auto downloadI64 = [&](void* device, std::size_t count) {
-        std::vector<int64_t> host(count, 0);
-        cuda.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(int64_t)));
-        return host;
-    };
-    auto devI64 = [&](void* device, std::vector<int64_t> dims) {
-        nert::TensorView view;
-        view.data = device;
-        view.dtype = nert::DataType::Int64;
-        view.dims = std::move(dims);
-        return view;
-    };
-    void* da = uploadI64(a);
-    void* db = uploadI64(b);
+    void* da = UploadInt64(cuda, a);
+    void* db = UploadInt64(cuda, b);
     std::vector<int64_t> gpuOut(6, 0);
-    void* dy = uploadI64(gpuOut);
-    nert::CudaDevice().kernels().find("Add")(node, {devI64(da, {2, 1}), devI64(db, {1, 3})}, {devI64(dy, {2, 3})});
-    gpuOut = downloadI64(dy, 6);
+    void* dy = UploadInt64(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Add")(node, {DeviceInt64(da, {2, 1}), DeviceInt64(db, {1, 3})},
+                                             {DeviceInt64(dy, {2, 3})});
+    gpuOut = DownloadInt64(cuda, dy, 6);
     cuda.allocator().release(da);
     cuda.allocator().release(db);
     cuda.allocator().release(dy);
@@ -324,41 +242,22 @@ TEST(NertCudaKernels, SubInt64Exact) {
     std::vector<int64_t> b = {3, 2, -7};
     std::vector<int64_t> cpuOut(3, 0);
     nert::Node node = MakeNode("sub0", "Sub");
-    auto uploadI64 = [&](const std::vector<int64_t>& host) {
-        void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        EXPECT_NE(device, nullptr);
-        cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        return device;
-    };
-    auto devI64 = [&](void* device, std::vector<int64_t> dims) {
-        nert::TensorView view;
-        view.data = device;
-        view.dtype = nert::DataType::Int64;
-        view.dims = std::move(dims);
-        return view;
-    };
     // CPU oracle via int64 views.
     {
-        nert::TensorView va, vb, vo;
-        va.data = a.data();
-        va.dtype = nert::DataType::Int64;
-        va.dims = {3};
-        vb.data = b.data();
-        vb.dtype = nert::DataType::Int64;
-        vb.dims = {3};
-        vo.data = cpuOut.data();
-        vo.dtype = nert::DataType::Int64;
-        vo.dims = {3};
+        nert::TensorView va = HostInt64(a, {3});
+        nert::TensorView vb = HostInt64(b, {3});
+        nert::TensorView vo = HostInt64(cpuOut, {3});
         nert::CpuDevice().kernels().find("Sub")(node, {va, vb}, {vo});
     }
     EXPECT_EQ(cpuOut, (std::vector<int64_t>{2, -3, 7}));
 
-    void* da = uploadI64(a);
-    void* db = uploadI64(b);
+    void* da = UploadInt64(cuda, a);
+    void* db = UploadInt64(cuda, b);
     std::vector<int64_t> gpuOut(3, 0);
-    void* dy = uploadI64(gpuOut);
-    nert::CudaDevice().kernels().find("Sub")(node, {devI64(da, {3}), devI64(db, {3})}, {devI64(dy, {3})});
-    cuda.transfer().device_to_host(gpuOut.data(), dy, static_cast<int64_t>(gpuOut.size() * sizeof(int64_t)));
+    void* dy = UploadInt64(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Sub")(node, {DeviceInt64(da, {3}), DeviceInt64(db, {3})},
+                                             {DeviceInt64(dy, {3})});
+    gpuOut = DownloadInt64(cuda, dy, 3);
     cuda.allocator().release(da);
     cuda.allocator().release(db);
     cuda.allocator().release(dy);
@@ -408,26 +307,14 @@ TEST(NertCudaKernels, DivInt64ZeroThrows) {
 
     std::vector<int64_t> a = {7, 8};
     std::vector<int64_t> b = {2, 0};
-    auto uploadI64 = [&](const std::vector<int64_t>& host) {
-        void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        EXPECT_NE(device, nullptr);
-        cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
-        return device;
-    };
-    auto devI64 = [&](void* device, std::vector<int64_t> dims) {
-        nert::TensorView view;
-        view.data = device;
-        view.dtype = nert::DataType::Int64;
-        view.dims = std::move(dims);
-        return view;
-    };
-    void* da = uploadI64(a);
-    void* db = uploadI64(b);
+    void* da = UploadInt64(cuda, a);
+    void* db = UploadInt64(cuda, b);
     std::vector<int64_t> y(2, 0);
-    void* dy = uploadI64(y);
+    void* dy = UploadInt64(cuda, y);
     nert::Node node = MakeNode("div_bad", "Div");
     try {
-        nert::CudaDevice().kernels().find("Div")(node, {devI64(da, {2}), devI64(db, {2})}, {devI64(dy, {2})});
+        nert::CudaDevice().kernels().find("Div")(node, {DeviceInt64(da, {2}), DeviceInt64(db, {2})},
+                                                 {DeviceInt64(dy, {2})});
         FAIL() << "expected InferenceException for int64 division by zero";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
