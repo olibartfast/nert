@@ -62,6 +62,19 @@ NERT_FIXTURE=fixtures/resnet18.onnx ctest --test-dir build --output-on-failure
 
 Check formatting with `scripts/format.sh --check` (or `--fix`).
 
+## Opset policy
+
+NERT loads opset 18, ONNX domain only. Models exported at an older opset
+are rejected at load — convert first, then load:
+
+```python
+import onnx
+from onnx import version_converter
+model = onnx.load("model_op16.onnx")
+model = version_converter.convert_version(model, 18)
+onnx.save(model, "model_op18.onnx")
+```
+
 ## Install and use
 
 ```bash
