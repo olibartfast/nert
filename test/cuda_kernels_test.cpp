@@ -259,27 +259,29 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
 
 // An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
 // rejection, matching the pinned CPU behavior; see N1 validation notes).
+// Probe op is MatMul (CPU-covered, no CUDA row yet): when MatMul gains a CUDA
+// row, move this probe to the next CPU-covered op without one.
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
     }
 
     nert::Graph graph;
-    graph.inputs = {{"x", {nert::DataType::Float32, {}}}};
-    nert::Node sigmoid = MakeNode("sg_bad", "Sigmoid");
-    sigmoid.inputs = {"x"};
-    sigmoid.outputs = {"y"};
-    graph.nodes = {sigmoid};
+    graph.inputs = {{"a", {nert::DataType::Float32, {}}}, {"b", {nert::DataType::Float32, {}}}};
+    nert::Node matmul = MakeNode("mm_bad", "MatMul");
+    matmul.inputs = {"a", "b"};
+    matmul.outputs = {"y"};
+    graph.nodes = {matmul};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model cuda(graph, {{"x", {4}}}, nert::CudaDevice());
+    nert::Model cuda(graph, {{"a", {2, 3}}, {"b", {3, 2}}}, nert::CudaDevice());
     try {
-        cuda.Run({{"x", std::vector<float>(4, 1.0F)}});
+        cuda.Run({{"a", std::vector<float>(6, 1.0F)}, {"b", std::vector<float>(6, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no CUDA kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("sg_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("Sigmoid"), std::string::npos) << message;
+        EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("MatMul"), std::string::npos) << message;
     }
 }
 
