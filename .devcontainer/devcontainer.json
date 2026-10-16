@@ -1,0 +1,9 @@
+{
+    "name": "nert-gpu-26.08",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": ["--gpus", "all"],
+    "workspaceFolder": "/work",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/work,type=bind"
+}
