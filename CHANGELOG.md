@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - Unreleased
+
+### Changed (breaking)
+
+- Namespace `engine` → `nert` and public headers `include/engine/` →
+  `include/nert/` (`#include "nert/engine.hpp"`). All C++ filenames are
+  now lowercase `snake_case` (e.g. `src/model_loader.cpp`,
+  `src/kernels/instance_normalization.cpp`); CTest suites `engine_*` →
+  `nert_*`. No behavior change. Consumers (Neuriplo adapter) update
+  includes + namespace; the `neuriplo_engine` CMake alias is kept.
+
 ## [0.1.0] - Unreleased
 
 ### Added
