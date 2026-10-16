@@ -75,8 +75,12 @@ class Model {
   private:
     // Execute the nodes with the graph inputs already bound in `views`, then
     // bind initializers and node outputs; on return `views` resolves every
-    // graph output (arena-backed views stay valid until the next run).
-    void Execute(std::map<std::string, TensorView>& views);
+    // graph output (arena-backed views stay valid until the next run). On a
+    // non-host device the host-bound views are staged to device memory
+    // first (one upload each, no per-op round-trips) and the graph outputs
+    // are downloaded into `host_outputs` (caller-owned), so output views
+    // stay host-readable.
+    void Execute(std::map<std::string, TensorView>& views, std::map<std::string, std::vector<uint8_t>>& host_outputs);
 
     // The view bound to graph output `name` after Execute.
     static const TensorView& OutputView(const std::map<std::string, TensorView>& views, const std::string& name);

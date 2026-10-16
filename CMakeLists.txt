@@ -123,8 +123,11 @@ if(NERT_ENABLE_CUDA)
     endif()
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
-    target_sources(nert PRIVATE src/cuda_device.cpp)
-    target_link_libraries(nert PUBLIC CUDA::cudart)
+    target_sources(nert PRIVATE src/cuda_device.cpp src/cuda/gemm.cu src/cuda/relu.cu src/cuda/add.cu
+                                src/cuda/table.cu)
+    # PRIVATE: no CUDA type leaks through the public headers, so consumers
+    # stay toolkit-free.
+    target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
 endif()
 
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects

@@ -65,6 +65,10 @@ public:
     virtual Allocator& allocator() = 0;
     virtual Transfer& transfer() = 0;
     virtual const KernelTable& kernels() const = 0;
+    // True when kernel views point at host memory (no staging needed). The
+    // CPU device and host-memory test devices use the default; the CUDA
+    // device overrides it to false so the executor stages transfers.
+    virtual bool is_host() const { return true; }
 };
 
 // The process-lifetime CPU device, the reference implementation of the seam.
