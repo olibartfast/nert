@@ -94,7 +94,10 @@ add_library(nert STATIC
     src/kernels/LessOrEqual.cpp
     src/kernels/GreaterOrEqual.cpp
     src/kernels/Or.cpp
-    src/kernels/ReduceL2.cpp)
+    src/kernels/ReduceL2.cpp
+    src/kernels/ArgMax.cpp
+    src/kernels/CumSum.cpp
+    src/kernels/EyeLike.cpp)
 target_compile_features(nert PUBLIC cxx_std_17)
 target_include_directories(nert
     PUBLIC
