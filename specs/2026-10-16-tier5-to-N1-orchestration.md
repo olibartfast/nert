@@ -63,7 +63,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 10 | N1a-M2 pilot kernels | `../nert-w-n1a-m2` / `wip/nert-n1a-m2` | OFF 8/8 + ON 10/10 (RTX 3060) + format clean | merged | done 2026-10-16: staging + cuBLAS Gemm + Relu/Add + parity |
 | 11 | N1e-1 Mul/Sub/Div CUDA | `../nert-w-n1e1` / `wip/nert-n1e1` | OFF 8/8 + ON 11/11 (RTX 3060) + format | merged | done 2026-10-16: broadcast template reuse; IEEE + int64-throw Div |
 | 12 | N1e-2 pooling CUDA | `../nert-w-n1e2` / `wip/nert-n1e2` | OFF 8/8 + ON 12/12 (RTX 3060) + format | merged | done 2026-10-16: MaxPool/AveragePool exact |
-| 13 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 13 | N1e-3 activations CUDA | `../nert-w-n1e3` / `wip/nert-n1e3` | OFF 8/8 + ON 13/13 (RTX 3060) + format | merged | done 2026-10-16: Sigmoid/Tanh/Softmax; MatMul now the no-row probe; BN skipped (no CPU kernel) |
+| 14 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
