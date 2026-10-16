@@ -67,5 +67,5 @@ defined before code and evidence recorded after execution.
 
 - Quantitative latency/memory targets: none (CPU path is explicitly not a
   performance target).
-- Whether `engine/` + namespace `engine` renames to `nert` ([Q-5] in
-  tech-stack): yes in one breaking 0.2 release, owner: maintainer.
+- [Q-5] decided 2026-10-16 (Phase 5, breaking 0.2): `include/nert/` +
+  namespace `nert`, all C++ filenames lowercase `snake_case`.
