@@ -22,9 +22,16 @@ Expected: configure + build clean; all `engine_*` suites pass; format clean;
   hand-computed unit case in `test/KernelsTest.cpp` (computed by hand, not
   captured), off-default attributes included, plus one negative load/shape
   case naming the op. Command: `ctest --test-dir build -R Kernels`.
-  **Phase A only:** tier-4 `InstanceNormalization` (incl. off-default
-  `epsilon`, per-channel scale/bias, negative cases) is covered; the 11
-  tier-5 operators are open — Phase B.
+  **Phase A:** tier-4 `InstanceNormalization` (incl. off-default
+  `epsilon`, per-channel scale/bias, negative cases) — done 2026-10-10.
+  **Phase B (done 2026-10-16):** all 11 tier-5 ops landed with hand-computed
+  + negative cases: `Elu` (default + alpha 2.0), `Max` (broadcast 2-input),
+  `Min` (3-input int64), `LessOrEqual`/`GreaterOrEqual`/`Or` (broadcast,
+  incl. int64 equality and bool), `ReduceL2` (axis keepdims + double-accum
+  proof), `ArgMax` (keepdims + last-index no-keepdims), `CumSum`
+  (inclusive + exclusive/reverse int64), `EyeLike` (default + k=1 int64),
+  `ScatterND` (row scatter + negative-index int64). Negative cases assert
+  node name + op substrings.
 - [x] [V-2] → [R-3]/[R-4]/[R-6]: ResNet-18 fixture ctest green (immutable
   acceptance above) — no regression from new kernels.
 - [x] [V-3] → [R-3]: RAFT parity evidence from Neuriplo
@@ -33,11 +40,13 @@ Expected: configure + build clean; all `engine_*` suites pass; format clean;
   Missing fixture/input fails, never skips.
 - [ ] [V-4] → [R-4]: OWLv2 + Grounding DINO rows evidence from Neuriplo
   (same harness): record export, opset, mode, max scaled diff / confident
-  rows, date. **Open — Phase B.**
+  rows, date. **Kernels landed 2026-10-16 (all 11 tier-5 ops); parity runs
+  are the planner-owned integration gate in Neuriplo — still open.**
 - [ ] [V-5] → [R-5]/[R-6]: regression evidence — YOLO + transformer + DETR
   manifests green on the same Neuriplo pin; `git diff --stat` reviewed for
   scope (new kernels + loader/shape/test entries only, no executor design
-  changes, no existing test weakened). **Open — Phase B.**
+  changes, no existing test weakened). **Scope held per-slice
+  (kernel+loader/shape/test/CMake only); manifest runs still open.**
 - [x] [V-6] → constraints: `scripts/format.sh --check` clean; no new runtime
   dependency (`grep` link closure / CMakeLists review); opset-18-only loader
   unchanged (no silent opset widening).
@@ -46,10 +55,12 @@ Expected: configure + build clean; all `engine_*` suites pass; format clean;
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
-| V-1 | `NERT_FIXTURE=fixtures/resnet18.onnx ctest --test-dir build -R Kernels` | pass | 2026-10-10 | tier-4 `InstanceNormalization`: hand-computed cases incl. off-default `epsilon`, per-channel scale/B, and negative load/shape cases. Tier-5 operators not yet implemented (Phase B). |
+| V-1 | `ctest --test-dir build -R engine_kernels` (8/8 non-fixture suites; fixture suites fail missing-fixture by design on this box) | pass | 2026-10-16 | all 11 tier-5 ops: hand-computed + negative cases per packet. No existing test weakened. |
 | V-2 | `NERT_FIXTURE=... ctest --test-dir build` | 12/12 pass | 2026-10-10 | ResNet-18 fixture; no regression from the new kernel. |
+| V-2b | non-fixture `ctest` (8 suites: kernels±, device, loader/shapes/plan/executor negatives, folding) | 8/8 pass | 2026-10-16 | post Tier-5 merge; fixture suites unrun (no fixture on box). |
 | V-3 | `NEURIPLO_MODEL_ZOO_MANIFEST=~/.cache/neuriplo-op-inventory/tier4_raft.manifest build-ne/backends/nert/test/nert_model_zoo_parity_test` | pass | 2026-10-10 | torchvision RAFT-large, opset 16→18, `parity`, real `bus.jpg` pair 256×320 in [-1,1] (+4 px shift); `max_abs_diff=6.94e-05`, `max_scaled_diff=6.10e-05`, atol 1e-3. Neuriplo build: NERT + ONNX_RUNTIME (ORT 1.28.0), `-DFETCHCONTENT_SOURCE_DIR_NERT=../nert-w-p4a`. |
 | V-6 | `scripts/format.sh --check` | pass | 2026-10-10 | 58 files; no new runtime dependency (stdlib-only kernel). |
+| V-6b | `scripts/format.sh --check` + link-closure review | pass | 2026-10-16 | 93 files; `nert` target stdlib-only (no new links); opset-18-only loader unchanged; excluded-file discipline held (no mass reformat). |
 
 ## Deviations
 

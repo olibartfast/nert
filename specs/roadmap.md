@@ -48,7 +48,11 @@ Active packet: `specs/2026-10-10-raft-open-vocab/`.
   **Complete (Phase A, 2026-10-10)** — kernel, shape rule, loader entry,
   hand-computed tests; RAFT parity `max_scaled_diff=6.10e-05` (atol 1e-3).
 - Tier 5: `ArgMax/Elu/LessOrEqual/ReduceL2/CumSum/EyeLike/GreaterOrEqual/
-  Max/Min/Or/ScatterND` + OWLv2 / Grounding DINO end to end. **Open (Phase B).**
+  Max/Min/Or/ScatterND` + OWLv2 / Grounding DINO end to end. **Kernels
+  complete 2026-10-16** (all 11: shape rule, loader entry, hand-computed +
+  negative tests, format clean, 8/8 non-fixture suites green); OWLv2 /
+  Grounding DINO parity + regression manifests are the open integration
+  gate (Neuriplo-side runs).
 - Exit: every gated export loads and matches ONNX Runtime per the packet's
   [V-3] (atol 1e-3 scaled, detection/DETR rows confident-only); ResNet
   fixture ctest stays green; no existing test weakened.
