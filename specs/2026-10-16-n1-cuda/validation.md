@@ -39,3 +39,5 @@ Defined before implementation. Evidence after execution.
 - cuBLAS handle created/destroyed per `Gemm` call (pool in N1e); a
   `cudaDeviceSynchronize` per pilot kernel favors correctness proof over
   throughput (streams/Graphs are consumer-side per the backend decision).
+
+| N1e-1 | Mul/Sub/Div CUDA vs CPU (broadcast, int64, IEEE div, int64 div-by-zero throw) + OFF 8/8 + ON 11/11 + format | pass | 2026-10-16 | RTX 3060 host leg; rank cap 16 shared with Add. |
