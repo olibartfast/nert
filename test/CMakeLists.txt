@@ -109,3 +109,17 @@ target_link_libraries(nert_constant_folding_test PRIVATE
     GTest::gtest
     GTest::gtest_main)
 add_test(NAME nert_constant_folding COMMAND nert_constant_folding_test)
+
+# CUDA device scaffold test (N1a-M1). Built only when the CUDA device layer
+# is enabled; SKIPs at run time without a GPU so toolkit-only runners stay
+# green.
+if(NERT_ENABLE_CUDA)
+    add_executable(nert_cuda_device_test cuda_device_test.cpp)
+    target_compile_features(nert_cuda_device_test PRIVATE cxx_std_17)
+    target_compile_options(nert_cuda_device_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_cuda_device_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_cuda_device COMMAND nert_cuda_device_test)
+endif()

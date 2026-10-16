@@ -109,6 +109,24 @@ add_library(nert::nert ALIAS nert)
 # Compatibility alias for consumers that still link the old target name.
 add_library(neuriplo_engine ALIAS nert)
 
+# CUDA device layer (Phase N1), opt-in so the default configure/build/test
+# never needs a toolkit: NERT_ENABLE_CUDA=ON requires CUDAToolkit and links
+# the CUDA runtime into `nert`; OFF (default) leaves the link closure
+# standard-library-only.
+option(NERT_ENABLE_CUDA "Build NERT with the CUDA device layer" OFF)
+if(NERT_ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR
+            "NERT_ENABLE_CUDA=ON requires a CUDA compiler (nvcc); none was found.")
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    target_sources(nert PRIVATE src/cuda_device.cpp)
+    target_link_libraries(nert PUBLIC CUDA::cudart)
+endif()
+
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects
 # (Neuriplo) that set it.
 if(NERT_BUILD_TESTS OR BUILD_INFERENCE_ENGINE_TESTS)

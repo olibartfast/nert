@@ -70,4 +70,10 @@ public:
 // The process-lifetime CPU device, the reference implementation of the seam.
 const Device& CpuDevice();
 
+// The process-lifetime CUDA device (allocator, transfers, CUDA kernel table).
+// Only available when the library is built with NERT_ENABLE_CUDA=ON; without
+// it the symbol is absent. M1 scaffold: the kernel table is empty (every op
+// resolves to null) until the pilot kernels land.
+const Device& CudaDevice();
+
 } // namespace nert
