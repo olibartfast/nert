@@ -50,7 +50,9 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 
 | Attempt | Packet slice | Worktree/branch | Acceptance (first pass) | Integration gate | Notes |
 |---|---|---|---|---|---|
-| — | B1 Elu/LessOrEqual/GreaterOrEqual/Or/Max/Min | `../nert-w-b1` / `wip/nert-b1` | — | — | dispatched next |
+| 1 | B1 6-op (Elu/LE/GE/Or/Max/Min) | `../nert-w-b1` / `wip/nert-b1` | not run (recon budget, 0 writes) | — | fail: slice too wide; split to B1a/B1b |
+| 2 | B1a Elu/Max/Min | `../nert-w-b1` / `wip/nert-b1` | 8/8 non-fixture pass; 4 fixture suites fail missing-fixture by design; format clean | merged 249681b | done 2026-10-16: planner-implemented after 2 worker recon stalls; scope 9 files, +577/-3 |
+| — | B1b LessOrEqual/GreaterOrEqual/Or | `../nert-w-b1b` / `wip/nert-b1b` | — | — | next |
 | — | B2 ArgMax/ReduceL2/CumSum/EyeLike | `../nert-w-b2` / `wip/nert-b2` | — | — | queued |
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |
 | — | Phase 4 hardening | packet to be written | — | — | queued |
