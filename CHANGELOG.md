@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CPU reference kernels for the operator set needed by the YOLO families, ViT,
   ViTPose, Depth Anything V2, VideoMAE, ViViT, TimeSformer, and the DETR
   family (RT-DETR v4, D-FINE/DEIM, DEIMv2, RF-DETR, RF-DETR-Seg).
+- Tier-5 open-vocabulary kernels: `Elu`, `Max`, `Min`, `LessOrEqual`,
+  `GreaterOrEqual`, `Or`, `ReduceL2`, `ArgMax`, `CumSum`, `EyeLike`,
+  `ScatterND` — each with shape rule, loader allowlist entry + opset-18
+  attribute policy, and hand-computed unit tests incl. off-default
+  attributes and a negative load/shape case. RAFT `InstanceNormalization`
+  (Tier-4) shipped earlier with RAFT parity `max_scaled_diff=6.10e-05`
+  (atol 1e-3).
 - float32 compute with int64/bool shape data and I/O; no dependencies beyond
   the C++ standard library.
 - Standalone CMake build, install rules, and `find_package(nert)` package
