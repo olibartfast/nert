@@ -1,0 +1,77 @@
+# Validation — bench/ playground layout
+
+Defined before implementation (2026-10-16). Evidence after execution.
+Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→V-7.
+
+## Checks
+
+- [V-1] Opt-in (R-5): default `cmake -S . -B build` configures;
+  `ctest -N --test-dir build | grep bench` empty. With
+  `-DNERT_BUILD_BENCH=ON`, `ctest -N` lists `bench_utils_headers` (+
+  `bench_gemm` once G2 lands).
+- [V-2] Harness (R-2): `cmake --build build --target nert_bench_gemm` then
+  `./build/bench/gemm/nert_bench_gemm` prints `[[58,64],[139,154]]`, 5/5
+  seeds, timings + speedup, exit `0`; a temporary local corruption of one
+  CPU element flips exit to `1` (not committed).
+- [V-3] Utils (R-3): `ctest -R bench_utils_headers` passes;
+  `grep -rn '\.h"' bench/` empty; `ATTRIBUTION.md` names source + deltas.
+- [V-4] Parity (R-4): `ctest -R bench_gemm` passes CPU-only (`SKIP:` GPU
+  half); on GPU runners CPU vs device within `1e-3·(1+|ref|)`.
+- [V-5] Matrix (R-2/R-4): default, `NERT_BENCH_USE_OPENCL=ON`,
+  `NERT_BENCH_USE_OPENCL_CPP=ON` each configure+build+test; both flags
+  together fail at configure with a clear message. Bench `ON` requires both
+  SDKs at configure (all helpers compile-checked together); which device
+  runs is per flag, and every device half runtime-SKIPs without a GPU
+  (CPU-only default build with SDKs stays green).
+- [V-6] No-regression (C-1/C-2/C-4): default configure+build+ctest green
+  (ResNet fixture path unchanged); `git status --porcelain` shows only
+  `bench/`, root hook, `specs/2026-10-16-kernel-bench-harness/`;
+  `nert` target links stdlib only (`ldd` has no CUDA/OpenCL).
+- [V-7] Style (R-7): `grep -rnE 'printf|fprintf|new float|delete\[|malloc|free\(|\([a-z_]+ ?\*\)' bench/ --include=*.cpp --include=*.hpp`
+  empty (excl. comments); `scripts/format.sh --check` passes.
+
+## Evidence (to fill)
+
+- Date / runner / GPU: 2026-10-16 / dev container / NVIDIA GeForce RTX 3060
+  Laptop GPU, driver 610.43.02, CUDA 12.0, CMake 3.28.3 (G1–G2 exercised the
+  CPU/SKIP paths; G3 exercised the real device).
+- V-1: PASS (G1a): default OFF configure OK, 0 bench tests; `-DNERT_BUILD_BENCH=ON` lists `bench_utils_headers`.
+- V-1: PASS (G1a): default OFF configure OK, 0 bench tests; `-DNERT_BUILD_BENCH=ON` lists `bench_utils_headers`.
+- V-2: DONE (G2): harness prints `[[58,64],[139,154]]`, 5/5 seeds, CPU
+  timings + `SKIP:` device half, exit `0`; corrupted expectation (58→59,
+  uncommitted) exits `1`, then restored.
+- V-3: DONE (G1b): `ctest -R bench_utils_headers` 1/1 passed with all five
+  headers included; `grep -rn '\.h"' bench/` empty; `ATTRIBUTION.md` records
+  source + per-file deltas.
+- V-4: DONE (G3, GPU runner): `ctest -R bench_gemm` passes with the real CUDA
+  tiled kernel: small exact + 5/5 large seeds, max abs diff 0.00 everywhere;
+  large 512×256×512: CPU median 492.3 ms vs GPU 1.63 ms (301x). Small-shape
+  GPU time is transfer-dominated (0.25 ms vs 0.0002 ms CPU) and reported as
+  measured. G2 CPU-only/SKIP behavior verified earlier on the same box via
+  the fallback TU.
+- V-5: PARTIAL (G3): default CUDA path configure+build+test green; OpenCL
+  flags + both-flags FATAL_ERROR pending (G4).
+- V-5: DONE (G4, RTX 3060): default CUDA + `NERT_BENCH_USE_OPENCL=ON` +
+  `NERT_BENCH_USE_OPENCL_CPP=ON` each configure+build+`ctest -R bench_` 2/2;
+  OpenCL C 5/5 exact (2.28x large), OpenCL C++ 5/5 exact (2.39x large);
+  both flags together fail at configure with the mutual-exclusion message.
+- V-6: DONE (G5): default configure+build green, 0 bench tests listed;
+  `git status` scope is `bench/`, root hook, `scripts/format.sh` (bench
+  cover), `specs/2026-10-16-kernel-bench-harness/`, roadmap N1 note. Default
+  ctest: 8/12 pass; the 4 failures (`engine_loader/shapes/plan/executor`)
+  fail only on "missing fixture: set NERT_FIXTURE" (fixture absent from this
+  box, by design fail-never-skip) and exercise `src/` only — bench is not in
+  the default build. `nert` STATIC target has no `target_link_libraries`
+  (stdlib-only holds; 0 cuda/opencl refs in its link.txt).
+- V-7: DONE (G5): C-idiom grep over `bench/` empty; `scripts/format.sh
+  --check` passes (73 files, now including `bench/`).
+- V-7: DONE (G5): C-idiom grep over `bench/` empty; `scripts/format.sh
+  --check` passes (73 files, now including `bench/`).
+- V-7 (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.
+
+## Acceptance (bench enabled)
+
+```bash
+cmake -S . -B build -DNERT_BUILD_BENCH=ON && cmake --build build --target nert_bench_gemm \
+&& ctest --test-dir build -R 'bench_' --output-on-failure
+```
