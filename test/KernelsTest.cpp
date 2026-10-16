@@ -4359,3 +4359,60 @@ TEST(EngineKernelsNegative, ReduceL2RejectsInt64) {
         EXPECT_NE(std::string(error.what()).find("rl2_bad"), std::string::npos) << error.what();
     }
 }
+
+// ArgMax over axis 1 keepdims: rows [1,4,2] -> 1, [3,3,5] -> 2 (first max).
+TEST(EngineKernels, ArgMaxAxisKeepdimsFirstMax) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 4.0f, 2.0f, 3.0f, 3.0f, 5.0f};
+    std::vector<int64_t> out(2, -1);
+    engine::Node node = MakeNode("argmax0", "ArgMax");
+    node.attributes.emplace_back("axis", int64_t{1});
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2, 3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {2, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{1, 2}));
+}
+
+// ArgMax with select_last_index 1 and keepdims 0: [2, 5, 5] -> 2 (last tie),
+// output rank drops to scalar shape {}.
+TEST(EngineKernels, ArgMaxLastIndexNoKeepdims) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> in = {2, 5, 5};
+    std::vector<int64_t> out(1, -1);
+    engine::Node node = MakeNode("argmax_last", "ArgMax");
+    node.attributes.emplace_back("axis", int64_t{0});
+    node.attributes.emplace_back("keepdims", int64_t{0});
+    node.attributes.emplace_back("select_last_index", int64_t{1});
+    std::vector<engine::TensorView> inputs = {Int64View(in, {3})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{2}));
+}
+
+// ArgMax rejects a float32 output, naming op and node.
+TEST(EngineKernelsNegative, ArgMaxRejectsNonInt64Output) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ArgMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("argmax_bad", "ArgMax");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("ArgMax"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("argmax_bad"), std::string::npos) << error.what();
+    }
+}

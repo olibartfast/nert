@@ -81,6 +81,7 @@ KernelFn FindCpuKernel(const std::string& op_type) {
         {"GreaterOrEqual", &GreaterOrEqual},
         {"Or", &Or},
         {"ReduceL2", &ReduceL2},
+        {"ArgMax", &ArgMax},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

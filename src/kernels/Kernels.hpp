@@ -238,5 +238,10 @@ void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vect
 void ReduceL2(const Node& node, const std::vector<TensorView>& inputs,
     const std::vector<TensorView>& outputs);
 
+// Index of the maximum element along `axis`; float32 or int64 data, int64
+// indices.
+void ArgMax(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
 } // namespace kernels
 } // namespace engine
