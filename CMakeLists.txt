@@ -128,7 +128,8 @@ if(NERT_ENABLE_CUDA)
     # still resolves the final link).
     target_include_directories(nert PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
     target_sources(nert PRIVATE src/cuda_device.cpp src/cuda/gemm.cu src/cuda/relu.cu src/cuda/add.cu
-                                src/cuda/mul.cu src/cuda/sub.cu src/cuda/div.cu src/cuda/table.cu)
+                                src/cuda/mul.cu src/cuda/sub.cu src/cuda/div.cu src/cuda/max_pool.cu
+                                src/cuda/average_pool.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
