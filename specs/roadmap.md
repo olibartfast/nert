@@ -72,12 +72,15 @@ in one breaking 0.2.0 commit (`wip/nert-phase5`), with the matching Neuriplo
 adapter change (includes + namespace) still to land consumer-side.
 Packet: `specs/2026-10-16-phase5-rename/`. No behavior change.
 
-## Phase N1 — CUDA Device Layer (Planned)
+## Phase N1 — CUDA Device Layer (In progress)
 
 Same model + same plan on CUDA, matching the CPU oracle within tolerance,
-device chosen once at load. Depends on the vendor-kernel decision (first-party
-vs opt-in cuBLAS/cuDNN baseline) — recorded in Neuriplo, decision needed here
-before any accelerated kernel.
+device chosen once at load. Vendor decision (2026-10-16, maintainer):
+hybrid, libraries-first — cuDNN/cuBLAS on NVIDIA, HIP via hipify on AMD,
+Vulkan first for the portable fallback. Landed: N1a scaffold + pilot
+(Gemm/Relu/Add, RTX 3060 parity) and N1b cuDNN Conv (parity). Queued: N1c
+HIP, N1d Vulkan/OpenCL, N1e fusion. Dev environment: `.devcontainer`
+(26.08 stack); host stays toolkit-minimal.
 
 Measurement note (2026-10-16, `specs/2026-10-16-kernel-bench-harness/`,
 branch `feature/bench-playground-layout`): the opt-in `bench/` harness now
