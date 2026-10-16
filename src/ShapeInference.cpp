@@ -851,7 +851,7 @@ std::optional<EvalTensor> eval_node(
         }
         return out;
     }
-    if (op == "Greater" || op == "Less") {
+    if (op == "Greater" || op == "Less" || op == "LessOrEqual" || op == "GreaterOrEqual") {
         if (node.inputs.size() != 2) {
             return std::nullopt;
         }
@@ -881,7 +881,7 @@ std::optional<EvalTensor> eval_node(
         }
         return out;
     }
-    if (op == "And") {
+    if (op == "And" || op == "Or") {
         if (node.inputs.size() != 2) {
             return std::nullopt;
         }
@@ -2404,14 +2404,14 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
         return {TensorInfo{DataType::Bool,
             broadcast_shape(need(0).dims, need(1).dims, node)}};
     }
-    if (op == "Greater" || op == "Less") {
+    if (op == "Greater" || op == "Less" || op == "LessOrEqual" || op == "GreaterOrEqual") {
         if (need(0).dtype != need(1).dtype) {
             fail(node, op + " inputs must share dtype");
         }
         return {TensorInfo{DataType::Bool,
             broadcast_shape(need(0).dims, need(1).dims, node)}};
     }
-    if (op == "And") {
+    if (op == "And" || op == "Or") {
         return {TensorInfo{DataType::Bool,
             broadcast_shape(need(0).dims, need(1).dims, node)}};
     }

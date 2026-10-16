@@ -224,5 +224,14 @@ void Max(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 // broadcasting; float32 or int64 data.
 void Min(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
+// Elementwise a <= b comparison with NumPy multidirectional broadcasting; bool output.
+void LessOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
+// Elementwise a >= b comparison with NumPy multidirectional broadcasting; bool output.
+void GreaterOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
+// Elementwise logical OR of bool tensors with NumPy multidirectional broadcasting.
+void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
 } // namespace kernels
 } // namespace engine
