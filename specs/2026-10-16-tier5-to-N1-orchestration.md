@@ -57,6 +57,6 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 5 | B2b ArgMax/CumSum/EyeLike | `../nert-w-b2b` / `wip/nert-b2b` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: direct, 2 commits |
 | 6 | B3 ScatterND | `../nert-w-b3` / `wip/nert-b3` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: Tier-5 11/11 kernels landed; OWLv2/DINO parity = integration gate (Neuriplo) |
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |
-| — | Phase 4 hardening | packet to be written | — | — | queued |
+| 7 | Phase 4 hardening | — (docs-only, main) | format clean; scope docs-only | committed | done 2026-10-16: Q-1/Q-3/Q-4 decided |
 | — | Phase 5 rename+filenames | one breaking commit | — | — | queued, maintainer gate |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
