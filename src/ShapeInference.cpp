@@ -1293,6 +1293,43 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
     return TensorInfo{dtype, out};
 }
 
+TensorInfo scatternd_shape(const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    if (inputs.size() < 3 || inputs[0] == nullptr || inputs[1] == nullptr ||
+        inputs[2] == nullptr) {
+        fail(node, "ScatterND requires data, indices, and updates");
+    }
+    if (inputs[0]->dtype != DataType::Float32 &&
+        inputs[0]->dtype != DataType::Int64 && inputs[0]->dtype != DataType::Bool) {
+        fail(node, "ScatterND data must be Float32, Int64, or Bool");
+    }
+    if (inputs[2]->dtype != inputs[0]->dtype) {
+        fail(node, "ScatterND data and updates must share dtype");
+    }
+    if (inputs[1]->dtype != DataType::Int64) {
+        fail(node, "ScatterND indices must be Int64");
+    }
+    const std::vector<int64_t>& dataDims = inputs[0]->dims;
+    const std::vector<int64_t>& indexDims = inputs[1]->dims;
+    const std::vector<int64_t>& updateDims = inputs[2]->dims;
+    if (indexDims.empty()) {
+        fail(node, "ScatterND indices must have rank >= 1");
+    }
+    const int64_t k = indexDims.back();
+    if (k < 1 || k > static_cast<int64_t>(dataDims.size())) {
+        fail(node, "ScatterND indices last dim must be within the data rank");
+    }
+    std::vector<int64_t> expected(indexDims.begin(), indexDims.end() - 1);
+    for (size_t i = static_cast<size_t>(k); i < dataDims.size(); ++i) {
+        expected.push_back(dataDims[i]);
+    }
+    if (updateDims != expected) {
+        fail(node, "ScatterND updates shape does not match indices and data");
+    }
+    return TensorInfo{inputs[0]->dtype, dataDims};
+}
+
 TensorInfo eyelike_shape(const Node& node,
     const std::vector<const TensorInfo*>& inputs)
 {
@@ -2516,6 +2553,9 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "EyeLike") {
         return {eyelike_shape(node, inputs)};
+    }
+    if (op == "ScatterND") {
+        return {scatternd_shape(node, inputs)};
     }
     if (op == "Range") {
         return {range_shape(ctx, node, inputs)};
