@@ -282,3 +282,157 @@ TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
         EXPECT_NE(message.find("Sigmoid"), std::string::npos) << message;
     }
 }
+
+// Mul broadcasts [2,1] float against [1,3] exactly like the CPU oracle.
+TEST(NertCudaKernels, MulBroadcastExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> a = {1.5F, -2.0F};
+    std::vector<float> b = {2.0F, 0.5F, -1.0F};
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::Node node = MakeNode("mul0", "Mul");
+    nert::CpuDevice().kernels().find("Mul")(node, {HostFloat(a, {2, 1}), HostFloat(b, {1, 3})},
+                                            {HostFloat(cpuOut, {2, 3})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{3.0F, 0.75F, -1.5F, -4.0F, -1.0F, 2.0F}));
+
+    void* da = Upload(cuda, a);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Mul")(node, {DeviceFloat(da, {2, 1}), DeviceFloat(db, {1, 3})},
+                                             {DeviceFloat(dy, {2, 3})});
+    gpuOut = Download(cuda, dy, 6);
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Sub over int64 matches the CPU oracle exactly, incl. negatives.
+TEST(NertCudaKernels, SubInt64Exact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<int64_t> a = {5, -1, 0};
+    std::vector<int64_t> b = {3, 2, -7};
+    std::vector<int64_t> cpuOut(3, 0);
+    nert::Node node = MakeNode("sub0", "Sub");
+    auto uploadI64 = [&](const std::vector<int64_t>& host) {
+        void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
+        EXPECT_NE(device, nullptr);
+        cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
+        return device;
+    };
+    auto devI64 = [&](void* device, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = device;
+        view.dtype = nert::DataType::Int64;
+        view.dims = std::move(dims);
+        return view;
+    };
+    // CPU oracle via int64 views.
+    {
+        nert::TensorView va, vb, vo;
+        va.data = a.data();
+        va.dtype = nert::DataType::Int64;
+        va.dims = {3};
+        vb.data = b.data();
+        vb.dtype = nert::DataType::Int64;
+        vb.dims = {3};
+        vo.data = cpuOut.data();
+        vo.dtype = nert::DataType::Int64;
+        vo.dims = {3};
+        nert::CpuDevice().kernels().find("Sub")(node, {va, vb}, {vo});
+    }
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{2, -3, 7}));
+
+    void* da = uploadI64(a);
+    void* db = uploadI64(b);
+    std::vector<int64_t> gpuOut(3, 0);
+    void* dy = uploadI64(gpuOut);
+    nert::CudaDevice().kernels().find("Sub")(node, {devI64(da, {3}), devI64(db, {3})}, {devI64(dy, {3})});
+    cuda.transfer().device_to_host(gpuOut.data(), dy, static_cast<int64_t>(gpuOut.size() * sizeof(int64_t)));
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Div float follows IEEE: 1/0 = inf, -1/0 = -inf, 0/0 = nan — like the oracle.
+TEST(NertCudaKernels, DivFloatIEEE) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> a = {1.0F, -1.0F, 0.0F, 5.0F};
+    std::vector<float> b = {0.0F, 0.0F, 0.0F, 2.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("div0", "Div");
+    nert::CpuDevice().kernels().find("Div")(node, {HostFloat(a, {4}), HostFloat(b, {4})}, {HostFloat(cpuOut, {4})});
+    EXPECT_EQ(cpuOut[3], 2.5F);
+    EXPECT_TRUE(std::isinf(cpuOut[0]) && cpuOut[0] > 0);
+    EXPECT_TRUE(std::isinf(cpuOut[1]) && cpuOut[1] < 0);
+    EXPECT_TRUE(std::isnan(cpuOut[2]));
+
+    void* da = Upload(cuda, a);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Div")(node, {DeviceFloat(da, {4}), DeviceFloat(db, {4})},
+                                             {DeviceFloat(dy, {4})});
+    gpuOut = Download(cuda, dy, 4);
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ASSERT_EQ(gpuOut.size(), cpuOut.size());
+    EXPECT_EQ(gpuOut[3], cpuOut[3]);
+    EXPECT_TRUE(std::isinf(gpuOut[0]) && gpuOut[0] > 0);
+    EXPECT_TRUE(std::isinf(gpuOut[1]) && gpuOut[1] < 0);
+    EXPECT_TRUE(std::isnan(gpuOut[2]));
+}
+
+// Div int64 with a zero divisor throws naming node + op, like the oracle.
+TEST(NertCudaKernels, DivInt64ZeroThrows) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<int64_t> a = {7, 8};
+    std::vector<int64_t> b = {2, 0};
+    auto uploadI64 = [&](const std::vector<int64_t>& host) {
+        void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
+        EXPECT_NE(device, nullptr);
+        cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
+        return device;
+    };
+    auto devI64 = [&](void* device, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = device;
+        view.dtype = nert::DataType::Int64;
+        view.dims = std::move(dims);
+        return view;
+    };
+    void* da = uploadI64(a);
+    void* db = uploadI64(b);
+    std::vector<int64_t> y(2, 0);
+    void* dy = uploadI64(y);
+    nert::Node node = MakeNode("div_bad", "Div");
+    try {
+        nert::CudaDevice().kernels().find("Div")(node, {devI64(da, {2}), devI64(db, {2})}, {devI64(dy, {2})});
+        FAIL() << "expected InferenceException for int64 division by zero";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("div_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Div"), std::string::npos) << message;
+    }
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+}
