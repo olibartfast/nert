@@ -55,7 +55,7 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 3 | B1b LessOrEqual/GreaterOrEqual/Or | `../nert-w-b1b` / `wip/nert-b1b` | 8/8 non-fixture pass; format clean | merged a9b232d | done 2026-10-16: direct, +553/-6 |
 | 4 | B2a ReduceL2 | `../nert-w-b2` / `wip/nert-b2` | 8/8 non-fixture pass; format clean | merged f4b5cf2 | done 2026-10-16: direct, incl. double-accum proof |
 | 5 | B2b ArgMax/CumSum/EyeLike | `../nert-w-b2b` / `wip/nert-b2b` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: direct, 2 commits |
-| — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | next |
+| 6 | B3 ScatterND | `../nert-w-b3` / `wip/nert-b3` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: Tier-5 11/11 kernels landed; OWLv2/DINO parity = integration gate (Neuriplo) |
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |
 | — | Phase 4 hardening | packet to be written | — | — | queued |
 | — | Phase 5 rename+filenames | one breaking commit | — | — | queued, maintainer gate |
