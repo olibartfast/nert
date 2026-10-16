@@ -60,3 +60,13 @@ summarize + clean scratch build dirs at each phase end.
 
 Order: G1 → G2 → G3 → G4 → G5 (each depends on the previous). Reviewer pass
 after G4, before G5 close-out.
+
+## Decisions (build-time findings)
+
+- [D-3] Bench `ON` requires both SDKs at configure (all helpers
+  compile-checked together in one TU); which device runs stays per flag.
+- [D-4] Bench floor is CMake >= 3.17 (CUDAToolkit module, explicit
+  `FATAL_ERROR`); runtime floor stays 3.16.
+- [D-5] G2 large-trial PASS means the oracle ran clean on 5 seeds (no device
+  to compare yet); the small exact test is the G2 correctness proof, the
+  device compare arrived in G3.

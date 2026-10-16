@@ -55,8 +55,19 @@ Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→
   `NERT_BENCH_USE_OPENCL_CPP=ON` each configure+build+`ctest -R bench_` 2/2;
   OpenCL C 5/5 exact (2.28x large), OpenCL C++ 5/5 exact (2.39x large);
   both flags together fail at configure with the mutual-exclusion message.
-- V-6: PASS (G1a, partial): default configure+existing tests untouched (only root option hook added); full ctest at close-out.
-- V-7: PASS (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.
+- V-6: DONE (G5): default configure+build green, 0 bench tests listed;
+  `git status` scope is `bench/`, root hook, `scripts/format.sh` (bench
+  cover), `specs/2026-10-16-kernel-bench-harness/`, roadmap N1 note. Default
+  ctest: 8/12 pass; the 4 failures (`engine_loader/shapes/plan/executor`)
+  fail only on "missing fixture: set NERT_FIXTURE" (fixture absent from this
+  box, by design fail-never-skip) and exercise `src/` only — bench is not in
+  the default build. `nert` STATIC target has no `target_link_libraries`
+  (stdlib-only holds; 0 cuda/opencl refs in its link.txt).
+- V-7: DONE (G5): C-idiom grep over `bench/` empty; `scripts/format.sh
+  --check` passes (73 files, now including `bench/`).
+- V-7: DONE (G5): C-idiom grep over `bench/` empty; `scripts/format.sh
+  --check` passes (73 files, now including `bench/`).
+- V-7 (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.
 
 ## Acceptance (bench enabled)
 
