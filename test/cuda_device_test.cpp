@@ -4,6 +4,7 @@
 // fails) so CPU-only runners with the toolkit installed stay green. The
 // default build (NERT_ENABLE_CUDA=OFF) does not compile this file.
 
+#include "cuda_test_helpers.hpp"
 #include "nert/device.hpp"
 
 #include <cstdint>
@@ -11,17 +12,6 @@
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
 #include <vector>
-
-namespace {
-
-// GTEST_SKIP must fire in the test body (it only returns from its own
-// function), so helpers report readiness and each TEST skips explicitly.
-bool HasCudaDevice() {
-    int count = 0;
-    return cudaGetDeviceCount(&count) == cudaSuccess && count >= 1;
-}
-
-} // namespace
 
 // The CUDA device names itself and exposes the seam trio.
 TEST(NertCudaDevice, NamesItself) {

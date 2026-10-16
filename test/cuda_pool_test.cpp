@@ -2,6 +2,7 @@
 //
 // Needs a CUDA device; without one every test SKIPs (never fails).
 
+#include "cuda_test_helpers.hpp"
 #include "nert/device.hpp"
 
 #include <cstdint>
@@ -11,49 +12,6 @@
 #include <vector>
 
 namespace {
-
-bool HasCudaDevice() {
-    int count = 0;
-    return cudaGetDeviceCount(&count) == cudaSuccess && count >= 1;
-}
-
-nert::TensorView HostFloat(std::vector<float>& data, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = data.empty() ? nullptr : data.data();
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-void* Upload(nert::Device& cuda, const std::vector<float>& host) {
-    void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(float)));
-    if (device == nullptr) {
-        throw std::runtime_error("Upload: device allocate failed");
-    }
-    cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(float)));
-    return device;
-}
-
-std::vector<float> Download(nert::Device& cuda, void* device, std::size_t count) {
-    std::vector<float> host(count, 0.0F);
-    cuda.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(float)));
-    return host;
-}
-
-nert::TensorView DeviceFloat(void* device, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = device;
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::Node MakeNode(const std::string& name, const std::string& op) {
-    nert::Node node;
-    node.name = name;
-    node.op_type = op;
-    return node;
-}
 
 std::vector<float> RunCudaPool(nert::Device& cuda, const std::string& op, nert::Node node, std::vector<float>& x,
                                std::vector<int64_t> xd, std::vector<int64_t> yd) {
