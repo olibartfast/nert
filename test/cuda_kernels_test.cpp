@@ -17,12 +17,11 @@
 
 namespace {
 
-// Skips the test when no CUDA device answers (never fails).
-void RequireCudaDevice() {
+// GTEST_SKIP must fire in the test body (it only returns from its own
+// function), so helpers report readiness and each TEST skips explicitly.
+bool HasCudaDevice() {
     int count = 0;
-    if (cudaGetDeviceCount(&count) != cudaSuccess || count < 1) {
-        GTEST_SKIP() << "no CUDA device (cudaGetDeviceCount found none)";
-    }
+    return cudaGetDeviceCount(&count) == cudaSuccess && count >= 1;
 }
 
 nert::TensorView HostFloat(std::vector<float>& data, std::vector<int64_t> dims) {
@@ -85,7 +84,9 @@ void ExpectNear(const std::vector<float>& got, const std::vector<float>& ref) {
 // Gemm small exact: [[1,2,3],[4,5,6]] x [[7,8],[9,10],[11,12]] =
 // [[58,64],[139,154]] on both tables, bit-exact here.
 TEST(NertCudaKernels, GemmSmallExact) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
 
     std::vector<float> a = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
@@ -114,7 +115,9 @@ TEST(NertCudaKernels, GemmSmallExact) {
 // Gemm with transposes, non-default alpha/beta, and a rank-1 [N] bias matches
 // the CPU oracle within tolerance.
 TEST(NertCudaKernels, GemmTransposedWithBiasWithinTolerance) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
 
     // A stored [3,2] transA=1 -> op(A) [2,3]; B stored [4,3] transB=1 ->
@@ -151,7 +154,9 @@ TEST(NertCudaKernels, GemmTransposedWithBiasWithinTolerance) {
 
 // Relu matches the CPU oracle exactly, incl. the zero boundary.
 TEST(NertCudaKernels, ReluExact) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
 
     std::vector<float> in = {-2.0F, -0.0F, 0.0F, 3.0F, 1.5F};
@@ -171,7 +176,9 @@ TEST(NertCudaKernels, ReluExact) {
 
 // Add broadcasts [2,1] int64 against [1,3] exactly like the CPU oracle.
 TEST(NertCudaKernels, AddBroadcastInt64Exact) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
 
     std::vector<int64_t> a = {1, 2};
@@ -215,7 +222,9 @@ TEST(NertCudaKernels, AddBroadcastInt64Exact) {
 // Micro-graph Gemm -> Relu -> Add runs on both devices and agrees within
 // tolerance, proving staging (upload/discharge) plus dispatch end to end.
 TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
 
     nert::Graph graph;
     graph.inputs = {{"a", {nert::DataType::Float32, {}}},
@@ -251,7 +260,9 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
 // An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
 // rejection, matching the pinned CPU behavior; see N1 validation notes).
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
 
     nert::Graph graph;
     graph.inputs = {{"x", {nert::DataType::Float32, {}}}};

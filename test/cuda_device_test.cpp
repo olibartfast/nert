@@ -14,12 +14,11 @@
 
 namespace {
 
-// Skips the test when no CUDA device answers (never fails).
-void RequireCudaDevice() {
+// GTEST_SKIP must fire in the test body (it only returns from its own
+// function), so helpers report readiness and each TEST skips explicitly.
+bool HasCudaDevice() {
     int count = 0;
-    if (cudaGetDeviceCount(&count) != cudaSuccess || count < 1) {
-        GTEST_SKIP() << "no CUDA device (cudaGetDeviceCount found none)";
-    }
+    return cudaGetDeviceCount(&count) == cudaSuccess && count >= 1;
 }
 
 } // namespace
@@ -32,15 +31,21 @@ TEST(NertCudaDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(cuda.transfer());
 }
 
-// M2 pilot rows resolve; anything else is still null so the executor
-// rejects the node naming op + node.
+// M2 pilot rows + N1b Conv resolve; anything else is still null so the
+// executor rejects the node naming op + node.
 TEST(NertCudaDevice, KernelTableServesPilotRows) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     const nert::Device& cuda = nert::CudaDevice();
     EXPECT_NE(cuda.kernels().find("Gemm"), nullptr);
     EXPECT_NE(cuda.kernels().find("Relu"), nullptr);
     EXPECT_NE(cuda.kernels().find("Add"), nullptr);
+#ifdef NERT_HAS_CUDNN
+    EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
+#else
     EXPECT_EQ(cuda.kernels().find("Conv"), nullptr);
+#endif
     EXPECT_EQ(cuda.kernels().find("Sigmoid"), nullptr);
 }
 
@@ -53,7 +58,9 @@ TEST(NertCudaDevice, RejectsNonPositiveAllocate) {
 
 // A host->device->host round trip preserves 1 KiB of patterned bytes.
 TEST(NertCudaDevice, TransferRoundTrip) {
-    RequireCudaDevice();
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
     nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
     const std::size_t bytes = 1024;
     std::vector<std::uint8_t> host(bytes, 0);
