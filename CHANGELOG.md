@@ -20,3 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   config exporting `nert::nert`.
 - GoogleTest suites (`engine_*`) driven by a ResNet-18 fixture provisioned with
   `tools/provision_resnet18.py`.
+- Opt-in `bench/` kernel measurement harness (`NERT_BUILD_BENCH=OFF` by
+  default), mirroring the gpu-playground per-kernel layout (`main.cpp` +
+  `cuda/` + `opencl/` + `opencl_cpp/` + vendored `.hpp` timing helpers):
+  starting with `gemm` on CUDA and OpenCL C/C++ against a bench-local CPU
+  oracle. Tooling only; the runtime stays standard-library-only.
