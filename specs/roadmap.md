@@ -57,11 +57,13 @@ Active packet: `specs/2026-10-10-raft-open-vocab/`.
   [V-3] (atol 1e-3 scaled, detection/DETR rows confident-only); ResNet
   fixture ctest stays green; no existing test weakened.
 
-## Phase 4 — Hardening + Policy (Planned)
+## Phase 4 — Hardening + Policy (Complete 2026-10-16)
 
-Resolve [Q-1] (opset policy), [Q-4] (CI zoo subset), [Q-3] if still open;
-close-out per neuriplo packet T-10 adapted to this repo (roadmap gate,
-CHANGELOG, consumer note). No new ops unless the survey demands it.
+[Q-1] decided: require opset-18 exports + conversion note (README).
+[Q-3] decided: static per load ([D-8], evidenced by RAFT parity).
+[Q-4] decided: ResNet-18 fixture only in CI; zoo parity in Neuriplo.
+Packet: `specs/2026-10-16-phase4-hardening/`. No new ops; no `src/`/
+`test/` behavior change.
 
 ## Phase 5 — Namespace Rename (Planned, Blocked on maintainer)
 

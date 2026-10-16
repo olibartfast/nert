@@ -75,14 +75,18 @@ their evidence there but never gate on exports NERT cannot provision itself.
 
 ## Open Technical Decisions
 
-- [Q-1] Accept opsets 12–17 natively (per-op attribute-vs-input variants), or
-  require opset-18 exports + conversion note? Recommendation: require 18.
-  Owner: maintainer.
-- [Q-3] RAFT symbolic spatial dims: static per load via input shapes (same as
-  batch, [D-8]), or wait for a plan cache? Recommendation: static per load.
-  Owner: maintainer.
-- [Q-4] Model zoo is large local exports, not CI fixtures. Which subset, if
-  any, is provisioned in CI? Owner: maintainer.
+Decided 2026-10-16 (Phase 4):
+
+- [Q-1] Opset policy: **require opset-18 exports + conversion note**
+  (was: recommendation). Loader accepts opset 18 only; README documents
+  the `onnx.version_converter` command. No native 12–17 support.
+- [Q-3] RAFT symbolic spatial dims: **static per load** via input shapes
+  ([D-8]) — confirmed by Tier-4 RAFT parity (`max_scaled_diff=6.10e-05`,
+  2026-10-10). No plan cache.
+- [Q-4] CI model subset: **ResNet-18 fixture only** (provisioned by
+  `.github/workflows/ci.yml` via `tools/provision_resnet18.py`). The
+  model zoo stays out of CI; parity runs live in Neuriplo
+  (`NertInferTest`, `nert_model_zoo_parity_test`).
 - [Q-5] Rename namespace `engine` + include prefix `engine/` to `nert`?
-  Recommendation: yes, one breaking 0.2 release with the matching adapter
-  change. Owner: maintainer.
+  Open — Phase 5 (one breaking 0.2 release with the matching adapter
+  change). Owner: maintainer.
