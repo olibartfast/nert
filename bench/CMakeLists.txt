@@ -7,3 +7,4 @@ if(NOT CMAKE_TESTING_ENABLED)
 endif()
 
 add_subdirectory(utils)
+add_subdirectory(gemm)

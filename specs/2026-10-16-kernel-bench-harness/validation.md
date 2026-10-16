@@ -34,11 +34,15 @@ Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→
 
 - Date / runner / GPU: 2026-10-16 / CPU-only container / no GPU (nvcc present, no device).
 - V-1: PASS (G1a): default OFF configure OK, 0 bench tests; `-DNERT_BUILD_BENCH=ON` lists `bench_utils_headers`.
-- V-2: pending (G2).
+- V-2: DONE (G2): harness prints `[[58,64],[139,154]]`, 5/5 seeds, CPU
+  timings + `SKIP:` device half, exit `0`; corrupted expectation (58→59,
+  uncommitted) exits `1`, then restored.
 - V-3: DONE (G1b): `ctest -R bench_utils_headers` 1/1 passed with all five
   headers included; `grep -rn '\.h"' bench/` empty; `ATTRIBUTION.md` records
   source + per-file deltas.
-- V-4: pending (G2).
+- V-4: PARTIAL (G2): `ctest -R bench_gemm` passes CPU-only (GPU half `SKIP`);
+  small exact test proves the oracle; large-trial PASS in G2 means the oracle
+  ran clean on 5 seeds — CPU-vs-device compare arrives with G3.
 - V-5: pending (G3/G4).
 - V-6: PASS (G1a, partial): default configure+existing tests untouched (only root option hook added); full ctest at close-out.
 - V-7: PASS (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.
