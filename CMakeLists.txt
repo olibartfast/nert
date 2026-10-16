@@ -87,7 +87,10 @@ add_library(nert STATIC
     src/kernels/Clip.cpp
     src/kernels/Squeeze.cpp
     src/kernels/LayerNormalization.cpp
-    src/kernels/InstanceNormalization.cpp)
+    src/kernels/InstanceNormalization.cpp
+    src/kernels/Elu.cpp
+    src/kernels/Max.cpp
+    src/kernels/Min.cpp)
 target_compile_features(nert PUBLIC cxx_std_17)
 target_include_directories(nert
     PUBLIC
