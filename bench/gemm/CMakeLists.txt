@@ -12,6 +12,15 @@ elseif(NERT_BENCH_USE_OPENCL)
     list(APPEND NERT_BENCH_GEMM_SOURCES opencl/gemm.cpp)
     set(NERT_BENCH_GEMM_BACKEND_DEF NERT_BENCH_OPENCL_BACKEND)
 else()
+    # CUDA path: compile the device TU with nvcc without raising the root
+    # project's language floor (stays C++-only, CMake 3.16).
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR "NERT_BUILD_BENCH CUDA path needs nvcc (no CUDA compiler found). Use an OpenCL flag or install the CUDA toolkit.")
+    endif()
+    enable_language(CUDA)
+    set_source_files_properties(cuda/gemm.cpp PROPERTIES LANGUAGE CUDA)
     list(APPEND NERT_BENCH_GEMM_SOURCES cuda/gemm.cpp)
 endif()
 

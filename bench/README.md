@@ -41,10 +41,11 @@ ctest --test-dir build -R bench_ --output-on-failure
 
 Bench is opt-in precisely so the default build needs nothing beyond a C++17
 compiler: with `NERT_BUILD_BENCH=OFF` (the default) no CUDA or OpenCL SDK is
-touched. With `NERT_BUILD_BENCH=ON`, both the CUDA toolkit and the OpenCL SDK
+touched and the CMake 3.16 floor holds. With `NERT_BUILD_BENCH=ON`, both the CUDA toolkit and the OpenCL SDK
 are required at configure time (all helper headers are compile-checked
 together via `bench_utils_headers`); a missing SDK fails naming the bench
-flag. Which device actually runs is still chosen by the backend flags below,
+flag. Bench also needs CMake >= 3.17 (CUDAToolkit module; explicit
+`FATAL_ERROR` otherwise) while the runtime keeps its 3.16 floor. Which device actually runs is still chosen by the backend flags below,
 and every device half runtime-SKIPs without a GPU, so CPU-only runners with
 the SDKs installed stay green.
 
