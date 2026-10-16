@@ -42,3 +42,4 @@ Defined before implementation. Evidence after execution.
 
 | N1e-1 | Mul/Sub/Div CUDA vs CPU (broadcast, int64, IEEE div, int64 div-by-zero throw) + OFF 8/8 + ON 11/11 + format | pass | 2026-10-16 | RTX 3060 host leg; rank cap 16 shared with Add. |
 | N1e-2 | MaxPool/AveragePool CUDA vs CPU (stride/pad/dilation/count_include_pad, negatives) + OFF 8/8 + ON 12/12 + format | pass | 2026-10-16 | RTX 3060 host leg; exact match (no tolerance needed). |
+| N1e-3 | Sigmoid/Tanh/Softmax CUDA vs CPU (hand-computed, stable-axis, negatives) + OFF 8/8 + ON 13/13 + format | pass | 2026-10-16 | RTX 3060 host leg; double-accum Softmax matches oracle order. BN skipped: no CPU kernel (folds at export). |

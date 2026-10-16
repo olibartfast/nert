@@ -46,12 +46,14 @@ TEST(NertCudaDevice, KernelTableServesPilotRows) {
     EXPECT_NE(cuda.kernels().find("Div"), nullptr);
     EXPECT_NE(cuda.kernels().find("MaxPool"), nullptr);
     EXPECT_NE(cuda.kernels().find("AveragePool"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Sigmoid"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Tanh"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Softmax"), nullptr);
 #ifdef NERT_HAS_CUDNN
     EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
 #else
     EXPECT_EQ(cuda.kernels().find("Conv"), nullptr);
 #endif
-    EXPECT_EQ(cuda.kernels().find("Sigmoid"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.
