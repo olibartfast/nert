@@ -59,7 +59,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |
 | 7 | Phase 4 hardening | — (docs-only, main) | format clean; scope docs-only | committed | done 2026-10-16: Q-1/Q-3/Q-4 decided |
 | 8 | Phase 5 rename+filenames | `../nert-w-phase5` / `wip/nert-phase5` | 8/8 non-fixture (`nert_*`); format clean; V-4 identifiers-only | merged | done 2026-10-16: M1 pure moves + M2/M3; 0.2.0 |
-| — | N1 CUDA layer | packet next | — | — | vendor decision RECEIVED (hybrid, libraries-first) |
+| 9 | N1a-M1 CUDA scaffold | `../nert-w-n1a` / `wip/nert-n1a` | OFF 8/8 + ON 9/9 (RTX 3060) + format clean; no-cuda link when OFF | merged | done 2026-10-16: allocator/transfer/empty-table + build wiring |
+| — | N1a-M2 pilot kernels | next | — | — | Gemm cuBLAS + Relu/Add first-party |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
