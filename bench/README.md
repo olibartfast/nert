@@ -37,6 +37,27 @@ cmake --build build
 ctest --test-dir build -R bench_ --output-on-failure
 ```
 
+## Kernels: gemm pilot
+
+```bash
+# CUDA path (default when bench is ON)
+cmake -S . -B build-cuda -DNERT_BUILD_BENCH=ON && cmake --build build-cuda --target nert_bench_gemm
+./build-cuda/bench/gemm/nert_bench_gemm
+
+# OpenCL C API
+cmake -S . -B build-ocl -DNERT_BUILD_BENCH=ON -DNERT_BENCH_USE_OPENCL=ON && cmake --build build-ocl --target nert_bench_gemm
+./build-ocl/bench/gemm/nert_bench_gemm
+
+# OpenCL C++ wrapper
+cmake -S . -B build-oclcpp -DNERT_BUILD_BENCH=ON -DNERT_BENCH_USE_OPENCL_CPP=ON && cmake --build build-oclcpp --target nert_bench_gemm
+./build-oclcpp/bench/gemm/nert_bench_gemm
+```
+
+Expected on a GPU runner (RTX 3060, 2026-10-16): small test prints
+`[[58,64],[139,154]]`, all 5 large seeds PASSED with max abs diff `0.00`,
+exit `0`. CUDA large is ~300x the naive CPU oracle; OpenCL legs ~2.3x
+(they rebuild + transfer per call — honestly reported, not tuned).
+
 ## SDK prerequisites
 
 Bench is opt-in precisely so the default build needs nothing beyond a C++17

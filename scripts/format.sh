@@ -78,7 +78,7 @@ is_excluded() {
 FILES=()
 while IFS= read -r f; do
     is_excluded "$f" || FILES+=("$f")
-done < <(find "$ROOT/src" "$ROOT/include" "$ROOT/test" \
+done < <(find "$ROOT/src" "$ROOT/include" "$ROOT/test" "$ROOT/bench" \
     \( -name '*.cpp' -o -name '*.hpp' \) -print | sort)
 
 if [[ ${#FILES[@]} -eq 0 ]]; then
