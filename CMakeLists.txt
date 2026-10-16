@@ -123,11 +123,29 @@ if(NERT_ENABLE_CUDA)
     endif()
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
+    # PUBLIC includes: test targets (and consumers building CUDA code) need
+    # the toolkit headers; libraries stay PRIVATE (static-link propagation
+    # still resolves the final link).
+    target_include_directories(nert PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
     target_sources(nert PRIVATE src/cuda_device.cpp src/cuda/gemm.cu src/cuda/relu.cu src/cuda/add.cu
                                 src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
+    # cuDNN (N1b Conv) is optional even with CUDA on: the host has CUDA but
+    # no cuDNN, and its ON build must keep working on the cuBLAS pilot.
+    find_path(CUDNN_INCLUDE_DIR NAMES cudnn.h PATHS /usr/include /usr/include/x86_64-linux-gnu
+                                                /usr/local/cuda/include "$ENV{CUDNN_ROOT}" "$ENV{CUDNN_ROOT}/include")
+    find_library(CUDNN_LIBRARY NAMES cudnn PATHS /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/cuda/lib64
+                                               "$ENV{CUDNN_ROOT}" "$ENV{CUDNN_ROOT}/lib64")
+    if(CUDNN_INCLUDE_DIR AND CUDNN_LIBRARY)
+        target_sources(nert PRIVATE src/cuda/conv.cu)
+        target_compile_definitions(nert PRIVATE NERT_HAS_CUDNN)
+        target_include_directories(nert PRIVATE ${CUDNN_INCLUDE_DIR})
+        target_link_libraries(nert PRIVATE ${CUDNN_LIBRARY})
+    else()
+        message(STATUS "cuDNN not found - CUDA Conv disabled (cuBLAS pilot only)")
+    endif()
 endif()
 
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects

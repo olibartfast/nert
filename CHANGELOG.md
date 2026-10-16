@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nert_*`. No behavior change. Consumers (Neuriplo adapter) update
   includes + namespace; the `neuriplo_engine` CMake alias is kept.
 
+### Added
+
+- Opt-in CUDA device layer (`NERT_ENABLE_CUDA=OFF` by default): same model
+  + same plan on CUDA — allocator, transfers, whole-graph staging, and an
+  op-keyed table (cuBLAS `Gemm`, first-party `Relu`/`Add`, cuDNN `Conv`),
+  matching the CPU oracle within tolerance. OFF link closure stays
+  standard-library-only; CUDA/cuDNN link PRIVATE.
+
 ## [0.1.0] - Unreleased
 
 ### Added
