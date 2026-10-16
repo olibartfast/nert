@@ -4,13 +4,13 @@
 // The indices are int64; negative values wrap by the axis dim and anything
 // still out of range throws. Data is float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -126,4 +126,4 @@ void Gather(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

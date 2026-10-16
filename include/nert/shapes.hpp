@@ -14,9 +14,9 @@
 #include <string>
 #include <vector>
 
-#include "engine/Graph.hpp"
+#include "nert/graph.hpp"
 
-namespace engine {
+namespace nert {
 
 // Concrete dimensions for the graph inputs, keyed by input name.
 using ShapeMap = std::map<std::string, std::vector<int64_t>>;
@@ -32,4 +32,4 @@ struct InferredShapes {
 // shaped statically, or when a node input or declared output never resolves.
 InferredShapes InferShapes(const Graph& graph, const ShapeMap& input_dims);
 
-} // namespace engine
+} // namespace nert

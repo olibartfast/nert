@@ -1,7 +1,7 @@
 // ReduceL2: sqrt of the sum of squares over the requested axes; float32
 // (double accumulation, rounded once to float32).
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -177,4 +177,4 @@ void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

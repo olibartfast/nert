@@ -12,10 +12,10 @@
 // opset-18 ResNet-18 export resolved via NERT_FIXTURE (env var or
 // CMake cache variable) and a missing fixture FAILS — never skipped or mocked.
 
-#include "engine/Graph.hpp"
-#include "engine/ModelLoader.hpp"
-#include "engine/Plan.hpp"
-#include "engine/Shapes.hpp"
+#include "nert/graph.hpp"
+#include "nert/model_loader.hpp"
+#include "nert/plan.hpp"
+#include "nert/shapes.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -148,35 +148,35 @@ std::string write_model_bytes(const std::string& name, const std::string& bytes)
     return path;
 }
 
-engine::Graph load_graph(const std::string& name, const std::string& bytes) {
-    return engine::LoadGraphFromFile(write_model_bytes(name, bytes));
+nert::Graph load_graph(const std::string& name, const std::string& bytes) {
+    return nert::LoadGraphFromFile(write_model_bytes(name, bytes));
 }
 
 std::vector<float> zeros(std::size_t count) { return std::vector<float>(count, 0.0F); }
 
-engine::TensorInfo f32(std::vector<int64_t> dims) {
-    engine::TensorInfo info;
-    info.dtype = engine::DataType::Float32;
+nert::TensorInfo f32(std::vector<int64_t> dims) {
+    nert::TensorInfo info;
+    info.dtype = nert::DataType::Float32;
     info.dims = std::move(dims);
     return info;
 }
 
-engine::TensorInfo i64(std::vector<int64_t> dims) {
-    engine::TensorInfo info;
-    info.dtype = engine::DataType::Int64;
+nert::TensorInfo i64(std::vector<int64_t> dims) {
+    nert::TensorInfo info;
+    info.dtype = nert::DataType::Int64;
     info.dims = std::move(dims);
     return info;
 }
 
-engine::TensorInfo boolean(std::vector<int64_t> dims) {
-    engine::TensorInfo info;
-    info.dtype = engine::DataType::Bool;
+nert::TensorInfo boolean(std::vector<int64_t> dims) {
+    nert::TensorInfo info;
+    info.dtype = nert::DataType::Bool;
     info.dims = std::move(dims);
     return info;
 }
 
-engine::Node relu_node(const std::string& name, const std::string& input, const std::string& output) {
-    engine::Node node;
+nert::Node relu_node(const std::string& name, const std::string& input, const std::string& output) {
+    nert::Node node;
     node.name = name;
     node.op_type = "Relu";
     node.inputs = {input};
@@ -185,7 +185,7 @@ engine::Node relu_node(const std::string& name, const std::string& input, const 
 }
 
 // Two planned byte ranges share at least one byte.
-bool ranges_overlap(const engine::BufferAssignment& a, const engine::BufferAssignment& b) {
+bool ranges_overlap(const nert::BufferAssignment& a, const nert::BufferAssignment& b) {
     return a.offset < b.offset + b.size && b.offset < a.offset + a.size;
 }
 
@@ -211,7 +211,7 @@ class EnginePlan : public ::testing::Test {
 // disjoint and they share offset 0. The chain outputs aout [1, 3] and b0 [2, 3]
 // overlap in time, so those must not share bytes.
 TEST_F(EnginePlan, DisjointLifetimesShareOffset) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.inputs.push_back({"y", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "a0"));
@@ -221,7 +221,7 @@ TEST_F(EnginePlan, DisjointLifetimesShareOffset) {
     graph.outputs.push_back({"aout", f32({1, 64})});
     graph.outputs.push_back({"bout", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["y"] = f32({1, 64});
     shapes.tensors["a0"] = f32({1, 64});
@@ -229,7 +229,7 @@ TEST_F(EnginePlan, DisjointLifetimesShareOffset) {
     shapes.tensors["b0"] = f32({1, 64});
     shapes.tensors["bout"] = f32({1, 64});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 4U);
     EXPECT_EQ(plan.buffers.at("a0").offset, plan.buffers.at("b0").offset)
         << "disjoint inclusive lifetimes should reuse: a0=" << plan.buffers.at("a0").offset
@@ -242,11 +242,11 @@ TEST_F(EnginePlan, DisjointLifetimesShareOffset) {
 // `a` stays live until Add consumes it at node 2, while `b` is defined at node
 // 1 and consumed at node 2: their live ranges intersect, so they cannot share.
 TEST_F(EnginePlan, OverlappingLifetimesDoNotOverlap) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "a"));
     graph.nodes.push_back(relu_node("relu1", "a", "b"));
-    engine::Node add;
+    nert::Node add;
     add.name = "add0";
     add.op_type = "Add";
     add.inputs = {"a", "b"};
@@ -254,16 +254,16 @@ TEST_F(EnginePlan, OverlappingLifetimesDoNotOverlap) {
     graph.nodes.push_back(add);
     graph.outputs.push_back({"c", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["a"] = f32({1, 64});
     shapes.tensors["b"] = f32({1, 64});
     shapes.tensors["c"] = f32({1, 64});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 3U);
-    const engine::BufferAssignment& a = plan.buffers.at("a");
-    const engine::BufferAssignment& b = plan.buffers.at("b");
+    const nert::BufferAssignment& a = plan.buffers.at("a");
+    const nert::BufferAssignment& b = plan.buffers.at("b");
     EXPECT_NE(a.offset, b.offset);
     const bool disjoint = a.offset + a.size <= b.offset || b.offset + b.size <= a.offset;
     EXPECT_TRUE(disjoint) << "a=" << a.offset << "+" << a.size << " b=" << b.offset << "+" << b.size;
@@ -271,11 +271,11 @@ TEST_F(EnginePlan, OverlappingLifetimesDoNotOverlap) {
 
 // Every offset is 64-byte aligned and every buffer fits inside the arena.
 TEST_F(EnginePlan, OffsetsAlignedAndWithinArena) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "a"));
     graph.nodes.push_back(relu_node("relu1", "a", "b"));
-    engine::Node add;
+    nert::Node add;
     add.name = "add0";
     add.op_type = "Add";
     add.inputs = {"a", "b"};
@@ -283,16 +283,16 @@ TEST_F(EnginePlan, OffsetsAlignedAndWithinArena) {
     graph.nodes.push_back(add);
     graph.outputs.push_back({"c", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["a"] = f32({1, 64});
     shapes.tensors["b"] = f32({1, 64});
     shapes.tensors["c"] = f32({1, 64});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_FALSE(plan.buffers.empty());
     for (const auto& entry : plan.buffers) {
-        const engine::BufferAssignment& buffer = entry.second;
+        const nert::BufferAssignment& buffer = entry.second;
         EXPECT_EQ(buffer.offset % 64, 0) << entry.first;
         EXPECT_LE(buffer.offset + buffer.size, plan.arena_size) << entry.first;
     }
@@ -305,20 +305,20 @@ TEST_F(EnginePlan, OffsetsAlignedAndWithinArena) {
 // arena is therefore strictly smaller than the sum of its tensors ([V-5] reuse
 // proof).
 TEST_F(EnginePlan, SequentialArenaSmallerThanSum) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "a0"));
     graph.nodes.push_back(relu_node("relu1", "a0", "a1"));
     graph.nodes.push_back(relu_node("relu2", "a1", "a2"));
     graph.outputs.push_back({"a2", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["a0"] = f32({1, 64});
     shapes.tensors["a1"] = f32({1, 64});
     shapes.tensors["a2"] = f32({1, 64});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     int64_t sum = 0;
     for (const auto& entry : plan.buffers) {
         sum += entry.second.size;
@@ -329,15 +329,15 @@ TEST_F(EnginePlan, SequentialArenaSmallerThanSum) {
 
 // Graph inputs and embedded constants are external: they never get a buffer.
 TEST_F(EnginePlan, InputsAndInitializersHaveNoBuffer) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 3, 8, 8})});
-    engine::Initializer weight;
-    weight.dtype = engine::DataType::Float32;
+    nert::Initializer weight;
+    weight.dtype = nert::DataType::Float32;
     weight.dims = {4, 3, 3, 3};
     weight.values = zeros(4 * 3 * 3 * 3);
     graph.initializers["w"] = weight;
 
-    engine::Node conv;
+    nert::Node conv;
     conv.name = "conv0";
     conv.op_type = "Conv";
     conv.inputs = {"x", "w"};
@@ -345,12 +345,12 @@ TEST_F(EnginePlan, InputsAndInitializersHaveNoBuffer) {
     graph.nodes.push_back(conv);
     graph.outputs.push_back({"y", f32({1, 4, 8, 8})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 3, 8, 8});
     shapes.tensors["w"] = f32({4, 3, 3, 3});
     shapes.tensors["y"] = f32({1, 4, 8, 8});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     EXPECT_EQ(plan.buffers.count("x"), 0U);
     EXPECT_EQ(plan.buffers.count("w"), 0U);
     EXPECT_EQ(plan.buffers.count("y"), 1U);
@@ -358,16 +358,16 @@ TEST_F(EnginePlan, InputsAndInitializersHaveNoBuffer) {
 
 // A declared graph output is an arena tensor and gets a buffer.
 TEST_F(EnginePlan, GraphOutputHasBuffer) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({2, 5})});
     graph.nodes.push_back(relu_node("relu0", "x", "y"));
     graph.outputs.push_back({"y", f32({2, 5})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({2, 5});
     shapes.tensors["y"] = f32({2, 5});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.count("y"), 1U);
     EXPECT_GT(plan.buffers.at("y").size, 0);
 }
@@ -380,18 +380,18 @@ TEST_F(EnginePlan, OutputNeverAliasesItsInput) {
     // Hermetic: relu1 consumes arena tensor `a` and defines `b`; the planner
     // must keep their byte ranges disjoint.
     {
-        engine::Graph graph;
+        nert::Graph graph;
         graph.inputs.push_back({"x", f32({1, 8})});
         graph.nodes.push_back(relu_node("relu0", "x", "a"));
         graph.nodes.push_back(relu_node("relu1", "a", "b"));
         graph.outputs.push_back({"b", f32({1, 8})});
 
-        engine::InferredShapes shapes;
+        nert::InferredShapes shapes;
         shapes.tensors["x"] = f32({1, 8});
         shapes.tensors["a"] = f32({1, 8});
         shapes.tensors["b"] = f32({1, 8});
 
-        const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+        const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
         ASSERT_EQ(plan.buffers.count("a"), 1U);
         ASSERT_EQ(plan.buffers.count("b"), 1U);
         EXPECT_FALSE(ranges_overlap(plan.buffers.at("a"), plan.buffers.at("b")))
@@ -408,11 +408,11 @@ TEST_F(EnginePlan, OutputNeverAliasesItsInput) {
     ASSERT_TRUE(std::filesystem::exists(fixture))
         << "fixture path from " << fixture_env_name() << " does not exist: " << fixture;
 
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
-    const engine::InferredShapes shapes = engine::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
 
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         for (const std::string& input : node.inputs) {
             const auto in_buffer = plan.buffers.find(input);
             if (in_buffer == plan.buffers.end()) {
@@ -442,10 +442,10 @@ TEST_F(EnginePlan, PerShapeSeamWithoutReload) {
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("b", 1, {1, 4, 8, 8}));
 
-    const engine::Graph graph = load_graph("plan_per_shape.onnx", encode_model(body));
+    const nert::Graph graph = load_graph("plan_per_shape.onnx", encode_model(body));
 
-    const engine::InferredShapes first = engine::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
-    const engine::MemoryPlan first_plan = engine::PlanMemory(graph, first);
+    const nert::InferredShapes first = nert::InferShapes(graph, {{"x", {1, 3, 8, 8}}});
+    const nert::MemoryPlan first_plan = nert::PlanMemory(graph, first);
     ASSERT_FALSE(first_plan.buffers.empty());
     ASSERT_EQ(first_plan.buffers.count("a"), 1U);
     ASSERT_EQ(first_plan.buffers.count("b"), 1U);
@@ -453,8 +453,8 @@ TEST_F(EnginePlan, PerShapeSeamWithoutReload) {
     EXPECT_EQ(first_plan.buffers.at("b").size, 1 * 4 * 8 * 8 * 4);
     EXPECT_GT(first_plan.arena_size, 0);
 
-    const engine::InferredShapes second = engine::InferShapes(graph, {{"x", {1, 3, 16, 16}}});
-    const engine::MemoryPlan second_plan = engine::PlanMemory(graph, second);
+    const nert::InferredShapes second = nert::InferShapes(graph, {{"x", {1, 3, 16, 16}}});
+    const nert::MemoryPlan second_plan = nert::PlanMemory(graph, second);
     ASSERT_FALSE(second_plan.buffers.empty());
     ASSERT_EQ(second_plan.buffers.count("a"), 1U);
     ASSERT_EQ(second_plan.buffers.count("b"), 1U);
@@ -466,20 +466,20 @@ TEST_F(EnginePlan, PerShapeSeamWithoutReload) {
 // Buffers are sized by dtype: bool 1 byte, float32 4 bytes, int64 8 bytes.
 // A mixed-dtype chain plans without overlap errors.
 TEST_F(EnginePlan, DtypeAwareBufferSizes) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "a"));
     graph.nodes.push_back(relu_node("relu1", "a", "b"));
     graph.nodes.push_back(relu_node("relu2", "b", "c"));
     graph.outputs.push_back({"c", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["a"] = boolean({1, 64}); // 64 elements x 1 byte
     shapes.tensors["b"] = f32({1, 64}); // 64 elements x 4 bytes
     shapes.tensors["c"] = i64({1, 64}); // 64 elements x 8 bytes
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 3U);
     EXPECT_EQ(plan.buffers.at("a").size, 64 * 1);
     EXPECT_EQ(plan.buffers.at("b").size, 64 * 4);
@@ -495,11 +495,11 @@ TEST_F(EnginePlan, DtypeAwareBufferSizes) {
 // (bool, live until node 2) and `b` (int64, defined at node 1) intersect, so
 // their byte ranges stay disjoint and planning succeeds.
 TEST_F(EnginePlan, MixedDtypeOverlappingLifetimesDoNotOverlap) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 16})});
     graph.nodes.push_back(relu_node("relu0", "x", "a"));
     graph.nodes.push_back(relu_node("relu1", "a", "b"));
-    engine::Node add;
+    nert::Node add;
     add.name = "add0";
     add.op_type = "Add";
     add.inputs = {"a", "b"};
@@ -507,13 +507,13 @@ TEST_F(EnginePlan, MixedDtypeOverlappingLifetimesDoNotOverlap) {
     graph.nodes.push_back(add);
     graph.outputs.push_back({"c", f32({1, 16})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 16});
     shapes.tensors["a"] = boolean({1, 16}); // 16 bytes
     shapes.tensors["b"] = i64({1, 16}); // 128 bytes
     shapes.tensors["c"] = f32({1, 16}); // 64 bytes
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 3U);
     EXPECT_EQ(plan.buffers.at("a").size, 16 * 1);
     EXPECT_EQ(plan.buffers.at("b").size, 16 * 8);
@@ -532,9 +532,9 @@ TEST_F(EnginePlan, FixturePlanNonEmpty) {
     ASSERT_TRUE(std::filesystem::exists(fixture))
         << "fixture path from " << fixture_env_name() << " does not exist: " << fixture;
 
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
-    const engine::InferredShapes shapes = engine::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"input", {1, 3, 224, 224}}});
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
 
     EXPECT_FALSE(plan.buffers.empty());
     EXPECT_GT(plan.arena_size, 0);
@@ -547,18 +547,18 @@ TEST_F(EnginePlan, FixturePlanNonEmpty) {
 // buffer: the executor resolves a buffer for every node output. Its lifetime
 // is [definition, definition].
 TEST_F(EnginePlan, DeadOutputTensorGetsBuffer) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 64})});
     graph.nodes.push_back(relu_node("relu0", "x", "dead"));
     graph.nodes.push_back(relu_node("relu1", "x", "out"));
     graph.outputs.push_back({"out", f32({1, 64})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["dead"] = f32({1, 64});
     shapes.tensors["out"] = f32({1, 64});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.count("dead"), 1U);
     ASSERT_EQ(plan.buffers.count("out"), 1U);
     EXPECT_EQ(plan.buffers.at("dead").size, 64 * 4);
@@ -571,9 +571,9 @@ TEST_F(EnginePlan, DeadOutputTensorGetsBuffer) {
 // Values lives [0, 0] while indices lives [0, 1], so their byte ranges must
 // stay disjoint.
 TEST_F(EnginePlan, TwoOutputNodeWithOneDeadOutputPlansBoth) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 8})});
-    engine::Node topk;
+    nert::Node topk;
     topk.name = "topk0";
     topk.op_type = "TopK";
     topk.inputs = {"x"};
@@ -582,13 +582,13 @@ TEST_F(EnginePlan, TwoOutputNodeWithOneDeadOutputPlansBoth) {
     graph.nodes.push_back(relu_node("relu0", "indices", "out"));
     graph.outputs.push_back({"out", f32({1, 4})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 8});
     shapes.tensors["values"] = f32({1, 4});
     shapes.tensors["indices"] = i64({1, 4});
     shapes.tensors["out"] = f32({1, 4});
 
-    const engine::MemoryPlan plan = engine::PlanMemory(graph, shapes);
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.count("values"), 1U);
     ASSERT_EQ(plan.buffers.count("indices"), 1U);
     ASSERT_EQ(plan.buffers.count("out"), 1U);
@@ -607,18 +607,18 @@ class EnginePlanNegative : public ::testing::Test {};
 
 // A node output absent from the inferred shapes names that tensor.
 TEST_F(EnginePlanNegative, MissingShapeNamesTensor) {
-    engine::Graph graph;
+    nert::Graph graph;
     graph.inputs.push_back({"x", f32({1, 4})});
     graph.nodes.push_back(relu_node("relu0", "x", "missing_tensor"));
     graph.outputs.push_back({"missing_tensor", f32({1, 4})});
 
-    engine::InferredShapes shapes;
+    nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 4});
 
     std::string message;
     try {
-        engine::PlanMemory(graph, shapes);
-    } catch (const engine::ModelLoadException& e) {
+        nert::PlanMemory(graph, shapes);
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "missing inferred shape did not throw";
@@ -627,13 +627,13 @@ TEST_F(EnginePlanNegative, MissingShapeNamesTensor) {
 
 // An empty graph cannot be planned.
 TEST_F(EnginePlanNegative, EmptyGraphRejected) {
-    engine::Graph graph;
-    engine::InferredShapes shapes;
+    nert::Graph graph;
+    nert::InferredShapes shapes;
 
     std::string message;
     try {
-        engine::PlanMemory(graph, shapes);
-    } catch (const engine::ModelLoadException& e) {
+        nert::PlanMemory(graph, shapes);
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "empty graph did not throw";

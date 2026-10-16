@@ -9,10 +9,10 @@
 //
 // Must not include or reference the backend abstraction layer.
 
-#include "engine/Device.hpp"
-#include "engine/Graph.hpp"
-#include "engine/Plan.hpp"
-#include "engine/Shapes.hpp"
+#include "nert/device.hpp"
+#include "nert/graph.hpp"
+#include "nert/plan.hpp"
+#include "nert/shapes.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 
 // One host-side tensor crossing the typed Run boundary: its element type, its
 // shape, and its elements as contiguous native-endian bytes. Float32 takes 4
@@ -88,4 +88,4 @@ class Model {
     void* arena_ = nullptr; // one allocation, shared by every arena tensor
 };
 
-} // namespace engine
+} // namespace nert

@@ -1,14 +1,14 @@
 // ReduceSum: sum over the requested axes; float32 (double accumulation, rounded
 // once to float32) or int64 data.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <type_traits>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -182,4 +182,4 @@ void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const st
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

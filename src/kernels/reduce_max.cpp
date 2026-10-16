@@ -3,7 +3,7 @@
 // The axes arrive as an optional int64 input; an absent axes input reduces
 // every axis. The `keepdims` attribute defaults to 1.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -157,4 +157,4 @@ void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const st
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

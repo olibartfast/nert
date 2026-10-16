@@ -65,10 +65,12 @@ Active packet: `specs/2026-10-10-raft-open-vocab/`.
 Packet: `specs/2026-10-16-phase4-hardening/`. No new ops; no `src/`/
 `test/` behavior change.
 
-## Phase 5 — Namespace Rename (Planned, Blocked on maintainer)
+## Phase 5 — Namespace Rename (Complete 2026-10-16)
 
-[Q-5]: `engine/` + namespace `engine` → `nert` in one breaking 0.2 release
-with the matching Neuriplo adapter change. Not mixed into operator work.
+[Q-5] decided: `include/nert/` + namespace `nert` + `snake_case` filenames
+in one breaking 0.2.0 commit (`wip/nert-phase5`), with the matching Neuriplo
+adapter change (includes + namespace) still to land consumer-side.
+Packet: `specs/2026-10-16-phase5-rename/`. No behavior change.
 
 ## Phase N1 — CUDA Device Layer (Planned)
 

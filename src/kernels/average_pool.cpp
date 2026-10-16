@@ -6,14 +6,14 @@
 // padded input, but never window positions that ceil_mode pushes past it; without
 // it the divisor counts only in-bounds positions. Naive, float32,
 // single-threaded.
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -226,4 +226,4 @@ void AveragePool(const Node& node, const std::vector<TensorView>& inputs, const 
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

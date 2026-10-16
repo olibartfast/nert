@@ -1,14 +1,14 @@
 // ReduceMean: mean over the requested axes; sums accumulate in double and the
 // mean rounds once to float32.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -179,4 +179,4 @@ void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const s
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

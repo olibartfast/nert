@@ -1,12 +1,12 @@
 // Not: elementwise logical negation of a bool tensor; the output keeps the input shape.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 
 void Not(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
@@ -40,4 +40,4 @@ void Not(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

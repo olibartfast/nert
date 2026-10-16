@@ -18,7 +18,7 @@
 #include <variant>
 #include <vector>
 
-namespace engine {
+namespace nert {
 
 // Raised for any malformed or unreadable model file, and for graphs the loader
 // cannot accept. The message carries the offending node name and op type.
@@ -126,4 +126,4 @@ struct Graph {
     std::vector<std::pair<std::string, TensorInfo>> outputs;
 };
 
-} // namespace engine
+} // namespace nert

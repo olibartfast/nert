@@ -1,13 +1,13 @@
 // Identity: copy of the input buffer; float32, int64, or bool data.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -61,4 +61,4 @@ void Identity(const Node& node, const std::vector<TensorView>& inputs, const std
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

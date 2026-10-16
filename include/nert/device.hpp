@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "engine/Graph.hpp"
+#include "nert/graph.hpp"
 
-namespace engine {
+namespace nert {
 
 // A non-owning view of one tensor: where its data lives, its element type, and
 // its concrete dimensions. `data` may be null for a zero-element tensor.
@@ -70,4 +70,4 @@ public:
 // The process-lifetime CPU device, the reference implementation of the seam.
 const Device& CpuDevice();
 
-} // namespace engine
+} // namespace nert

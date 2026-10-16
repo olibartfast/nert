@@ -4,14 +4,14 @@
 // the dividend. A zero divisor is rejected with node context (there is no
 // integer inf/nan to fall back on).
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -136,4 +136,4 @@ void Mod(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

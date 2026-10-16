@@ -4,13 +4,13 @@
 // dropped. `select_last_index` (default 0) picks the last tied maximum
 // instead of the first. Data is float32 or int64; indices are int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -123,4 +123,4 @@ void ArgMax(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

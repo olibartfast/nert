@@ -9,14 +9,14 @@
 //
 // Must not include anything from the backend abstraction layer.
 
-#include "engine/Graph.hpp"
-#include "engine/Shapes.hpp"
+#include "nert/graph.hpp"
+#include "nert/shapes.hpp"
 
 #include <cstdint>
 #include <map>
 #include <string>
 
-namespace engine {
+namespace nert {
 
 // Where one arena tensor lives: a byte offset and a byte size.
 struct BufferAssignment {
@@ -38,4 +38,4 @@ struct MemoryPlan {
 // has no nodes.
 MemoryPlan PlanMemory(const Graph& graph, const InferredShapes& shapes);
 
-} // namespace engine
+} // namespace nert

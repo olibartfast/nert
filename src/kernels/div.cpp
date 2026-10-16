@@ -4,14 +4,14 @@
 // Float division by zero follows IEEE-754 float semantics (inf/nan) and never
 // throws; integer division truncates toward zero and a zero divisor throws.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -152,4 +152,4 @@ void Div(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

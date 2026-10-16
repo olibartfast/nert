@@ -8,14 +8,14 @@
 // optional Mean and InvStdDev outputs keep the leading dims and set the
 // normalized ones to 1. Statistics accumulate in double; data is float32.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -160,4 +160,4 @@ void LayerNormalization(const Node& node, const std::vector<TensorView>& inputs,
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

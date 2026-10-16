@@ -1,13 +1,13 @@
 // IsNaN: elementwise NaN test over float32 data; bool output.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -50,4 +50,4 @@ void IsNaN(const Node& node, const std::vector<TensorView>& inputs, const std::v
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

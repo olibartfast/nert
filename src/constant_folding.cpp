@@ -4,9 +4,9 @@
 // of the node and its constant inputs, so folding reuses the same shape rules
 // as a normal load instead of duplicating them.
 
-#include "engine/ConstantFolding.hpp"
+#include "nert/constant_folding.hpp"
 
-#include "engine/Shapes.hpp"
+#include "nert/shapes.hpp"
 
 #include <cstdint>
 #include <set>
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace {
 
 // Upper bound on one folded tensor, so folding never materializes a large
@@ -142,4 +142,4 @@ int FoldConstants(Graph& graph, const Device& device) {
     return folded;
 }
 
-} // namespace engine
+} // namespace nert

@@ -3,10 +3,10 @@
 
 find_package(GTest REQUIRED)
 
-add_executable(engine_loader_test LoaderTest.cpp)
-target_compile_features(engine_loader_test PRIVATE cxx_std_17)
-target_compile_options(engine_loader_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_loader_test PRIVATE
+add_executable(nert_loader_test loader_test.cpp)
+target_compile_features(nert_loader_test PRIVATE cxx_std_17)
+target_compile_options(nert_loader_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_loader_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
@@ -22,90 +22,90 @@ if(NOT NERT_FIXTURE AND EXISTS
         "/tmp/opencode/resnet18_export/resnet18.onnx")
 endif()
 
-add_test(NAME engine_loader
-    COMMAND engine_loader_test --gtest_filter=EngineLoader.*)
-add_test(NAME engine_loader_negative
-    COMMAND engine_loader_test --gtest_filter=EngineLoaderNegative.*)
+add_test(NAME nert_loader
+    COMMAND nert_loader_test --gtest_filter=NertLoader.*)
+add_test(NAME nert_loader_negative
+    COMMAND nert_loader_test --gtest_filter=NertLoaderNegative.*)
 
-add_executable(engine_shapes_test ShapeInferenceTest.cpp)
-target_compile_features(engine_shapes_test PRIVATE cxx_std_17)
-target_compile_options(engine_shapes_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_shapes_test PRIVATE
+add_executable(nert_shapes_test shape_inference_test.cpp)
+target_compile_features(nert_shapes_test PRIVATE cxx_std_17)
+target_compile_options(nert_shapes_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_shapes_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
 
-add_test(NAME engine_shapes
-    COMMAND engine_shapes_test --gtest_filter=EngineShapes.*)
-add_test(NAME engine_shapes_negative
-    COMMAND engine_shapes_test --gtest_filter=EngineShapesNegative.*)
+add_test(NAME nert_shapes
+    COMMAND nert_shapes_test --gtest_filter=NertShapes.*)
+add_test(NAME nert_shapes_negative
+    COMMAND nert_shapes_test --gtest_filter=NertShapesNegative.*)
 
-add_executable(engine_plan_test MemoryPlannerTest.cpp)
-target_compile_features(engine_plan_test PRIVATE cxx_std_17)
-target_compile_options(engine_plan_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_plan_test PRIVATE
+add_executable(nert_plan_test memory_planner_test.cpp)
+target_compile_features(nert_plan_test PRIVATE cxx_std_17)
+target_compile_options(nert_plan_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_plan_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
 
-add_test(NAME engine_plan
-    COMMAND engine_plan_test --gtest_filter=EnginePlan.*)
-add_test(NAME engine_plan_negative
-    COMMAND engine_plan_test --gtest_filter=EnginePlanNegative.*)
+add_test(NAME nert_plan
+    COMMAND nert_plan_test --gtest_filter=NertPlan.*)
+add_test(NAME nert_plan_negative
+    COMMAND nert_plan_test --gtest_filter=NertPlanNegative.*)
 
-add_executable(engine_device_test DeviceTest.cpp)
-target_compile_features(engine_device_test PRIVATE cxx_std_17)
-target_compile_options(engine_device_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_device_test PRIVATE
+add_executable(nert_device_test device_test.cpp)
+target_compile_features(nert_device_test PRIVATE cxx_std_17)
+target_compile_options(nert_device_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_device_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
 
-add_test(NAME engine_device
-    COMMAND engine_device_test --gtest_filter=EngineDevice.*)
+add_test(NAME nert_device
+    COMMAND nert_device_test --gtest_filter=NertDevice.*)
 
-add_executable(engine_kernels_test KernelsTest.cpp)
-target_compile_features(engine_kernels_test PRIVATE cxx_std_17)
-target_compile_options(engine_kernels_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_kernels_test PRIVATE
+add_executable(nert_kernels_test kernels_test.cpp)
+target_compile_features(nert_kernels_test PRIVATE cxx_std_17)
+target_compile_options(nert_kernels_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_kernels_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
 
-add_test(NAME engine_kernels
-    COMMAND engine_kernels_test --gtest_filter=EngineKernels.*)
-add_test(NAME engine_kernels_negative
-    COMMAND engine_kernels_test --gtest_filter=EngineKernelsNegative.*)
+add_test(NAME nert_kernels
+    COMMAND nert_kernels_test --gtest_filter=NertKernels.*)
+add_test(NAME nert_kernels_negative
+    COMMAND nert_kernels_test --gtest_filter=NertKernelsNegative.*)
 
-add_executable(engine_executor_test ExecutorTest.cpp)
-target_compile_features(engine_executor_test PRIVATE cxx_std_17)
-target_compile_options(engine_executor_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_executor_test PRIVATE
+add_executable(nert_executor_test executor_test.cpp)
+target_compile_features(nert_executor_test PRIVATE cxx_std_17)
+target_compile_options(nert_executor_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_executor_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
 
-add_test(NAME engine_executor
-    COMMAND engine_executor_test --gtest_filter=EngineExecutor.*)
-add_test(NAME engine_executor_negative
-    COMMAND engine_executor_test --gtest_filter=EngineExecutorNegative.*)
+add_test(NAME nert_executor
+    COMMAND nert_executor_test --gtest_filter=NertExecutor.*)
+add_test(NAME nert_executor_negative
+    COMMAND nert_executor_test --gtest_filter=NertExecutorNegative.*)
 
 # The fixture end-to-end run may take seconds; give it room beyond the default.
-set_tests_properties(engine_executor PROPERTIES TIMEOUT 1800)
+set_tests_properties(nert_executor PROPERTIES TIMEOUT 1800)
 
 if(NERT_FIXTURE)
-    set_tests_properties(engine_loader engine_loader_negative
-        engine_shapes engine_shapes_negative
-        engine_plan engine_plan_negative
-        engine_executor engine_executor_negative PROPERTIES
+    set_tests_properties(nert_loader nert_loader_negative
+        nert_shapes nert_shapes_negative
+        nert_plan nert_plan_negative
+        nert_executor nert_executor_negative PROPERTIES
         ENVIRONMENT "NERT_FIXTURE=${NERT_FIXTURE}")
 endif()
 
-add_executable(engine_constant_folding_test ConstantFoldingTest.cpp)
-target_compile_features(engine_constant_folding_test PRIVATE cxx_std_17)
-target_compile_options(engine_constant_folding_test PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(engine_constant_folding_test PRIVATE
+add_executable(nert_constant_folding_test constant_folding_test.cpp)
+target_compile_features(nert_constant_folding_test PRIVATE cxx_std_17)
+target_compile_options(nert_constant_folding_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(nert_constant_folding_test PRIVATE
     nert
     GTest::gtest
     GTest::gtest_main)
-add_test(NAME engine_constant_folding COMMAND engine_constant_folding_test)
+add_test(NAME nert_constant_folding COMMAND nert_constant_folding_test)

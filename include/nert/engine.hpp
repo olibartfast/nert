@@ -6,7 +6,7 @@
 // kernels. It stands on its own — nothing here includes or links the backend
 // abstraction layer, and the build enforces that separation.
 
-namespace engine {
+namespace nert {
 
 // Placeholder so the library has a symbol while the runtime is built out.
 // Replaced by the executor once it exists.
@@ -15,4 +15,4 @@ public:
     Engine() = default;
 };
 
-} // namespace engine
+} // namespace nert

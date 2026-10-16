@@ -1,13 +1,13 @@
 // Range: 1-D sequence start, start + delta, ... up to (excluding) limit; float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -95,4 +95,4 @@ void Range(const Node& node, const std::vector<TensorView>& inputs, const std::v
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -4,14 +4,14 @@
 // Each aligned pair resolves to max(d, s) when either side is one (missing
 // leading axes broadcast as size one). Data is float32, int64, or bool.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -136,4 +136,4 @@ void Expand(const Node& node, const std::vector<TensorView>& inputs, const std::
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

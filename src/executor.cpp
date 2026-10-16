@@ -10,7 +10,7 @@
 // outputs are copied out of the arena, so a second Run observes the same plan
 // and the same arena.
 
-#include "engine/Executor.hpp"
+#include "nert/executor.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace {
 
 // Product of a shape's dimensions. An empty shape is a scalar: one element.
@@ -264,4 +264,4 @@ void Model::Execute(std::map<std::string, TensorView>& views) {
     }
 }
 
-} // namespace engine
+} // namespace nert

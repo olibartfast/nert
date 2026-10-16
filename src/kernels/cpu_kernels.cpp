@@ -3,13 +3,13 @@
 // One function-local static maps the exact op-type strings to their kernels;
 // unknown op types resolve to null. There is no global mutable registry.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 
 KernelFn FindCpuKernel(const std::string& op_type) {
@@ -91,4 +91,4 @@ KernelFn FindCpuKernel(const std::string& op_type) {
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -4,14 +4,14 @@
 // rank + 1, so -1 keeps a trailing singleton. The buffer copies flat in
 // order. Data is float32 or int64.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -86,4 +86,4 @@ void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std:
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

@@ -6,13 +6,13 @@
 // rejected at load. An optional rank-1 bias of length M is added. Naive,
 // float32, single-threaded scatter.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& context) {
@@ -189,4 +189,4 @@ void ConvTranspose(const Node& node, const std::vector<TensorView>& inputs, cons
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

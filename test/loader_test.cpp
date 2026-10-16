@@ -26,8 +26,8 @@
 
 #include <gtest/gtest.h>
 
-#include "engine/Graph.hpp"
-#include "engine/ModelLoader.hpp"
+#include "nert/graph.hpp"
+#include "nert/model_loader.hpp"
 
 namespace {
 
@@ -314,8 +314,8 @@ std::string load_error_message(const std::string& bytes,
     const std::string& file_name)
 {
     try {
-        engine::LoadGraphFromFile(write_model_bytes(file_name, bytes));
-    } catch (const engine::ModelLoadException& e) {
+        nert::LoadGraphFromFile(write_model_bytes(file_name, bytes));
+    } catch (const nert::ModelLoadException& e) {
         return e.what();
     }
     return "<no ModelLoadException thrown>";
@@ -349,18 +349,18 @@ TEST_F(EngineLoader, RealFixtureLoads)
     ASSERT_TRUE(std::filesystem::exists(fixture))
         << "fixture path from " << fixture_env_name()
         << " does not exist: " << fixture;
-    EXPECT_NO_THROW(engine::LoadGraphFromFile(fixture));
+    EXPECT_NO_THROW(nert::LoadGraphFromFile(fixture));
 }
 
 TEST_F(EngineLoader, RealFixtureNodeCountAndOpsHistogram)
 {
     const std::string fixture = fixture_path();
     ASSERT_TRUE(std::filesystem::exists(fixture));
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
     ASSERT_EQ(graph.nodes.size(), 49U); // reference model node count
 
     std::map<std::string, size_t> histogram;
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         histogram[node.op_type]++;
     }
     EXPECT_EQ(histogram.at("Conv"), 20U);
@@ -377,15 +377,15 @@ TEST_F(EngineLoader, RealFixtureInitializerCount)
 {
     const std::string fixture = fixture_path();
     ASSERT_TRUE(std::filesystem::exists(fixture));
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
     EXPECT_EQ(graph.initializers.size(), 44U); // reference model initializers
     for (const auto& init : graph.initializers) {
         EXPECT_FALSE(init.first.empty());
-        if (init.second.dtype == engine::DataType::Int64) {
+        if (init.second.dtype == nert::DataType::Int64) {
             EXPECT_FALSE(
                 std::get<std::vector<std::int64_t>>(init.second.values).empty());
         } else {
-            EXPECT_EQ(init.second.dtype, engine::DataType::Float32);
+            EXPECT_EQ(init.second.dtype, nert::DataType::Float32);
             EXPECT_FALSE(std::get<std::vector<float>>(init.second.values)
                     .empty()); // resolved, real float payloads
         }
@@ -399,30 +399,30 @@ TEST_F(EngineLoader, RealFixtureInt64ShapeConstants)
 {
     const std::string fixture = fixture_path();
     ASSERT_TRUE(std::filesystem::exists(fixture));
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
 
     ASSERT_EQ(graph.initializers.count("val_230"), 1U);
-    const engine::Initializer& shape = graph.initializers.at("val_230");
-    EXPECT_EQ(shape.dtype, engine::DataType::Int64);
+    const nert::Initializer& shape = graph.initializers.at("val_230");
+    EXPECT_EQ(shape.dtype, nert::DataType::Int64);
     EXPECT_EQ(shape.dims, (std::vector<std::int64_t>{2}));
     EXPECT_EQ(std::get<std::vector<std::int64_t>>(shape.values),
         (std::vector<std::int64_t>{1, 512}));
 
     ASSERT_EQ(graph.tensors.count("val_230"), 1U);
-    EXPECT_EQ(graph.tensors.at("val_230").dtype, engine::DataType::Int64);
+    EXPECT_EQ(graph.tensors.at("val_230").dtype, nert::DataType::Int64);
 }
 
 TEST_F(EngineLoader, RealFixtureIODtypesAndShapes)
 {
     const std::string fixture = fixture_path();
     ASSERT_TRUE(std::filesystem::exists(fixture));
-    const engine::Graph graph = engine::LoadGraphFromFile(fixture);
+    const nert::Graph graph = nert::LoadGraphFromFile(fixture);
     ASSERT_EQ(graph.inputs.size(), 1U);
-    EXPECT_EQ(graph.inputs.front().second.dtype, engine::DataType::Float32);
+    EXPECT_EQ(graph.inputs.front().second.dtype, nert::DataType::Float32);
     EXPECT_EQ(graph.inputs.front().second.dims,
         (std::vector<std::int64_t>{1, 3, 224, 224})); // FLOAT [1,3,224,224]
     ASSERT_EQ(graph.outputs.size(), 1U);
-    EXPECT_EQ(graph.outputs.front().second.dtype, engine::DataType::Float32);
+    EXPECT_EQ(graph.outputs.front().second.dtype, nert::DataType::Float32);
     EXPECT_EQ(graph.outputs.front().second.dims,
         (std::vector<std::int64_t>{1, 1000})); // -> FLOAT [1,1000]
 }
@@ -436,7 +436,7 @@ TEST_F(EngineLoader, HermeticReluNodeAndGraphIo)
     put_sub(body, 11, encode_value_info("x", 1, {1, 2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("relu_model.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().name, "relu0");
@@ -447,7 +447,7 @@ TEST_F(EngineLoader, HermeticReluNodeAndGraphIo)
     EXPECT_EQ(graph.initializers.size(), 0U);
     ASSERT_EQ(graph.inputs.size(), 1U);
     EXPECT_EQ(graph.inputs.front().first, "x");
-    EXPECT_EQ(graph.inputs.front().second.dtype, engine::DataType::Float32);
+    EXPECT_EQ(graph.inputs.front().second.dtype, nert::DataType::Float32);
     EXPECT_EQ(graph.inputs.front().second.dims,
         (std::vector<int64_t>{1, 2, 3, 4}));
     ASSERT_EQ(graph.outputs.size(), 1U);
@@ -471,11 +471,11 @@ TEST_F(EngineLoader, HermeticGemmAttributesAndInitializer)
     put_sub(body, 11, encode_value_info("y", 1, {2, 2}));
     put_sub(body, 12, encode_value_info("z", 1, {2, 3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("gemm_model.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
-    std::map<std::string, engine::Attribute> attrs;
-    for (const engine::Attribute& a : graph.nodes.front().attributes) {
+    std::map<std::string, nert::Attribute> attrs;
+    for (const nert::Attribute& a : graph.nodes.front().attributes) {
         attrs[a.name] = a;
     }
     ASSERT_EQ(attrs.size(), 4U);
@@ -485,8 +485,8 @@ TEST_F(EngineLoader, HermeticGemmAttributesAndInitializer)
     EXPECT_EQ(std::get<std::int64_t>(attrs.at("transA").value), 0);
     EXPECT_EQ(std::get<std::int64_t>(attrs.at("transB").value), 1);
     ASSERT_EQ(graph.initializers.size(), 1U);
-    const engine::Initializer& w = graph.initializers.at("w");
-    EXPECT_EQ(w.dtype, engine::DataType::Float32);
+    const nert::Initializer& w = graph.initializers.at("w");
+    EXPECT_EQ(w.dtype, nert::DataType::Float32);
     EXPECT_EQ(std::get<std::vector<float>>(w.values),
         (std::vector<float>{1.0F, -2.5F, 3.0F, 4.25F, 0.5F, -1.0F}));
 }
@@ -506,17 +506,17 @@ TEST_F(EngineLoader, HermeticInt64ReshapeConstant)
         put_sub(body, 12, encode_value_info("y", 1, {1, 48}));
         put_sub(body, 13, encode_value_info("shape", 7 /*INT64*/, {2}));
 
-        const engine::Graph graph = engine::LoadGraphFromFile(write_model_bytes(
+        const nert::Graph graph = nert::LoadGraphFromFile(write_model_bytes(
             via_raw_data ? "reshape_raw.onnx" : "reshape_varint.onnx",
             encode_model(body)));
         ASSERT_EQ(graph.initializers.size(), 1U);
-        const engine::Initializer& shape = graph.initializers.at("shape");
-        EXPECT_EQ(shape.dtype, engine::DataType::Int64);
+        const nert::Initializer& shape = graph.initializers.at("shape");
+        EXPECT_EQ(shape.dtype, nert::DataType::Int64);
         EXPECT_EQ(shape.dims, (std::vector<std::int64_t>{2}));
         EXPECT_EQ(std::get<std::vector<std::int64_t>>(shape.values),
             (std::vector<std::int64_t>{1, 512}));
         ASSERT_EQ(graph.tensors.count("shape"), 1U);
-        EXPECT_EQ(graph.tensors.at("shape").dtype, engine::DataType::Int64);
+        EXPECT_EQ(graph.tensors.at("shape").dtype, nert::DataType::Int64);
     }
 }
 
@@ -534,7 +534,7 @@ TEST_F(EngineLoader, HermeticConstantFoldingFloat)
     put_sub(body, 11, encode_value_info("x", 1, {3}));
     put_sub(body, 12, encode_value_info("y", 1, {3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("const_fold_float.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().name, "add0");
@@ -542,8 +542,8 @@ TEST_F(EngineLoader, HermeticConstantFoldingFloat)
     EXPECT_EQ(graph.nodes.front().inputs,
         (std::vector<std::string>{"x", "c0"}));
     ASSERT_EQ(graph.initializers.count("c0"), 1U);
-    const engine::Initializer& folded = graph.initializers.at("c0");
-    EXPECT_EQ(folded.dtype, engine::DataType::Float32);
+    const nert::Initializer& folded = graph.initializers.at("c0");
+    EXPECT_EQ(folded.dtype, nert::DataType::Float32);
     EXPECT_EQ(folded.dims, (std::vector<std::int64_t>{3}));
     EXPECT_EQ(std::get<std::vector<float>>(folded.values), values);
 }
@@ -566,15 +566,15 @@ TEST_F(EngineLoader, HermeticDoubleConstantNarrowsToFloat)
     put_sub(body, 12, encode_value_info("y", 1, {2}));
     put_sub(body, 13, encode_value_info("c0", 11, {2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("const_fold_double.onnx", encode_model(body)));
     ASSERT_EQ(graph.initializers.count("c0"), 1U);
-    const engine::Initializer& folded = graph.initializers.at("c0");
-    EXPECT_EQ(folded.dtype, engine::DataType::Float32);
+    const nert::Initializer& folded = graph.initializers.at("c0");
+    EXPECT_EQ(folded.dtype, nert::DataType::Float32);
     EXPECT_EQ(std::get<std::vector<float>>(folded.values),
         (std::vector<float>{0.5F, 79.5F}));
     ASSERT_EQ(graph.tensors.count("c0"), 1U);
-    EXPECT_EQ(graph.tensors.at("c0").dtype, engine::DataType::Float32);
+    EXPECT_EQ(graph.tensors.at("c0").dtype, nert::DataType::Float32);
 }
 
 // Hermetic positive: an identical repeated value-info entry (torch 2.12
@@ -589,7 +589,7 @@ TEST_F(EngineLoader, HermeticDuplicateValueInfo)
     put_sub(body, 13, encode_value_info("h", 1, {2}));
     std::string same = body;
     put_sub(same, 13, encode_value_info("h", 1, {2}));
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("dup_value_info.onnx", encode_model(same)));
     EXPECT_EQ(graph.tensors.at("h").dims, (std::vector<std::int64_t>{2}));
 
@@ -619,10 +619,10 @@ TEST_F(EngineLoader, HermeticBoolInitializerLoads)
     put_sub(body, 11, encode_value_info("x", 1, {3}));
     put_sub(body, 12, encode_value_info("y", 1, {3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("bool_init.onnx", encode_model(body)));
-    const engine::Initializer& mask = graph.initializers.at("mask");
-    EXPECT_EQ(mask.dtype, engine::DataType::Bool);
+    const nert::Initializer& mask = graph.initializers.at("mask");
+    EXPECT_EQ(mask.dtype, nert::DataType::Bool);
     EXPECT_EQ(std::get<std::vector<std::uint8_t>>(mask.values),
         (std::vector<std::uint8_t>{1, 0, 1}));
 }
@@ -641,13 +641,13 @@ TEST_F(EngineLoader, HermeticConstantFoldingInt64)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 48}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("const_fold_int64.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().op_type, "Reshape");
     ASSERT_EQ(graph.initializers.count("shape"), 1U);
-    const engine::Initializer& folded = graph.initializers.at("shape");
-    EXPECT_EQ(folded.dtype, engine::DataType::Int64);
+    const nert::Initializer& folded = graph.initializers.at("shape");
+    EXPECT_EQ(folded.dtype, nert::DataType::Int64);
     EXPECT_EQ(folded.dims, (std::vector<std::int64_t>{2}));
     EXPECT_EQ(std::get<std::vector<std::int64_t>>(folded.values), values);
 }
@@ -661,7 +661,7 @@ TEST_F(EngineLoader, HermeticFlattenLoads)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 12}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("flatten_model.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().op_type, "Flatten");
@@ -684,14 +684,14 @@ TEST_F(EngineLoader, HermeticBoolValueInfoAccepted)
     put_sub(body, 13, encode_value_info("idx", 7 /*INT64*/, {2}));
     put_sub(body, 13, encode_value_info("act", 1 /*FLOAT*/, {2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("bool_vi.onnx", encode_model(body)));
     ASSERT_EQ(graph.tensors.count("flag"), 1U);
-    EXPECT_EQ(graph.tensors.at("flag").dtype, engine::DataType::Bool);
+    EXPECT_EQ(graph.tensors.at("flag").dtype, nert::DataType::Bool);
     ASSERT_EQ(graph.tensors.count("idx"), 1U);
-    EXPECT_EQ(graph.tensors.at("idx").dtype, engine::DataType::Int64);
+    EXPECT_EQ(graph.tensors.at("idx").dtype, nert::DataType::Int64);
     ASSERT_EQ(graph.tensors.count("act"), 1U);
-    EXPECT_EQ(graph.tensors.at("act").dtype, engine::DataType::Float32);
+    EXPECT_EQ(graph.tensors.at("act").dtype, nert::DataType::Float32);
 }
 
 // Hermetic positive: the no-attribute elementwise ops (Mul/Div/Sub/Sigmoid)
@@ -706,14 +706,14 @@ TEST_F(EngineLoader, HermeticNewElementwiseLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 3, 4, 4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("new_elem.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 4U);
     EXPECT_EQ(graph.nodes[0].op_type, "Sigmoid");
     EXPECT_EQ(graph.nodes[1].op_type, "Mul");
     EXPECT_EQ(graph.nodes[2].op_type, "Div");
     EXPECT_EQ(graph.nodes[3].op_type, "Sub");
-    for (const engine::Node& node : graph.nodes) {
+    for (const nert::Node& node : graph.nodes) {
         EXPECT_TRUE(node.attributes.empty()) << node.op_type;
     }
 }
@@ -731,7 +731,7 @@ TEST_F(EngineLoader, HermeticConcatSplitLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 32, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 32, 4, 4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("concat_split.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Split");
@@ -758,7 +758,7 @@ TEST_F(EngineLoader, HermeticUnsqueezeExpandLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("unsq_expand.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Unsqueeze");
@@ -782,7 +782,7 @@ TEST_F(EngineLoader, HermeticTransposeGatherLoads)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("h", 1, {2, 3, 4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("tr_gather.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 3U);
     EXPECT_EQ(graph.nodes[0].op_type, "Transpose");
@@ -804,7 +804,7 @@ TEST_F(EngineLoader, HermeticCastLoads)
     put_sub(body, 11, encode_value_info("x", 1, {4}));
     put_sub(body, 12, encode_value_info("y", 1, {4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("cast.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(std::get<std::int64_t>(graph.nodes[0].attributes.front().value),
@@ -831,7 +831,7 @@ TEST_F(EngineLoader, HermeticSoftmaxResizeLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 1, 4, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 1, 8, 8}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("sm_resize.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Softmax");
@@ -859,7 +859,7 @@ TEST_F(EngineLoader, HermeticSliceTopKLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 10}));
     put_sub(body, 12, encode_value_info("v", 1, {1, 3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("slice_topk.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Slice");
@@ -879,7 +879,7 @@ TEST_F(EngineLoader, HermeticCastToBoolLoads)
     put_sub(body, 11, encode_value_info("x", 1, {4}));
     put_sub(body, 12, encode_value_info("y", 1, {4}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("cast_bool.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(std::get<std::int64_t>(graph.nodes[0].attributes.front().value),
@@ -897,12 +897,12 @@ TEST_F(EngineLoader, ValueInfoZeroDimensionLoads)
     put_sub(body, 12, encode_value_info("y", 1, {2}));
     put_sub(body, 13, encode_value_info("empty", 7 /*INT64*/, {0}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("vi_zero_dim.onnx", encode_model(body)));
     const auto it = graph.tensors.find("empty");
     ASSERT_NE(it, graph.tensors.end());
     EXPECT_EQ(it->second.dims, (std::vector<std::int64_t>{0}));
-    EXPECT_EQ(it->second.dtype, engine::DataType::Int64);
+    EXPECT_EQ(it->second.dtype, nert::DataType::Int64);
 }
 
 // Hermetic positive: ConstantOfShape carries an INT64 tensor `value`; Shape,
@@ -924,7 +924,7 @@ TEST_F(EngineLoader, HermeticConstantOfShapeEqualWhereShapeLoads)
     put_sub(body, 11, encode_value_info("y", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("z", 1, {2, 3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("cos_eq_where.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 4U);
     EXPECT_EQ(graph.nodes[0].op_type, "ConstantOfShape");
@@ -949,7 +949,7 @@ TEST_F(EngineLoader, HermeticReduceMaxModLoads)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("rm_mod.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "ReduceMax");
@@ -970,7 +970,7 @@ TEST_F(EngineLoader, HermeticConvKernelShapeAdmitted)
     put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 4, 8, 8}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("conv_ks.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().op_type, "Conv");
@@ -1036,18 +1036,18 @@ TEST_F(EngineLoader, HermeticInt64AndBoolGraphIoAccepted)
     put_sub(body, 12, encode_value_info("y_int", 7 /*INT64*/, {2, 2}));
     put_sub(body, 12, encode_value_info("y_bool", 9 /*BOOL*/, {2, 2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("int_bool_io.onnx", encode_model(body)));
     ASSERT_EQ(graph.inputs.size(), 2U);
     EXPECT_EQ(graph.inputs[0].first, "x_int");
-    EXPECT_EQ(graph.inputs[0].second.dtype, engine::DataType::Int64);
+    EXPECT_EQ(graph.inputs[0].second.dtype, nert::DataType::Int64);
     EXPECT_EQ(graph.inputs[1].first, "x_bool");
-    EXPECT_EQ(graph.inputs[1].second.dtype, engine::DataType::Bool);
+    EXPECT_EQ(graph.inputs[1].second.dtype, nert::DataType::Bool);
     ASSERT_EQ(graph.outputs.size(), 2U);
     EXPECT_EQ(graph.outputs[0].first, "y_int");
-    EXPECT_EQ(graph.outputs[0].second.dtype, engine::DataType::Int64);
+    EXPECT_EQ(graph.outputs[0].second.dtype, nert::DataType::Int64);
     EXPECT_EQ(graph.outputs[1].first, "y_bool");
-    EXPECT_EQ(graph.outputs[1].second.dtype, engine::DataType::Bool);
+    EXPECT_EQ(graph.outputs[1].second.dtype, nert::DataType::Bool);
     EXPECT_EQ(graph.inputs[0].second.dims, (std::vector<int64_t>{2, 2}));
 }
 
@@ -1146,7 +1146,7 @@ TEST_F(EngineLoader, NamedDimensionLoadsAsSymbolic)
     put_sub(body, 11, encode_value_info("x_dyn", 1, {2, 2}, true));
     put_sub(body, 12, encode_value_info("y", 1, {2, 2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("dyn_in.onnx", encode_model(body)));
     ASSERT_EQ(graph.inputs.size(), 1U);
     EXPECT_EQ(graph.inputs.front().second.dims,
@@ -1180,8 +1180,8 @@ TEST_F(EngineLoaderNegative, MissingModelFileNamesPath)
             .string();
     std::string message;
     try {
-        engine::LoadGraphFromFile(path);
-    } catch (const engine::ModelLoadException& e) {
+        nert::LoadGraphFromFile(path);
+    } catch (const nert::ModelLoadException& e) {
         message = e.what();
     }
     EXPECT_FALSE(message.empty()) << "missing model file did not throw";
@@ -1330,7 +1330,7 @@ TEST_F(EngineLoader, HermeticConstantOfShapeFloatBoolAndAbsentValueLoad)
     put_sub(body, 11, encode_value_info("x", 1, {2}));
     put_sub(body, 12, encode_value_info("y", 1, {2}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("cos_values.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 4U);
     ASSERT_EQ(graph.nodes[0].attributes.size(), 1U);
@@ -1353,7 +1353,7 @@ TEST_F(EngineLoader, HermeticInstanceNormalizationEpsilonLoads)
     put_sub(body, 11, encode_value_info("x", 1, {1, 2, 3, 3}));
     put_sub(body, 12, encode_value_info("y", 1, {1, 2, 3, 3}));
 
-    const engine::Graph graph = engine::LoadGraphFromFile(
+    const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("instancenorm.onnx", encode_model(body)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes[0].op_type, "InstanceNormalization");

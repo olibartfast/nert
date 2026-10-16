@@ -4,15 +4,15 @@
 // Every kernel matches the KernelFn calling convention fixed in Device.hpp: it
 // reads the node's attributes and the input views and writes the output views,
 // owning no storage. FindCpuKernel maps an op type to its implementation. This
-// header is private to engine/src/kernels; nothing outside the engine includes
+// header is private to src/kernels; nothing outside the runtime includes
 // it, and it must not reference the backend abstraction layer.
 
 #include <string>
 #include <vector>
 
-#include "engine/Device.hpp"
+#include "nert/device.hpp"
 
-namespace engine {
+namespace nert {
 namespace kernels {
 
 // Elementwise max(0, x) over the output element count.
@@ -259,4 +259,4 @@ void ScatterND(const Node& node, const std::vector<TensorView>& inputs,
     const std::vector<TensorView>& outputs);
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert

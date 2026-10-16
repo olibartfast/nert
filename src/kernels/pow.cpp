@@ -3,7 +3,7 @@
 // Base and exponent are float32; the output matches the base. An exponent of
 // exactly two squares the base, which is what every surveyed export uses.
 
-#include "Kernels.hpp"
+#include "kernels.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace engine {
+namespace nert {
 namespace kernels {
 namespace {
 
@@ -115,4 +115,4 @@ void Pow(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 }
 
 } // namespace kernels
-} // namespace engine
+} // namespace nert
