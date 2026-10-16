@@ -32,7 +32,10 @@ Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→
 
 ## Evidence (to fill)
 
-- Date / runner / GPU: 2026-10-16 / CPU-only container / no GPU (nvcc present, no device).
+- Date / runner / GPU: 2026-10-16 / dev container / NVIDIA GeForce RTX 3060
+  Laptop GPU, driver 610.43.02, CUDA 12.0, CMake 3.28.3 (G1–G2 exercised the
+  CPU/SKIP paths; G3 exercised the real device).
+- V-1: PASS (G1a): default OFF configure OK, 0 bench tests; `-DNERT_BUILD_BENCH=ON` lists `bench_utils_headers`.
 - V-1: PASS (G1a): default OFF configure OK, 0 bench tests; `-DNERT_BUILD_BENCH=ON` lists `bench_utils_headers`.
 - V-2: DONE (G2): harness prints `[[58,64],[139,154]]`, 5/5 seeds, CPU
   timings + `SKIP:` device half, exit `0`; corrupted expectation (58→59,
@@ -40,9 +43,14 @@ Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→
 - V-3: DONE (G1b): `ctest -R bench_utils_headers` 1/1 passed with all five
   headers included; `grep -rn '\.h"' bench/` empty; `ATTRIBUTION.md` records
   source + per-file deltas.
-- V-4: PARTIAL (G2): `ctest -R bench_gemm` passes CPU-only (GPU half `SKIP`);
-  small exact test proves the oracle; large-trial PASS in G2 means the oracle
-  ran clean on 5 seeds — CPU-vs-device compare arrives with G3.
+- V-4: DONE (G3, GPU runner): `ctest -R bench_gemm` passes with the real CUDA
+  tiled kernel: small exact + 5/5 large seeds, max abs diff 0.00 everywhere;
+  large 512×256×512: CPU median 492.3 ms vs GPU 1.63 ms (301x). Small-shape
+  GPU time is transfer-dominated (0.25 ms vs 0.0002 ms CPU) and reported as
+  measured. G2 CPU-only/SKIP behavior verified earlier on the same box via
+  the fallback TU.
+- V-5: PARTIAL (G3): default CUDA path configure+build+test green; OpenCL
+  flags + both-flags FATAL_ERROR pending (G4).
 - V-5: pending (G3/G4).
 - V-6: PASS (G1a, partial): default configure+existing tests untouched (only root option hook added); full ctest at close-out.
 - V-7: PASS (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.

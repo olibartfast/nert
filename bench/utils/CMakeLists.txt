@@ -1,11 +1,11 @@
 # Header-only bench utilities, vendored (with attribution, see ATTRIBUTION.md)
 # from the gpu-playground reference. Bench is opt-in (NERT_BUILD_BENCH=ON),
 # so requiring the device SDKs here never affects the default build: the
-# runtime `nert` target stays standard-library-only. When bench is enabled,
-# both the CUDA toolkit and the OpenCL SDK are required at configure time
-# (all helper headers are compile-checked together); which device actually
-# runs is still chosen per backend flag, and every device half runtime-SKIPs
-# without a GPU.
+# runtime `nert` target stays standard-library-only. The bench tree needs
+# CMake >= 3.17 (CUDAToolkit module); the runtime keeps its 3.16 floor.
+if(CMAKE_VERSION VERSION_LESS 3.17)
+    message(FATAL_ERROR "NERT_BUILD_BENCH=ON requires CMake >= 3.17 (have ${CMAKE_VERSION}); reconfigure with -DNERT_BUILD_BENCH=OFF or upgrade CMake.")
+endif()
 
 find_package(CUDAToolkit REQUIRED)
 find_package(OpenCL REQUIRED)
