@@ -37,7 +37,15 @@ cmake --build build
 ctest --test-dir build -R bench_ --output-on-failure
 ```
 
-## Kernels: gemm pilot
+## Kernels: gemm pilot (vendored copies)
+
+The `gemm` / `matmul` harnesses below measure **vendored kernel copies**,
+not shipped code (`cpu/gemm.cpp` duplicates the runtime oracle by design;
+`cuda/gemm.cpp` is a tiled kernel while the runtime ships cuBLAS). They
+remain the algorithm playground and still serve the OpenCL bench legs,
+which have no runtime device until N1d — but they are NOT runtime
+benchmarks. For shipped-kernel numbers use `bench/runtime` (next
+section); deleting the vendored CUDA copies is a follow-up tied to N1d.
 
 ```bash
 # CUDA path (default when bench is ON)
@@ -57,6 +65,44 @@ Expected on a GPU runner (RTX 3060, 2026-10-16): small test prints
 `[[58,64],[139,154]]`, all 5 large seeds PASSED with max abs diff `0.00`,
 exit `0`. CUDA large is ~300x the naive CPU oracle; OpenCL legs ~2.3x
 (they rebuild + transfer per call — honestly reported, not tuned).
+
+## Runtime bench: shipped kernels, no duplicated code
+
+```bash
+cmake -S . -B build-cuda -DNERT_ENABLE_CUDA=ON -DNERT_BUILD_BENCH=ON
+cmake --build build-cuda --target nert_bench_runtime
+./build-cuda/bench/runtime/nert_bench_runtime
+# or: ctest --test-dir build-cuda -R bench_runtime --output-on-failure
+```
+
+`bench/runtime/main.cpp` implements zero kernel logic: one fixture per op
+(shapes + attrs + fixed-seed data) drives the runtime's own
+`CpuDevice`/`CudaDevice` tables, times both (`steady_clock` around the
+internally synchronized calls), compares within `1e-3·(1+|ref|)`, and
+prints `op | case | cpu_ms | gpu_ms | speedup | maxdiff`. New kernel
+coverage = new fixture. Built only with `NERT_ENABLE_CUDA=ON` (OFF builds
+carry no `CudaDevice` symbol); without a GPU, or for a missing CUDA row
+(e.g. Conv without cuDNN), the case prints `SKIP:` and still exits 0.
+
+Reference numbers (RTX 3060, 2026-10-16, 11 passed / 1 skipped):
+
+| op | case | cpu_ms | gpu_ms | speedup | maxdiff |
+|----|------|--------|--------|---------|---------|
+| Gemm | 512³ | 1480.40 | 0.66 | 2227.7x | 1.05e-05 |
+| Relu | 4M | 96.90 | 3.94 | 24.6x | 0 |
+| Sigmoid | 4M | 63.80 | 3.88 | 16.4x | 1.19e-07 |
+| Tanh | 4M | 248.98 | 4.17 | 59.7x | 1.19e-07 |
+| Add | 4M bcast | 200.72 | 9.56 | 21.0x | 0 |
+| Mul | 4M bcast | 198.88 | 9.62 | 20.7x | 0 |
+| Sub | 4M bcast | 200.52 | 9.73 | 20.6x | 0 |
+| Div | 4M | 116.31 | 9.57 | 12.2x | 0 |
+| MaxPool | [8,64,112,112] k3 s2 | 382.15 | 1.76 | 217.6x | 0 |
+| AveragePool | [8,64,112,112] k3 s2 | 146.76 | 1.64 | 89.6x | 0 |
+| Softmax | [256,4096] | 58.92 | 20.22 | 2.9x | 0 |
+| Conv | — | SKIP (no CUDA row: no cuDNN on this leg) | | | |
+
+Softmax is only 2.9x: one thread per row with double accumulation on both
+sides, honestly reported, not tuned.
 
 ## SDK prerequisites
 
