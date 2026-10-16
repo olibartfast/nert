@@ -4045,3 +4045,140 @@ TEST(EngineKernels, SoftmaxSumsInDouble) {
     EXPECT_LT(out[0], 0.99996f);
     EXPECT_EQ(out[1], static_cast<float>(tail / total));
 }
+
+// Elu with default alpha 1.0: x >= 0 passes through, x < 0 maps to exp(x)-1.
+// in = [-1, 0, 1]: exp(-1)-1 = -0.63212055...
+TEST(EngineKernels, EluDefaultAlpha) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Elu");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {-1.0f, 0.0f, 1.0f};
+    std::vector<float> out(3, 0.0f);
+    engine::Node node = MakeNode("elu0", "Elu");
+    std::vector<engine::TensorView> inputs = {FloatView(in, {3})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_FLOAT_EQ(out[1], 0.0f);
+    EXPECT_FLOAT_EQ(out[2], 1.0f);
+    EXPECT_NEAR(out[0], static_cast<float>(std::exp(-1.0) - 1.0), 1e-6f);
+}
+
+// Elu with alpha 2.0: negative side scales by alpha.
+// in = [-1, 2]: 2*(exp(-1)-1) = -1.2642411..., 2 passes through.
+TEST(EngineKernels, EluNonDefaultAlpha) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Elu");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {-1.0f, 2.0f};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("elu_alpha", "Elu");
+    node.attributes.emplace_back("alpha", 2.0f);
+    std::vector<engine::TensorView> inputs = {FloatView(in, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_FLOAT_EQ(out[1], 2.0f);
+    EXPECT_NEAR(out[0], static_cast<float>(2.0 * (std::exp(-1.0) - 1.0)), 1e-6f);
+}
+
+// Max broadcasts [2,1] against [1,3] and takes the elementwise maximum:
+// [[1,4,2],[3,0,5]] vs [[2,1,6]] -> [[2,4,6],[3,1,6]].
+TEST(EngineKernels, MaxBroadcastsTwoInputs) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Max");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 4.0f, 2.0f, 3.0f, 0.0f, 5.0f};
+    std::vector<float> b = {2.0f, 1.0f, 6.0f};
+    std::vector<float> out(6, 0.0f);
+    engine::Node node = MakeNode("max0", "Max");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2, 3}), FloatView(b, {1, 3})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{2.0f, 4.0f, 6.0f, 3.0f, 1.0f, 6.0f}));
+}
+
+// Min over three int64 inputs: elementwise minimum, incl. negative values.
+// [5, -1] vs [3, 2] vs [4, -3] -> [3, -3].
+TEST(EngineKernels, MinThreeInt64Inputs) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Min");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> a = {5, -1};
+    std::vector<int64_t> b = {3, 2};
+    std::vector<int64_t> c = {4, -3};
+    std::vector<int64_t> out(2, 0);
+    engine::Node node = MakeNode("min0", "Min");
+    std::vector<engine::TensorView> inputs = {Int64View(a, {2}), Int64View(b, {2}), Int64View(c, {2})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{3, -3}));
+}
+
+// Elu rejects an int64 input, naming the op and node.
+TEST(EngineKernelsNegative, EluRejectsInt64) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Elu");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> in = {1, 2};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("elu_bad", "Elu");
+    std::vector<engine::TensorView> inputs = {Int64View(in, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("Elu"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("elu_bad"), std::string::npos) << error.what();
+    }
+}
+
+// Max rejects mixed float32/int64 inputs, naming the op and node.
+TEST(EngineKernelsNegative, MaxRejectsMixedDtypes) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Max");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 2.0f};
+    std::vector<int64_t> b = {1, 2};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("max_bad", "Max");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2}), Int64View(b, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("Max"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("max_bad"), std::string::npos) << error.what();
+    }
+}
+
+// Min rejects non-broadcastable shapes, naming the op and node.
+TEST(EngineKernelsNegative, MinRejectsBroadcastMismatch) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Min");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 2.0f, 3.0f};
+    std::vector<float> b = {1.0f, 2.0f};
+    std::vector<float> out(3, 0.0f);
+    engine::Node node = MakeNode("min_bad", "Min");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {3}), FloatView(b, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {3})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("Min"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("min_bad"), std::string::npos) << error.what();
+    }
+}
