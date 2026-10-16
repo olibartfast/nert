@@ -796,6 +796,14 @@ const std::unordered_map<std::string, AttrSlot>& instancenorm_attrs()
     return k;
 }
 
+const std::unordered_map<std::string, AttrSlot>& elu_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        { "alpha", AttrSlot::Float },
+    };
+    return k;
+}
+
 static const std::unordered_map<std::string, AttrSlot> kNoAttrs;
 
 const std::unordered_map<std::string,
@@ -865,6 +873,9 @@ allowed_attributes()
             { "InstanceNormalization", &instancenorm_attrs() },
             { "GridSample", &gridsample_attrs() },
             { "Einsum", &einsum_attrs() },
+            { "Elu", &elu_attrs() },
+            { "Max", &kNoAttrs },
+            { "Min", &kNoAttrs },
         };
     return kOps;
 }
@@ -1304,7 +1315,7 @@ Node decode_node(const uint8_t* data, size_t size)
             "GatherElements/Mod/ReduceMax/Resize/Softmax/Split/TopK/Transpose/"
             "Floor/Identity/Pow/Tile/AveragePool/ConvTranspose/Erf/Sqrt/Tanh/"
             "IsNaN/Squeeze/LayerNormalization/InstanceNormalization/Abs/Neg/Exp/Log/Cos/Sin/Clip/"
-            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum only)");
+            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min only)");
     }
 
     const std::unordered_map<std::string, AttrSlot>& allowed = *op_it->second;

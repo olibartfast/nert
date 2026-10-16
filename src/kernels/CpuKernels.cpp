@@ -74,6 +74,9 @@ KernelFn FindCpuKernel(const std::string& op_type) {
         {"ReduceSum", &ReduceSum},
         {"Range", &Range},
         {"Pad", &Pad},
+        {"Elu", &Elu},
+        {"Max", &Max},
+        {"Min", &Min},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

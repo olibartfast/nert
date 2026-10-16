@@ -212,5 +212,17 @@ void Range(const Node& node, const std::vector<TensorView>& inputs, const std::v
 // crop; float32 or int64 data.
 void Pad(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
+// Elementwise x >= 0 ? x : alpha * (exp(x) - 1); float32, `alpha` defaults
+// to 1.0.
+void Elu(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
+// Elementwise maximum over one or more inputs with NumPy multidirectional
+// broadcasting; float32 or int64 data.
+void Max(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
+// Elementwise minimum over one or more inputs with NumPy multidirectional
+// broadcasting; float32 or int64 data.
+void Min(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+
 } // namespace kernels
 } // namespace engine
