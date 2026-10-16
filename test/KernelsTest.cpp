@@ -4528,3 +4528,66 @@ TEST(EngineKernelsNegative, EyeLikeRejectsRank3) {
         EXPECT_NE(std::string(error.what()).find("eye_bad"), std::string::npos) << error.what();
     }
 }
+
+// ScatterND scatters two rows into a 4x2 zero matrix:
+// indices [[0],[2]], updates [[1,2],[3,4]] -> [[1,2],[0,0],[3,4],[0,0]].
+TEST(EngineKernels, ScatterNDRowScatter) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ScatterND");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> data(8, 0.0f);
+    std::vector<int64_t> indices = {0, 2};
+    std::vector<float> updates = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(8, -1.0f);
+    engine::Node node = MakeNode("snd0", "ScatterND");
+    std::vector<engine::TensorView> inputs = {FloatView(data, {4, 2}), Int64View(indices, {2, 1}),
+                                              FloatView(updates, {2, 2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {4, 2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{1.0f, 2.0f, 0.0f, 0.0f, 3.0f, 4.0f, 0.0f, 0.0f}));
+}
+
+// ScatterND with a negative index and int64 data: data [10,20,30],
+// indices [[-1]], updates [99] -> [10,20,99].
+TEST(EngineKernels, ScatterNDNegativeIndexInt64) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ScatterND");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> data = {10, 20, 30};
+    std::vector<int64_t> indices = {-1};
+    std::vector<int64_t> updates = {99};
+    std::vector<int64_t> out(3, -1);
+    engine::Node node = MakeNode("snd_neg", "ScatterND");
+    std::vector<engine::TensorView> inputs = {Int64View(data, {3}), Int64View(indices, {1, 1}),
+                                              Int64View(updates, {1})};
+    std::vector<engine::TensorView> outputs = {Int64View(out, {3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{10, 20, 99}));
+}
+
+// ScatterND rejects an out-of-range index, naming op and node.
+TEST(EngineKernelsNegative, ScatterNDRejectsIndexOutOfRange) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("ScatterND");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> data = {1.0f, 2.0f};
+    std::vector<int64_t> indices = {5};
+    std::vector<float> updates = {9.0f};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("snd_bad", "ScatterND");
+    std::vector<engine::TensorView> inputs = {FloatView(data, {2}), Int64View(indices, {1, 1}),
+                                              FloatView(updates, {1})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("ScatterND"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("snd_bad"), std::string::npos) << error.what();
+    }
+}

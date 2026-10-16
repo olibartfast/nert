@@ -253,5 +253,10 @@ void CumSum(const Node& node, const std::vector<TensorView>& inputs,
 void EyeLike(const Node& node, const std::vector<TensorView>& inputs,
     const std::vector<TensorView>& outputs);
 
+// Copy `data`, then scatter `updates` slices at int64 `indices`; float32,
+// int64, or bool data.
+void ScatterND(const Node& node, const std::vector<TensorView>& inputs,
+    const std::vector<TensorView>& outputs);
+
 } // namespace kernels
 } // namespace engine
