@@ -97,7 +97,8 @@ add_library(nert STATIC
     src/kernels/ReduceL2.cpp
     src/kernels/ArgMax.cpp
     src/kernels/CumSum.cpp
-    src/kernels/EyeLike.cpp)
+    src/kernels/EyeLike.cpp
+    src/kernels/ScatterND.cpp)
 target_compile_features(nert PUBLIC cxx_std_17)
 target_include_directories(nert
     PUBLIC
