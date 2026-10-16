@@ -44,6 +44,8 @@ TEST(NertCudaDevice, KernelTableServesPilotRows) {
     EXPECT_NE(cuda.kernels().find("Mul"), nullptr);
     EXPECT_NE(cuda.kernels().find("Sub"), nullptr);
     EXPECT_NE(cuda.kernels().find("Div"), nullptr);
+    EXPECT_NE(cuda.kernels().find("MaxPool"), nullptr);
+    EXPECT_NE(cuda.kernels().find("AveragePool"), nullptr);
 #ifdef NERT_HAS_CUDNN
     EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
 #else

@@ -2,8 +2,8 @@
 //
 // One function-local static maps exact op-type strings to their kernels;
 // unknown op types resolve to null so the executor rejects the node naming
-// op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div (first-party),
-// Conv (cuDNN, NERT_HAS_CUDNN builds only).
+// op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div/MaxPool/AveragePool
+// (first-party), Conv (cuDNN, NERT_HAS_CUDNN builds only).
 
 #include "nert/device.hpp"
 
@@ -19,13 +19,16 @@ void Add(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 void Mul(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Sub(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Div(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void MaxPool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void AveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #ifdef NERT_HAS_CUDNN
 void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #endif
 
 KernelFn FindCudaKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
-        {"Gemm", &Gemm}, {"Relu", &Relu}, {"Add", &Add}, {"Mul", &Mul}, {"Sub", &Sub}, {"Div", &Div},
+        {"Gemm", &Gemm}, {"Relu", &Relu}, {"Add", &Add},         {"Mul", &Mul},
+        {"Sub", &Sub},   {"Div", &Div},   {"MaxPool", &MaxPool}, {"AveragePool", &AveragePool},
 #ifdef NERT_HAS_CUDNN
         {"Conv", &Conv},
 #endif
