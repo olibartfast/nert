@@ -32,13 +32,16 @@ TEST(NertCudaDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(cuda.transfer());
 }
 
-// M1 scaffold: every op resolves to null, so the executor rejects the node
-// naming op + node (verified at the seam level here).
-TEST(NertCudaDevice, KernelTableIsEmptyForNow) {
+// M2 pilot rows resolve; anything else is still null so the executor
+// rejects the node naming op + node.
+TEST(NertCudaDevice, KernelTableServesPilotRows) {
     RequireCudaDevice();
     const nert::Device& cuda = nert::CudaDevice();
-    EXPECT_EQ(cuda.kernels().find("Relu"), nullptr);
-    EXPECT_EQ(cuda.kernels().find("Gemm"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Gemm"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Relu"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Add"), nullptr);
+    EXPECT_EQ(cuda.kernels().find("Conv"), nullptr);
+    EXPECT_EQ(cuda.kernels().find("Sigmoid"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.

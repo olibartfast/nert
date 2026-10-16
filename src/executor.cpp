@@ -116,7 +116,8 @@ InferenceResult Model::Run(const std::map<std::string, std::vector<float>>& inpu
         views.emplace(name, std::move(view));
     }
 
-    Execute(views);
+    std::map<std::string, std::vector<uint8_t>> host_outputs;
+    Execute(views, host_outputs);
 
     InferenceResult result;
     for (const auto& entry : graph_.outputs) {
@@ -136,6 +137,8 @@ HostTensorMap Model::RunTyped(const HostTensorMap& inputs) {
     std::map<std::string, TensorView> views;
     // Bool inputs are normalised to 0/1 bytes so kernels may read them as bool.
     std::map<std::string, std::vector<uint8_t>> bool_inputs;
+    // Download targets for the graph outputs on non-host devices.
+    std::map<std::string, std::vector<uint8_t>> host_outputs;
 
     for (const auto& entry : graph_.inputs) {
         const std::string& name = entry.first;
@@ -174,7 +177,7 @@ HostTensorMap Model::RunTyped(const HostTensorMap& inputs) {
         views.emplace(name, std::move(view));
     }
 
-    Execute(views);
+    Execute(views, host_outputs);
 
     HostTensorMap result;
     for (const auto& entry : graph_.outputs) {
@@ -209,7 +212,19 @@ const TensorView& Model::OutputView(const std::map<std::string, TensorView>& vie
     return it->second;
 }
 
-void Model::Execute(std::map<std::string, TensorView>& views) {
+// Byte size of a host-bound view for device staging, or 0 when the view has
+// no host dtype, no data, or no elements. Nulls and empties keep their exact
+// CPU semantics by skipping staging (kernels see the same nulls as on CPU).
+int64_t StagedBytes(const TensorView& view) {
+    const size_t elem = HostElementSize(view.dtype);
+    if (view.data == nullptr || elem == 0) {
+        return 0;
+    }
+    return ElementCount(view.dims) * static_cast<int64_t>(elem);
+}
+
+void Model::Execute(std::map<std::string, TensorView>& views,
+                    std::map<std::string, std::vector<uint8_t>>& host_outputs) {
     for (const auto& entry : graph_.initializers) {
         const Initializer& init = entry.second;
         TensorView view;
@@ -221,6 +236,27 @@ void Model::Execute(std::map<std::string, TensorView>& views) {
             throw InferenceException("executor: initializer '" + entry.first + "' has no values of its dtype");
         }
         views.emplace(entry.first, std::move(view));
+    }
+
+    std::vector<void*> staged;
+    if (!device_->is_host()) {
+        // Whole-graph staging: every host-bound view is uploaded once and
+        // repointed at device memory, so kernels run with no per-op host
+        // round-trips by design.
+        for (auto& staged_entry : views) {
+            TensorView& view = staged_entry.second;
+            const int64_t bytes = StagedBytes(view);
+            if (bytes == 0) {
+                continue;
+            }
+            void* device_buffer = device_->allocator().allocate(bytes);
+            if (device_buffer == nullptr) {
+                throw InferenceException("executor: could not stage '" + staged_entry.first + "' on the device");
+            }
+            device_->transfer().host_to_device(device_buffer, view.data, bytes);
+            view.data = device_buffer;
+            staged.push_back(device_buffer);
+        }
     }
 
     for (const Node& node : graph_.nodes) {
@@ -261,6 +297,30 @@ void Model::Execute(std::map<std::string, TensorView>& views) {
         }
 
         kernel(node, node_inputs, node_outputs);
+    }
+
+    if (!device_->is_host()) {
+        // Graph outputs are downloaded once into caller-owned host buffers so
+        // the result extraction above keeps reading host memory; aliased
+        // inputs/initializers download from their staged copies.
+        for (const auto& entry : graph_.outputs) {
+            const auto produced = views.find(entry.first);
+            if (produced == views.end()) {
+                throw InferenceException("executor: graph output '" + entry.first + "' was never produced");
+            }
+            TensorView& view = produced->second;
+            const int64_t bytes = StagedBytes(view);
+            if (bytes == 0) {
+                continue;
+            }
+            std::vector<uint8_t>& host = host_outputs[entry.first];
+            host.resize(static_cast<std::size_t>(bytes));
+            device_->transfer().device_to_host(host.data(), view.data, bytes);
+            view.data = host.data();
+        }
+        for (void* device_buffer : staged) {
+            device_->allocator().release(device_buffer);
+        }
     }
 }
 
