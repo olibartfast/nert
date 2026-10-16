@@ -879,6 +879,7 @@ allowed_attributes()
             { "LessOrEqual", &kNoAttrs },
             { "GreaterOrEqual", &kNoAttrs },
             { "Or", &kNoAttrs },
+            { "ReduceL2", &reducemean_attrs() },
         };
     return kOps;
 }
@@ -1318,7 +1319,7 @@ Node decode_node(const uint8_t* data, size_t size)
             "GatherElements/Mod/ReduceMax/Resize/Softmax/Split/TopK/Transpose/"
             "Floor/Identity/Pow/Tile/AveragePool/ConvTranspose/Erf/Sqrt/Tanh/"
             "IsNaN/Squeeze/LayerNormalization/InstanceNormalization/Abs/Neg/Exp/Log/Cos/Sin/Clip/"
-            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min/LessOrEqual/GreaterOrEqual/Or only)");
+            "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min/LessOrEqual/GreaterOrEqual/Or/ReduceL2 only)");
     }
 
     const std::unordered_map<std::string, AttrSlot>& allowed = *op_it->second;

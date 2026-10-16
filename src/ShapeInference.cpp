@@ -1293,6 +1293,60 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
     return TensorInfo{dtype, out};
 }
 
+TensorInfo reducel2_shape(const StaticContext& ctx, const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    if (inputs.empty() || inputs[0] == nullptr) {
+        fail(node, "ReduceL2 requires an input");
+    }
+    if (inputs[0]->dtype != DataType::Float32) {
+        fail(node, "ReduceL2 data must be Float32");
+    }
+    const DataType dtype = DataType::Float32;
+    const std::vector<int64_t>& in = inputs[0]->dims;
+    const int64_t rank = static_cast<int64_t>(in.size());
+    const bool keepdims = attr_int(node, "keepdims", 1) != 0;
+    const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+
+    std::vector<int64_t> axes;
+    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes = int64_constant(ctx, node, node.inputs[1]);
+    }
+    std::set<int64_t> seen;
+    for (int64_t& axis : axes) {
+        if (axis < 0) {
+            axis += rank;
+        }
+        if (axis < 0 || axis >= rank) {
+            fail(node, "ReduceL2 axis is out of range");
+        }
+        if (!seen.insert(axis).second) {
+            fail(node, "ReduceL2 axes must be unique");
+        }
+    }
+
+    std::vector<int64_t> out = in;
+    if (axes.empty()) {
+        if (noop_empty) {
+            return TensorInfo{dtype, out};
+        }
+        for (int64_t i = 0; i < rank; ++i) {
+            axes.push_back(i);
+        }
+    }
+    std::sort(axes.begin(), axes.end());
+    if (keepdims) {
+        for (const int64_t axis : axes) {
+            out[static_cast<size_t>(axis)] = 1;
+        }
+    } else {
+        for (auto it = axes.rbegin(); it != axes.rend(); ++it) {
+            out.erase(out.begin() + *it);
+        }
+    }
+    return TensorInfo{dtype, out};
+}
+
 // Read a scalar Float32 Range operand from an initializer or the evaluator's
 // float lane.
 double range_float_scalar(const StaticContext& ctx, const Node& node,
@@ -2351,6 +2405,9 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "ReduceSum") {
         return {reducesum_shape(ctx, node, inputs)};
+    }
+    if (op == "ReduceL2") {
+        return {reducel2_shape(ctx, node, inputs)};
     }
     if (op == "Range") {
         return {range_shape(ctx, node, inputs)};
