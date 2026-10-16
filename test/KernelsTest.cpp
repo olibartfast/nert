@@ -4182,3 +4182,120 @@ TEST(EngineKernelsNegative, MinRejectsBroadcastMismatch) {
         EXPECT_NE(std::string(error.what()).find("min_bad"), std::string::npos) << error.what();
     }
 }
+
+// LessOrEqual broadcasts [2,1] against [1,3]: [[1,4,2],[3,0,5]] <= [[2,1,6]]
+// -> [[1,0,1],[0,1,1]].
+TEST(EngineKernels, LessOrEqualBroadcastsTwoInputs) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("LessOrEqual");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 4.0f, 2.0f, 3.0f, 0.0f, 5.0f};
+    std::vector<float> b = {2.0f, 1.0f, 6.0f};
+    std::vector<std::uint8_t> out(6, 0);
+    engine::Node node = MakeNode("le0", "LessOrEqual");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2, 3}), FloatView(b, {1, 3})};
+    std::vector<engine::TensorView> outputs = {BoolView(out, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(BoolBytes(out), (std::vector<std::uint8_t>{1, 0, 1, 0, 1, 1}));
+}
+
+// GreaterOrEqual over int64 with equality on the diagonal:
+// [1,2] >= [1,3] -> [1,0]; equality counts as true (off-default vs Greater).
+TEST(EngineKernels, GreaterOrEqualInt64WithEquality) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("GreaterOrEqual");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> a = {1, 2};
+    std::vector<int64_t> b = {1, 3};
+    std::vector<std::uint8_t> out(2, 0);
+    engine::Node node = MakeNode("ge0", "GreaterOrEqual");
+    std::vector<engine::TensorView> inputs = {Int64View(a, {2}), Int64View(b, {2})};
+    std::vector<engine::TensorView> outputs = {BoolView(out, {2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(BoolBytes(out), (std::vector<std::uint8_t>{1, 0}));
+}
+
+// Or broadcasts [2,1] bool against [1,3] bool:
+// [[1,0,0],[0,1,0]] || [[0,1,0]] -> [[1,1,0],[0,1,0]].
+TEST(EngineKernels, OrBroadcastsBoolInputs) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Or");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> a = {1, 0, 0, 0, 1, 0};
+    std::vector<std::uint8_t> b = {0, 1, 0};
+    std::vector<std::uint8_t> out(6, 0);
+    engine::Node node = MakeNode("or0", "Or");
+    std::vector<engine::TensorView> inputs = {BoolView(a, {2, 3}), BoolView(b, {1, 3})};
+    std::vector<engine::TensorView> outputs = {BoolView(out, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(BoolBytes(out), (std::vector<std::uint8_t>{1, 1, 0, 0, 1, 0}));
+}
+
+// LessOrEqual rejects mixed float32/int64 inputs, naming op and node.
+TEST(EngineKernelsNegative, LessOrEqualRejectsMixedDtypes) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("LessOrEqual");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 2.0f};
+    std::vector<int64_t> b = {1, 2};
+    std::vector<std::uint8_t> out(2, 0);
+    engine::Node node = MakeNode("le_bad", "LessOrEqual");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2}), Int64View(b, {2})};
+    std::vector<engine::TensorView> outputs = {BoolView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("LessOrEqual"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("le_bad"), std::string::npos) << error.what();
+    }
+}
+
+// GreaterOrEqual rejects a non-bool output, naming op and node.
+TEST(EngineKernelsNegative, GreaterOrEqualRejectsNonBoolOutput) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("GreaterOrEqual");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 2.0f};
+    std::vector<float> b = {1.0f, 3.0f};
+    std::vector<float> out(2, 0.0f);
+    engine::Node node = MakeNode("ge_bad", "GreaterOrEqual");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2}), FloatView(b, {2})};
+    std::vector<engine::TensorView> outputs = {FloatView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("GreaterOrEqual"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("ge_bad"), std::string::npos) << error.what();
+    }
+}
+
+// Or rejects float32 inputs, naming op and node.
+TEST(EngineKernelsNegative, OrRejectsNonBoolInput) {
+    engine::KernelFn kernel = engine::CpuDevice().kernels().find("Or");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a = {1.0f, 0.0f};
+    std::vector<std::uint8_t> b = {1, 0};
+    std::vector<std::uint8_t> out(2, 0);
+    engine::Node node = MakeNode("or_bad", "Or");
+    std::vector<engine::TensorView> inputs = {FloatView(a, {2}), BoolView(b, {2})};
+    std::vector<engine::TensorView> outputs = {BoolView(out, {2})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const engine::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("Or"), std::string::npos) << error.what();
+        EXPECT_NE(std::string(error.what()).find("or_bad"), std::string::npos) << error.what();
+    }
+}
