@@ -51,7 +51,10 @@ Trace: R-1→V-1, R-2→V-2/V-5, R-3→V-3, R-4→V-4/V-5, R-5→V-1/V-6, R-7→
   the fallback TU.
 - V-5: PARTIAL (G3): default CUDA path configure+build+test green; OpenCL
   flags + both-flags FATAL_ERROR pending (G4).
-- V-5: pending (G3/G4).
+- V-5: DONE (G4, RTX 3060): default CUDA + `NERT_BENCH_USE_OPENCL=ON` +
+  `NERT_BENCH_USE_OPENCL_CPP=ON` each configure+build+`ctest -R bench_` 2/2;
+  OpenCL C 5/5 exact (2.28x large), OpenCL C++ 5/5 exact (2.39x large);
+  both flags together fail at configure with the mutual-exclusion message.
 - V-6: PASS (G1a, partial): default configure+existing tests untouched (only root option hook added); full ctest at close-out.
 - V-7: PASS (G1a files): `clang-format-18 --dry-run --Werror` clean on the 3 bench C++ files.
 
