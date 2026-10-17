@@ -175,6 +175,44 @@ if(NERT_ENABLE_OPENCL)
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)
 endif()
 
+# HIP device layer (Phase N1c, NVIDIA target), opt-in like CUDA/OpenCL:
+# NERT_ENABLE_HIP=ON requires a CUDA compiler (the NVIDIA backend drives
+# nvcc) plus the HIP headers (HIP_INCLUDE_DIR or $HIP_PATH, e.g. from the
+# hip-dev package); OFF (default) leaves the link closure
+# standard-library-only. Independent of the other device flags. The AMD
+# half (hipcc/clang, rocBLAS/MIOpen) is a later slice on the AMD runner.
+option(NERT_ENABLE_HIP "Build NERT with the HIP device layer (NVIDIA target)" OFF)
+if(NERT_ENABLE_HIP)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR
+            "NERT_ENABLE_HIP=ON requires a CUDA compiler (nvcc) for the NVIDIA target; none was found.")
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    find_path(HIP_INCLUDE_DIR hip/hip_runtime_api.h
+        HINTS $ENV{HIP_PATH} /opt/rocm
+        PATH_SUFFIXES include
+        DOC "HIP headers (hip-dev package or HIP_PATH)")
+    if(NOT HIP_INCLUDE_DIR)
+        message(FATAL_ERROR
+            "NERT_ENABLE_HIP=ON requires the HIP headers (set HIP_INCLUDE_DIR or HIP_PATH); none were found.")
+    endif()
+    target_sources(nert PRIVATE src/hip_device.cpp)
+    # The HIP dialect compiles with nvcc on the NVIDIA target (what
+    # hipcc -platform=nvidia does); the backend selection + headers stay
+    # file-scoped so the rest of `nert` is untouched.
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp PROPERTY LANGUAGE CUDA)
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+        __HIP_PLATFORM_NVIDIA__)
+    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
+        ${HIP_INCLUDE_DIR})
+    # PRIVATE: no HIP type leaks through the public headers, so consumers
+    # stay toolkit-free.
+    target_link_libraries(nert PRIVATE CUDA::cudart)
+endif()
+
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects
 # (Neuriplo) that set it.
 if(NERT_BUILD_TESTS OR BUILD_INFERENCE_ENGINE_TESTS)
