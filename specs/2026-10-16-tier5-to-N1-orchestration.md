@@ -69,7 +69,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 16 | N1g-2 concat family CUDA | `../nert-w-n1g2` / `wip/nert-n1g2` | OFF 8/8 + ON 15/15 (RTX 3060) + format | merged | done 2026-10-17: Concat/Split/Slice; YOLO 343/485 (70.7%) |
 | 17 | N1g-3 index movement CUDA | `../nert-w-n1g3` / `wip/nert-n1g3` | OFF 8/8 + ON 16/16 (RTX 3060) + format | merged | done 2026-10-17: Transpose/Gather/GatherElements; YOLO 353/485 (72.8%) |
 | 18 | N1g-4 MatMul CUDA | `../nert-w-n1g4` / `wip/nert-n1g4` | OFF 8/8 + ON 16/16 (RTX 3060) + format | merged | done 2026-10-17: MatMul cuBLAS batched; Einsum permanent probe; YOLO 357/485 (73.6%) |
-| 19 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 19 | N1g-5a misc elementwise CUDA | `../nert-w-n1g5` / `wip/nert-n1g5` | OFF 8/8 + ON 17/17 (RTX 3060) + format | merged | done 2026-10-17: Cast/Equal/Where/Shape/ConstantOfShape/Mod; YOLO 369/485 (76.1%) |
+| 20 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
