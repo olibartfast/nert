@@ -13,8 +13,9 @@ untouched, format clean, CUDA container leg green.
   fallback tested when the frontend dir is absent.
 - [V-B2] Slice B: default build (OFF) has no frontend include or link;
   CUDA-without-frontend still builds and passes.
-- [V-C1] Slice C: fused Conv+Bias+Relu matches composed legacy rows;
-  bench proves the fused win.
+- [V-C1] Slice C: in-graph bias matches the sliced row on the
+  padded/grouped/bias fixtures; bench bias fixture before/after; same
+  tolerance (target exact).
 - [V-G] Format clean; no `src/kernels/`, loader, shape, executor diffs.
 
 ## Evidence
