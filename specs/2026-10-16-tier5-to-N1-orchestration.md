@@ -85,7 +85,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 32 | plumb-B resident weights | `../nert-w-plumbb` / `wip/nert-plumbb` | OFF 8/8 + CUDA 9/9 + OCL 2/2 + HIP 2/2 + format | merged | done 2026-10-17: upload-once initializers, RAII staging, traffic tests |
 | 33 | N1c-M4 HIP activations (NVIDIA) | `../nert-w-n1cm4` / `wip/nert-n1cm4` | OFF 8/8 + HIP-leg 10/10 (RTX 3060) + format | merged | done 2026-10-17: TDD red-green per op, hipify + review, double-accum softmax |
 | 34 | task Phase 1 ResNet-18 gate | `../nert-w-task1` / `wip/nert-task1` | OFF 8/8 + CUDA gate top-1 107=107 + GAP rows + format | merged | done 2026-10-17: GAP mini-slice (4th wiring point: loader allowlist); gate dev noted 2.2e-03 |
-| 35 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 35 | task Phase 2 RF-DETR | `../nert-w-task2` / `wip/nert-task2` | docs only, no code | merged | done 2026-10-17: inventory + CPU parity (model-identical), R1..R6b slices filed |
+| 36 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
