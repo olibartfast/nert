@@ -154,12 +154,18 @@ __global__ void BiasAddKernel(float* y, const float* bias, int64_t batch, int64_
     }
 }
 
-// Cached engine choice + workspace per resolved geometry.
+// Cached engine choice + descriptors + workspace per resolved geometry. The
+// handle and these objects are process-lifetime (single-threaded executor
+// use, like the tables); the map intentionally does not clean up at exit.
 struct PlanCacheEntry {
     bool ready = false;
     cudnnConvolutionFwdAlgo_t algo = CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM;
     size_t workspace_bytes = 0;
     void* workspace = nullptr;
+    cudnnTensorDescriptor_t x_desc = nullptr;
+    cudnnTensorDescriptor_t y_desc = nullptr;
+    cudnnFilterDescriptor_t w_desc = nullptr;
+    cudnnConvolutionDescriptor_t conv_desc = nullptr;
 };
 
 std::map<std::string, PlanCacheEntry>& PlanCache() {
@@ -170,6 +176,17 @@ std::map<std::string, PlanCacheEntry>& PlanCache() {
 std::mutex& PlanCacheMutex() {
     static std::mutex mutex;
     return mutex;
+}
+
+// One process-lifetime cuDNN handle: creating a handle per call was most of
+// the measured Conv overhead (N1e slice A).
+cudnnHandle_t SharedHandle() {
+    static cudnnHandle_t handle = [] {
+        cudnnHandle_t created = nullptr;
+        CheckCudnn(cudnnCreate(&created), "cudnnCreate", "Conv");
+        return created;
+    }();
+    return handle;
 }
 
 } // namespace
@@ -311,32 +328,10 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
         return strides;
     };
 
-    cudnnHandle_t handle = nullptr;
-    CheckCudnn(cudnnCreate(&handle), "cudnnCreate", context);
-    cudnnTensorDescriptor_t xDesc = nullptr, yDesc = nullptr;
-    cudnnFilterDescriptor_t wDesc = nullptr;
-    cudnnConvolutionDescriptor_t convDesc = nullptr;
-    CheckCudnn(cudnnCreateTensorDescriptor(&xDesc), "cudnnCreateTensorDescriptor", context);
-    CheckCudnn(cudnnCreateTensorDescriptor(&yDesc), "cudnnCreateTensorDescriptor", context);
-    CheckCudnn(cudnnCreateFilterDescriptor(&wDesc), "cudnnCreateFilterDescriptor", context);
-    CheckCudnn(cudnnCreateConvolutionDescriptor(&convDesc), "cudnnCreateConvolutionDescriptor", context);
-    const std::vector<int> xStrides = contiguous_strides(xDims);
-    const std::vector<int> yStrides = contiguous_strides(yDims);
-    CheckCudnn(cudnnSetTensorNdDescriptor(xDesc, CUDNN_DATA_FLOAT, nbDims, xDims.data(), xStrides.data()),
-               "cudnnSetTensorNdDescriptor", context);
-    CheckCudnn(cudnnSetTensorNdDescriptor(yDesc, CUDNN_DATA_FLOAT, nbDims, yDims.data(), yStrides.data()),
-               "cudnnSetTensorNdDescriptor", context);
-    CheckCudnn(cudnnSetFilterNdDescriptor(wDesc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, nbDims, wDims.data()),
-               "cudnnSetFilterNdDescriptor", context);
-    CheckCudnn(cudnnSetConvolutionNdDescriptor(convDesc, static_cast<int>(cudnn_spatial), pad.data(), stride.data(),
-                                               dilation.data(), CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT),
-               "cudnnSetConvolutionNdDescriptor", context);
-    CheckCudnn(cudnnSetConvolutionMathType(convDesc, CUDNN_DEFAULT_MATH), "cudnnSetConvolutionMathType", context);
-    CheckCudnn(cudnnSetConvolutionGroupCount(convDesc, IntOrThrow(group, "group", context)),
-               "cudnnSetConvolutionGroupCount", context);
+    cudnnHandle_t handle = SharedHandle();
 
-    // Plan cache: v7 PREFER_FASTEST heuristics per resolved geometry; the
-    // workspace is allocated once per key and kept for the process.
+    // Plan cache: descriptors + v7 PREFER_FASTEST engine per resolved
+    // geometry; workspace allocated once per key and kept for the process.
     std::string key;
     for (int d : xDims) {
         key += std::to_string(d) + ",";
@@ -355,32 +350,55 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
         plan = &PlanCache()[key];
     }
     if (!plan->ready) {
-        int returned = 0;
-        cudnnConvolutionFwdAlgoPerf_t perf{};
-        CheckCudnn(cudnnGetConvolutionForwardAlgorithm_v7(handle, xDesc, wDesc, convDesc, yDesc, 1, &returned, &perf),
-                   "cudnnGetConvolutionForwardAlgorithm_v7", context);
-        if (returned < 1 || perf.status != CUDNN_STATUS_SUCCESS) {
-            throw InferenceException(context + ": cuDNN found no forward algorithm here");
-        }
-        cudnnConvolutionFwdAlgo_t algo = perf.algo;
-        size_t workspaceBytes = 0;
-        CheckCudnn(
-            cudnnGetConvolutionForwardWorkspaceSize(handle, xDesc, wDesc, convDesc, yDesc, algo, &workspaceBytes),
-            "cudnnGetConvolutionForwardWorkspaceSize", context);
-        void* workspace = nullptr;
-        if (workspaceBytes > 0) {
-            CheckCuda(cudaMalloc(&workspace, workspaceBytes), "cudaMalloc", context);
-        }
         std::lock_guard<std::mutex> lock(PlanCacheMutex());
-        plan->algo = algo;
-        plan->workspace_bytes = workspaceBytes;
-        plan->workspace = workspace;
-        plan->ready = true;
+        if (!plan->ready) {
+            const std::vector<int> xStrides = contiguous_strides(xDims);
+            const std::vector<int> yStrides = contiguous_strides(yDims);
+            CheckCudnn(cudnnCreateTensorDescriptor(&plan->x_desc), "cudnnCreateTensorDescriptor", context);
+            CheckCudnn(cudnnCreateTensorDescriptor(&plan->y_desc), "cudnnCreateTensorDescriptor", context);
+            CheckCudnn(cudnnCreateFilterDescriptor(&plan->w_desc), "cudnnCreateFilterDescriptor", context);
+            CheckCudnn(cudnnCreateConvolutionDescriptor(&plan->conv_desc), "cudnnCreateConvolutionDescriptor", context);
+            CheckCudnn(
+                cudnnSetTensorNdDescriptor(plan->x_desc, CUDNN_DATA_FLOAT, nbDims, xDims.data(), xStrides.data()),
+                "cudnnSetTensorNdDescriptor", context);
+            CheckCudnn(
+                cudnnSetTensorNdDescriptor(plan->y_desc, CUDNN_DATA_FLOAT, nbDims, yDims.data(), yStrides.data()),
+                "cudnnSetTensorNdDescriptor", context);
+            CheckCudnn(
+                cudnnSetFilterNdDescriptor(plan->w_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, nbDims, wDims.data()),
+                "cudnnSetFilterNdDescriptor", context);
+            CheckCudnn(cudnnSetConvolutionNdDescriptor(plan->conv_desc, static_cast<int>(cudnn_spatial), pad.data(),
+                                                       stride.data(), dilation.data(), CUDNN_CROSS_CORRELATION,
+                                                       CUDNN_DATA_FLOAT),
+                       "cudnnSetConvolutionNdDescriptor", context);
+            CheckCudnn(cudnnSetConvolutionMathType(plan->conv_desc, CUDNN_DEFAULT_MATH), "cudnnSetConvolutionMathType",
+                       context);
+            CheckCudnn(cudnnSetConvolutionGroupCount(plan->conv_desc, IntOrThrow(group, "group", context)),
+                       "cudnnSetConvolutionGroupCount", context);
+
+            int returned = 0;
+            cudnnConvolutionFwdAlgoPerf_t perf{};
+            CheckCudnn(cudnnGetConvolutionForwardAlgorithm_v7(handle, plan->x_desc, plan->w_desc, plan->conv_desc,
+                                                              plan->y_desc, 1, &returned, &perf),
+                       "cudnnGetConvolutionForwardAlgorithm_v7", context);
+            if (returned < 1 || perf.status != CUDNN_STATUS_SUCCESS) {
+                throw InferenceException(context + ": cuDNN found no forward algorithm here");
+            }
+            plan->algo = perf.algo;
+            CheckCudnn(cudnnGetConvolutionForwardWorkspaceSize(handle, plan->x_desc, plan->w_desc, plan->conv_desc,
+                                                               plan->y_desc, plan->algo, &plan->workspace_bytes),
+                       "cudnnGetConvolutionForwardWorkspaceSize", context);
+            if (plan->workspace_bytes > 0) {
+                CheckCuda(cudaMalloc(&plan->workspace, plan->workspace_bytes), "cudaMalloc", context);
+            }
+            plan->ready = true;
+        }
     }
 
     const float alpha = 1.0F, beta = 0.0F;
-    CheckCudnn(cudnnConvolutionForward(handle, &alpha, xDesc, x.data, wDesc, w.data, convDesc, plan->algo,
-                                       plan->workspace, plan->workspace_bytes, &beta, yDesc, out.data),
+    CheckCudnn(cudnnConvolutionForward(handle, &alpha, plan->x_desc, x.data, plan->w_desc, w.data, plan->conv_desc,
+                                       plan->algo, plan->workspace, plan->workspace_bytes, &beta, plan->y_desc,
+                                       out.data),
                "cudnnConvolutionForward", context);
 
     if (hasBias) {
@@ -395,12 +413,6 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
         CheckCuda(cudaGetLastError(), "BiasAddKernel launch", context);
     }
     CheckCuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize", context);
-
-    cudnnDestroyTensorDescriptor(xDesc);
-    cudnnDestroyTensorDescriptor(yDesc);
-    cudnnDestroyFilterDescriptor(wDesc);
-    cudnnDestroyConvolutionDescriptor(convDesc);
-    cudnnDestroy(handle);
 }
 
 } // namespace cuda_kernels

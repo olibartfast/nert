@@ -21,4 +21,4 @@ untouched, format clean, CUDA container leg green.
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
-| — | — | pending | — | — |
+| V-A1 | Slice A: container `nert-gpu:26.08`, CUDA+bench build; Conv bench fixture before 5.87 ms / after 0.98 ms (5.99x), maxdiff unchanged 3.81e-06; full ctest 23/23 with fixture; OFF 12/12; format | pass | 2026-10-18 | One process handle + cached descriptors/algo/workspace per geometry; numerics bit-identical to the pre-slice row. |
