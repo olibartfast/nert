@@ -168,6 +168,7 @@ if(NERT_ENABLE_OPENCL)
             "NERT_ENABLE_OPENCL=ON requires the OpenCL headers and ICD loader; none were found.")
     endif()
     target_sources(nert PRIVATE src/opencl_device.cpp)
+    target_sources(nert PRIVATE src/opencl/runtime.cpp src/opencl/relu.cpp src/opencl/add.cpp src/opencl/table.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)
