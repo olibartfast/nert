@@ -21,11 +21,12 @@ void Div(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 void Sigmoid(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Tanh(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Reshape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindHIPKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
-        {"Relu", &Relu}, {"Add", &Add},         {"Mul", &Mul},   {"Sub", &Sub},
-        {"Div", &Div},   {"Sigmoid", &Sigmoid}, {"Tanh", &Tanh}, {"Softmax", &Softmax},
+        {"Relu", &Relu},       {"Add", &Add},   {"Mul", &Mul},         {"Sub", &Sub},         {"Div", &Div},
+        {"Sigmoid", &Sigmoid}, {"Tanh", &Tanh}, {"Softmax", &Softmax}, {"Reshape", &Reshape},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

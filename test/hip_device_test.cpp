@@ -46,6 +46,7 @@ TEST(NertHIPDevice, KernelTableServesPilotRows) {
     EXPECT_NE(hip.kernels().find("Sigmoid"), nullptr);
     EXPECT_NE(hip.kernels().find("Tanh"), nullptr);
     EXPECT_NE(hip.kernels().find("Softmax"), nullptr);
+    EXPECT_NE(hip.kernels().find("Reshape"), nullptr);
     EXPECT_EQ(hip.kernels().find("Gemm"), nullptr);
 }
 

@@ -308,3 +308,110 @@ TEST(NertHIPKernels, SoftmaxAxisZeroStable) {
         EXPECT_NEAR(gpu[0 * 2 + c] + gpu[1 * 2 + c] + gpu[2 * 2 + c], 1.0F, 1e-3) << "col " << c;
     }
 }
+
+// Reshape [2,3] -> [3,2] preserves flat order; the shape operand is read
+// back from device memory and validated on the host.
+TEST(NertHIPKernels, ReshapeFloatPreservesOrder) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {3, 2};
+    nert::Node node = MakeNode("reshape0", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(hip, x);
+    void* dshape = UploadInt64(hip, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(hip, gpuOut);
+    nert::HipDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {2})},
+                                                {DeviceFloat(dy, {3, 2})});
+    gpuOut = Download(hip, dy, 6);
+    hip.allocator().release(dx);
+    hip.allocator().release(dshape);
+    hip.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape shape {0,-1} copies the matching input dim (2) and infers 3.
+TEST(NertHIPKernels, ReshapeZeroAndInferred) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {0, -1};
+    nert::Node node = MakeNode("reshape1", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(hip, x);
+    void* dshape = UploadInt64(hip, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(hip, gpuOut);
+    nert::HipDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {2})},
+                                                {DeviceFloat(dy, {2, 3})});
+    gpuOut = Download(hip, dy, 6);
+    hip.allocator().release(dx);
+    hip.allocator().release(dshape);
+    hip.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape int64 copies raw elements unchanged.
+TEST(NertHIPKernels, ReshapeInt64Copies) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<int64_t> x = {7, -8, 9, 10};
+    nert::Node node = MakeNode("reshape2", "Reshape");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+
+    void* dx = UploadInt64(hip, x);
+    std::vector<int64_t> gpuOut(4, 0);
+    void* dy = UploadInt64(hip, gpuOut);
+    nert::HipDevice().kernels().find("Reshape")(node, {DeviceInt64(dx, {2, 2})}, {DeviceInt64(dy, {4})});
+    gpuOut = DownloadInt64(hip, dy, 4);
+    hip.allocator().release(dx);
+    hip.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape whose target product differs from the element count is rejected,
+// naming the op and node.
+TEST(NertHIPKernels, ReshapeRejectsCountMismatch) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {4};
+    nert::Node node = MakeNode("reshape_bad", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(hip, x);
+    void* dshape = UploadInt64(hip, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(hip, gpuOut);
+    try {
+        nert::HipDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {1})},
+                                                    {DeviceFloat(dy, {4})});
+        FAIL() << "expected InferenceException";
+    } catch (const nert::InferenceException& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("Reshape"), std::string::npos) << message;
+        EXPECT_NE(message.find("reshape_bad"), std::string::npos) << message;
+    }
+    hip.allocator().release(dx);
+    hip.allocator().release(dshape);
+    hip.allocator().release(dy);
+}
