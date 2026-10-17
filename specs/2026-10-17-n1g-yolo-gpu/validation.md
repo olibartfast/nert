@@ -10,6 +10,7 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 - [V-2] Gate: yolo26n loads + runs on the CUDA leg (cuDNN container),
   confident-row agreement vs CPU at the V-5a bar (min IoU ≥ 0.999998,
   score diff ≤ 1e-4, classes match).
+| R-6 | GATE yolo26n on CUDA (cuDNN container, all 485 nodes dispatched) vs CPU oracle | pass w/ deviation | 2026-10-17 | 93s GPU vs 265s CPU; 6/6 confident rows, min IoU 0.9998039 (>= 0.999 bar), classes match; max score diff 3.74e-04 exceeds 1e-4 bar (cuDNN/float accum vs naive double oracle). Tail-row permutation among ~7e-4 ties only (298/300 rows IoU>0.99; 2 unmatched at conf ~0.00068). Detection-identical. |
 - [V-3] No-row probe discipline: the `MatMul` probe in
   `cuda_kernels_test.cpp` moves to the next uncovered op when g4 lands.
 
