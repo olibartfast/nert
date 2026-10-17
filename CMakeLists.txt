@@ -200,14 +200,15 @@ if(NERT_ENABLE_HIP)
             "NERT_ENABLE_HIP=ON requires the HIP headers (set HIP_INCLUDE_DIR or HIP_PATH); none were found.")
     endif()
     target_sources(nert PRIVATE src/hip_device.cpp)
+    target_sources(nert PRIVATE src/hip/relu.cu src/hip/add.cu src/hip/table.cpp)
     # The HIP dialect compiles with nvcc on the NVIDIA target (what
-    # hipcc -platform=nvidia does); the backend selection + headers stay
-    # file-scoped so the rest of `nert` is untouched.
+    # hipcc -platform=nvidia does). .cu files pick up CUDA automatically;
+    # the .cpp device file needs it set explicitly.
     set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp PROPERTY LANGUAGE CUDA)
-    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp APPEND PROPERTY COMPILE_DEFINITIONS
-        __HIP_PLATFORM_NVIDIA__)
-    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp APPEND PROPERTY INCLUDE_DIRECTORIES
-        ${HIP_INCLUDE_DIR})
+    # PRIVATE: the NVIDIA backend selection + HIP headers stay inside `nert`,
+    # so consumers stay toolkit-free.
+    target_compile_definitions(nert PRIVATE __HIP_PLATFORM_NVIDIA__)
+    target_include_directories(nert PRIVATE ${HIP_INCLUDE_DIR})
     # PRIVATE: no HIP type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart)
