@@ -269,6 +269,42 @@ TEST_F(EnginePlan, OverlappingLifetimesDoNotOverlap) {
     EXPECT_TRUE(disjoint) << "a=" << a.offset << "+" << a.size << " b=" << b.offset << "+" << b.size;
 }
 
+// Residual link: `a` (256 floats, live [0,2]) is still live when small `b`
+// (4 floats, live [1,2]) is placed, so `b` must jump straight past `a`'s
+// end; `c` (live [2,2]) then jumps past both. Pins the exact offsets, which
+// proves the jump produces the same plan as stepping 64 bytes at a time:
+// a@0, b@1024, c@1088, arena 2112.
+TEST_F(EnginePlan, JumpReusesExactOffsets) {
+    nert::Graph graph;
+    graph.inputs.push_back({"x", f32({256})});
+    graph.inputs.push_back({"y", f32({4})});
+    graph.nodes.push_back(relu_node("relu0", "x", "a"));
+    graph.nodes.push_back(relu_node("relu1", "y", "b"));
+    nert::Node add;
+    add.name = "add0";
+    add.op_type = "Add";
+    add.inputs = {"a", "b"};
+    add.outputs = {"c"};
+    graph.nodes.push_back(add);
+    graph.outputs.push_back({"c", f32({256})});
+
+    nert::InferredShapes shapes;
+    shapes.tensors["x"] = f32({256});
+    shapes.tensors["y"] = f32({4});
+    shapes.tensors["a"] = f32({256});
+    shapes.tensors["b"] = f32({4});
+    shapes.tensors["c"] = f32({256});
+
+    const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
+    ASSERT_EQ(plan.buffers.size(), 3U);
+    EXPECT_EQ(plan.buffers.at("a").offset, 0);
+    EXPECT_EQ(plan.buffers.at("a").size, 1024);
+    EXPECT_EQ(plan.buffers.at("b").offset, 1024);
+    EXPECT_EQ(plan.buffers.at("b").size, 16);
+    EXPECT_EQ(plan.buffers.at("c").offset, 1088);
+    EXPECT_EQ(plan.arena_size, 2112);
+}
+
 // Every offset is 64-byte aligned and every buffer fits inside the arena.
 TEST_F(EnginePlan, OffsetsAlignedAndWithinArena) {
     nert::Graph graph;
@@ -424,8 +460,8 @@ TEST_F(EnginePlan, OutputNeverAliasesItsInput) {
                     continue;
                 }
                 EXPECT_FALSE(ranges_overlap(in_buffer->second, out_buffer->second))
-                    << "node '" << node.name << "' (" << node.op_type << ") output '" << output
-                    << "' aliases input '" << input << "'";
+                    << "node '" << node.name << "' (" << node.op_type << ") output '" << output << "' aliases input '"
+                    << input << "'";
             }
         }
     }
@@ -476,8 +512,8 @@ TEST_F(EnginePlan, DtypeAwareBufferSizes) {
     nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 64});
     shapes.tensors["a"] = boolean({1, 64}); // 64 elements x 1 byte
-    shapes.tensors["b"] = f32({1, 64}); // 64 elements x 4 bytes
-    shapes.tensors["c"] = i64({1, 64}); // 64 elements x 8 bytes
+    shapes.tensors["b"] = f32({1, 64});     // 64 elements x 4 bytes
+    shapes.tensors["c"] = i64({1, 64});     // 64 elements x 8 bytes
 
     const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 3U);
@@ -486,8 +522,7 @@ TEST_F(EnginePlan, DtypeAwareBufferSizes) {
     EXPECT_EQ(plan.buffers.at("c").size, 64 * 8);
     for (const auto& entry : plan.buffers) {
         EXPECT_EQ(entry.second.offset % 64, 0) << entry.first;
-        EXPECT_LE(entry.second.offset + entry.second.size, plan.arena_size)
-            << entry.first;
+        EXPECT_LE(entry.second.offset + entry.second.size, plan.arena_size) << entry.first;
     }
 }
 
@@ -510,8 +545,8 @@ TEST_F(EnginePlan, MixedDtypeOverlappingLifetimesDoNotOverlap) {
     nert::InferredShapes shapes;
     shapes.tensors["x"] = f32({1, 16});
     shapes.tensors["a"] = boolean({1, 16}); // 16 bytes
-    shapes.tensors["b"] = i64({1, 16}); // 128 bytes
-    shapes.tensors["c"] = f32({1, 16}); // 64 bytes
+    shapes.tensors["b"] = i64({1, 16});     // 128 bytes
+    shapes.tensors["c"] = f32({1, 16});     // 64 bytes
 
     const nert::MemoryPlan plan = nert::PlanMemory(graph, shapes);
     ASSERT_EQ(plan.buffers.size(), 3U);
@@ -604,6 +639,47 @@ TEST_F(EnginePlan, TwoOutputNodeWithOneDeadOutputPlansBoth) {
 // ===========================================================================
 
 class EnginePlanNegative : public ::testing::Test {};
+
+// A shape whose element count overflows int64 throws naming the tensor
+// instead of wrapping around (undefined behaviour the old `size < 0`
+// check could miss once wrapped positive).
+TEST_F(EnginePlanNegative, ElementCountOverflowNamesTensor) {
+    nert::Graph graph;
+    graph.inputs.push_back({"x", f32({1})});
+    graph.nodes.push_back(relu_node("relu0", "x", "big"));
+    graph.outputs.push_back({"big", f32({INT64_MAX, 2})});
+
+    nert::InferredShapes shapes;
+    shapes.tensors["x"] = f32({1});
+    shapes.tensors["big"] = f32({INT64_MAX, 2});
+
+    try {
+        (void)nert::PlanMemory(graph, shapes);
+        FAIL() << "expected ModelLoadException for an overflowing element count";
+    } catch (const nert::ModelLoadException& e) {
+        EXPECT_NE(std::string(e.what()).find("big"), std::string::npos) << e.what();
+    }
+}
+
+// A shape whose element count fits but whose byte size does not (here one
+// more float than INT64_MAX / 4) throws naming the tensor.
+TEST_F(EnginePlanNegative, ByteSizeOverflowNamesTensor) {
+    nert::Graph graph;
+    graph.inputs.push_back({"x", f32({1})});
+    graph.nodes.push_back(relu_node("relu0", "x", "wide"));
+    graph.outputs.push_back({"wide", f32({INT64_MAX / 4 + 1})});
+
+    nert::InferredShapes shapes;
+    shapes.tensors["x"] = f32({1});
+    shapes.tensors["wide"] = f32({INT64_MAX / 4 + 1});
+
+    try {
+        (void)nert::PlanMemory(graph, shapes);
+        FAIL() << "expected ModelLoadException for an overflowing byte size";
+    } catch (const nert::ModelLoadException& e) {
+        EXPECT_NE(std::string(e.what()).find("wide"), std::string::npos) << e.what();
+    }
+}
 
 // A node output absent from the inferred shapes names that tensor.
 TEST_F(EnginePlanNegative, MissingShapeNamesTensor) {
