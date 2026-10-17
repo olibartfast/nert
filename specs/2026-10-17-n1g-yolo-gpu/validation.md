@@ -17,4 +17,5 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
+| N1g-2 | Concat/Split/Slice CUDA vs CPU (neg-axis/equal/sizes/basic/stepped, 3 negatives) + OFF 8/8 + ON 15/15 + format | pass | 2026-10-17 | RTX 3060 host leg; exact match. YOLO coverage now 343/485 (70.7%). |
 | N1g-1 | Reshape/Unsqueeze/Flatten/Expand CUDA vs CPU (-1/allowzero/neg-axes/bcast/i64, 4 negatives) + OFF 8/8 + ON 14/14 + format | pass | 2026-10-17 | RTX 3060 host leg; exact match. YOLO coverage now 301/485 (62.1%). |
