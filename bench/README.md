@@ -6,10 +6,11 @@ Standalone tooling for timing shipped kernels against the CPU oracle.
 
 `bench/runtime/main.cpp` implements zero kernel logic: one fixture per
 op (shapes + attrs + fixed-seed data) drives the runtime's own device
-tables, times both sides (`steady_clock` around the internally
+tables for every device layer the binary was built with (CUDA, OpenCL,
+HIP), times both sides (`steady_clock` around the internally
 synchronized calls), compares within `1e-3·(1+|ref|)`, and prints
-`op | case | cpu_ms | gpu_ms | speedup | maxdiff`. New kernel coverage
-means a new fixture — never a copied kernel.
+`op | case | device | cpu_ms | dev_ms | speedup | maxdiff`. New kernel
+coverage means a new fixture — never a copied kernel.
 
 ## Flags
 
@@ -19,38 +20,62 @@ means a new fixture — never a copied kernel.
 
 Bench is opt-in precisely so the default build needs nothing beyond a
 C++17 compiler. Which devices get benched is decided by the device
-flags (`NERT_ENABLE_CUDA`, and later OpenCL/HIP): a device that is not
-compiled in simply has no bench half, and a missing GPU at run time
-prints `SKIP:` and still exits 0, so CPU-only runners stay green.
+flags (`NERT_ENABLE_CUDA`, `NERT_ENABLE_OPENCL`, `NERT_ENABLE_HIP`):
+one binary enumerates exactly the devices it was built with. A device
+that is not compiled in has no bench half at all; one that is compiled
+in but missing at run time prints `SKIP:` and still exits 0, so
+CPU-only runners stay green. Device rows an op lacks also `SKIP:`, so
+the same fixture list runs on every leg.
 
 ## Commands
 
 ```bash
+# One leg per device layer; build any combination into one binary.
 cmake -S . -B build-cuda -DNERT_ENABLE_CUDA=ON -DNERT_BUILD_BENCH=ON
+cmake -S . -B build-ocl -DNERT_ENABLE_OPENCL=ON -DNERT_BUILD_BENCH=ON
+cmake -S . -B build-hip -DNERT_ENABLE_HIP=ON -DNERT_BUILD_BENCH=ON \
+    -DHIP_INCLUDE_DIR=/path/to/hip/include
 cmake --build build-cuda --target nert_bench_runtime
 ./build-cuda/bench/runtime/nert_bench_runtime
 # or: ctest --test-dir build-cuda -R bench_runtime --output-on-failure
 ```
 
-Reference numbers (RTX 3060, 2026-10-16, 11 passed / 1 skipped):
+Reference numbers (RTX 3060, 2026-10-17/18, one line per device leg):
 
-| op | case | cpu_ms | gpu_ms | speedup | maxdiff |
-|----|------|--------|--------|---------|---------|
-| Gemm | 512³ | 1480.40 | 0.66 | 2227.7x | 1.05e-05 |
-| Relu | 4M | 96.90 | 3.94 | 24.6x | 0 |
-| Sigmoid | 4M | 63.80 | 3.88 | 16.4x | 1.19e-07 |
-| Tanh | 4M | 248.98 | 4.17 | 59.7x | 1.19e-07 |
-| Add | 4M bcast | 200.72 | 9.56 | 21.0x | 0 |
-| Mul | 4M bcast | 198.88 | 9.62 | 20.7x | 0 |
-| Sub | 4M bcast | 200.52 | 9.73 | 20.6x | 0 |
-| Div | 4M | 116.31 | 9.57 | 12.2x | 0 |
-| MaxPool | [8,64,112,112] k3 s2 | 382.15 | 1.76 | 217.6x | 0 |
-| AveragePool | [8,64,112,112] k3 s2 | 146.76 | 1.64 | 89.6x | 0 |
-| Softmax | [256,4096] | 58.92 | 20.22 | 2.9x | 0 |
-| Conv | — | SKIP (no CUDA row: no cuDNN on this leg) | | | |
+| device | op | case | cpu_ms | dev_ms | speedup | maxdiff |
+|--------|----|------|--------|--------|---------|---------|
+| CUDA | Gemm | 512³ | 1637.50 | 0.65 | 2525.8x | 1.05e-05 |
+| CUDA | Relu | 4M | 95.65 | 4.04 | 23.7x | 0 |
+| CUDA | Sigmoid | 4M | 64.98 | 3.89 | 16.7x | 1.19e-07 |
+| CUDA | Tanh | 4M | 252.57 | 4.14 | 61.1x | 1.19e-07 |
+| CUDA | Add | 4M bcast | 212.01 | 9.69 | 21.9x | 0 |
+| CUDA | Mul | 4M bcast | 192.97 | 9.63 | 20.0x | 0 |
+| CUDA | Sub | 4M bcast | 211.43 | 9.68 | 21.8x | 0 |
+| CUDA | Div | 4M | 117.45 | 9.47 | 12.4x | 0 |
+| CUDA | MaxPool | [8,64,112,112] k3 s2 | 379.40 | 2.04 | 185.7x | 0 |
+| CUDA | AveragePool | [8,64,112,112] k3 s2 | 137.04 | 1.47 | 93.2x | 0 |
+| CUDA | Softmax | [256,4096] | 56.22 | 18.06 | 3.1x | 0 |
+| OpenCL | Relu | 4M | 94.28 | 3.76 | 25.1x | 0 |
+| OpenCL | Sigmoid | 4M | 63.53 | 3.78 | 16.8x | 1.79e-07 |
+| OpenCL | Tanh | 4M | 244.65 | 3.77 | 64.9x | 1.19e-07 |
+| OpenCL | Add | 4M bcast | 195.18 | 3.76 | 51.9x | 0 |
+| OpenCL | Mul | 4M bcast | 203.69 | 3.82 | 53.3x | 0 |
+| OpenCL | Sub | 4M bcast | 206.20 | 3.72 | 55.5x | 0 |
+| OpenCL | Div | 4M | 112.31 | 4.03 | 27.9x | 4.77e-07 |
+| OpenCL | Softmax | [256,4096] | 54.96 | 4.24 | 13.0x | 4.54e-09 |
+| HIP | Relu | 4M | 91.12 | 4.19 | 21.8x | 0 |
+| HIP | Sigmoid | 4M | 67.46 | 4.07 | 16.6x | 1.19e-07 |
+| HIP | Tanh | 4M | 247.50 | 4.28 | 57.8x | 1.19e-07 |
+| HIP | Add | 4M bcast | 196.64 | 9.57 | 20.6x | 0 |
+| HIP | Mul | 4M bcast | 192.22 | 9.64 | 19.9x | 0 |
+| HIP | Sub | 4M bcast | 188.75 | 9.65 | 19.6x | 0 |
+| HIP | Div | 4M | 105.87 | 9.56 | 11.1x | 0 |
+| HIP | Softmax | [256,4096] | 54.96 | 17.32 | 3.2x | 0 |
 
-Softmax is only 2.9x: one thread per row with double accumulation on
-both sides, honestly reported, not tuned.
+Rows without a device kernel `SKIP` on that leg: CUDA has no cuDNN in
+the host container (Conv), OpenCL/HIP have no Gemm/pools/Conv yet.
+Softmax is only ~3x on CUDA/HIP: one thread per row with double
+accumulation on both sides, honestly reported, not tuned.
 
 ## History
 
@@ -58,3 +83,8 @@ Before 2026-10-17 `bench/` also held per-kernel harnesses (`gemm`,
 `matmul`) that timed vendored kernel copies instead of shipped code.
 They were deleted once the OpenCL and HIP runtime devices landed, since
 the reason to keep them (bench legs with no runtime device) was gone.
+
+2026-10-18 (Slice 2): the driver enumerates every enabled device layer
+behind one fixture list and prints a `device` column; the legacy
+CUDA-only `gpu_ms` column became `dev_ms`. Building with no device
+flags produces no bench target.

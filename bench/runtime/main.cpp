@@ -1,15 +1,17 @@
-// Runtime bench (N1f): parity + timing for every shipped CUDA kernel.
+// Runtime bench (N1f/N1d/N1c): parity + timing for every shipped kernel.
 //
-// Unlike bench/gemm + bench/matmul (vendored kernel copies), this driver
-// implements ZERO kernel logic: it builds one fixture per op (shapes +
-// attrs + deterministic data) and runs the runtime's own tables —
-// CpuDevice (oracle) vs CudaDevice (device) — through the public seam.
-// Adding kernel coverage means adding a fixture, never reimplementing.
+// This driver implements ZERO kernel logic: it builds one fixture per op
+// (shapes + attrs + deterministic data) and runs the runtime's own tables —
+// CpuDevice (oracle) vs every device layer this binary was built with
+// (CUDA, OpenCL, HIP) — through the public seam. Adding kernel coverage
+// means adding a fixture, never reimplementing.
 //
 // Exit 0 + PASSED when every executed case matches within 1e-3*(1+|ref|);
-// a missing device or a missing CUDA row prints SKIP: and still exits 0.
-// Any mismatch exits 1. Timings are steady_clock around the (internally
-// synchronized) kernel calls: honest end-to-end ms.
+// a device that is not compiled in is absent from the binary entirely, and
+// one that is compiled in but missing at run time (or lacks a row for an
+// op) prints SKIP: and still exits 0. Any mismatch exits 1. Timings are
+// steady_clock around the (internally synchronized) kernel calls: honest
+// end-to-end ms.
 
 #include "nert/device.hpp"
 
@@ -33,6 +35,13 @@ struct Case {
     std::vector<std::vector<int64_t>> inDims;
     std::vector<std::vector<float>> inData;
     std::vector<int64_t> outDims;
+};
+
+// One compiled-in device layer and whether it is usable right now.
+struct DeviceSlot {
+    std::string name;
+    nert::Device* device = nullptr;
+    bool present = false;
 };
 
 nert::Node MakeNode(const std::string& name, const std::string& op) {
@@ -81,97 +90,113 @@ template <typename Fn> double TimeMs(Fn&& fn, int iters) {
     return std::chrono::duration<double, std::milli>(end - start).count() / iters;
 }
 
-bool HasCudaDevice(nert::Device& cuda) {
-    void* probe = cuda.allocator().allocate(1);
-    if (probe == nullptr) {
+// A device is usable when its allocator hands out one byte. Constructing the
+// device or allocating may throw (no platform/driver): both mean SKIP.
+bool ProbeDevice(nert::Device& device) {
+    try {
+        void* probe = device.allocator().allocate(1);
+        if (probe == nullptr) {
+            return false;
+        }
+        device.allocator().release(probe);
+        return true;
+    } catch (...) {
         return false;
     }
-    cuda.allocator().release(probe);
-    return true;
 }
 
-int RunCase(nert::Device& cuda, bool devicePresent, const Case& c, int& passed, int& skipped, int& failed) {
-    nert::KernelFn cpuFn = nert::CpuDevice().kernels().find(c.op);
-    if (cpuFn == nullptr) {
-        std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << "NO CPU ORACLE  FAIL\n";
-        ++failed;
-        return 1;
+template <typename Factory> void AddDevice(std::vector<DeviceSlot>& slots, const char* name, Factory factory) {
+    DeviceSlot slot;
+    slot.name = name;
+    try {
+        slot.device = &const_cast<nert::Device&>(factory());
+        slot.present = ProbeDevice(*slot.device);
+    } catch (...) {
+        slot.present = false;
     }
-    std::vector<nert::TensorView> cpuIns;
-    for (std::size_t i = 0; i < c.inData.size(); ++i) {
-        nert::TensorView v;
-        v.data = const_cast<float*>(c.inData[i].data());
-        v.dtype = nert::DataType::Float32;
-        v.dims = c.inDims[i];
-        cpuIns.push_back(v);
-    }
-    std::vector<float> ref(static_cast<std::size_t>(Count(c.outDims)), 0.0F);
-    nert::TensorView refView;
-    refView.data = ref.data();
-    refView.dtype = nert::DataType::Float32;
-    refView.dims = c.outDims;
-    cpuFn(c.node, cpuIns, {refView});
-    const double firstMs = TimeMs([&] { cpuFn(c.node, cpuIns, {refView}); }, 1);
-    const int cpuIters = firstMs > 1500.0 ? 1 : 3;
-    const double cpuMs = cpuIters == 1 ? firstMs : TimeMs([&] { cpuFn(c.node, cpuIns, {refView}); }, cpuIters);
+    slots.push_back(std::move(slot));
+}
 
-    if (!devicePresent) {
-        std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << "SKIP: no CUDA device\n";
+std::vector<DeviceSlot> EnumerateDevices() {
+    std::vector<DeviceSlot> slots;
+#ifdef NERT_BENCH_CUDA
+    AddDevice(slots, "CUDA", []() -> const nert::Device& { return nert::CudaDevice(); });
+#endif
+#ifdef NERT_BENCH_OPENCL
+    AddDevice(slots, "OpenCL", []() -> const nert::Device& { return nert::OpenCLDevice(); });
+#endif
+#ifdef NERT_BENCH_HIP
+    AddDevice(slots, "HIP", []() -> const nert::Device& { return nert::HipDevice(); });
+#endif
+    return slots;
+}
+
+// Runs one case on one device against the already-computed CPU reference.
+void RunDeviceCase(const DeviceSlot& slot, const Case& c, const std::vector<float>& ref, double cpuMs, int& passed,
+                   int& skipped, int& failed) {
+    if (!slot.present) {
+        std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << std::setw(9) << slot.name
+                  << "SKIP: device not present\n";
         ++skipped;
-        return 0;
+        return;
     }
-    nert::KernelFn cudaFn = cuda.kernels().find(c.op);
-    if (cudaFn == nullptr) {
-        std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << "SKIP: no CUDA row\n";
+    nert::Device& device = *slot.device;
+    nert::KernelFn deviceFn = device.kernels().find(c.op);
+    if (deviceFn == nullptr) {
+        std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << std::setw(9) << slot.name
+                  << "SKIP: no " << slot.name << " row\n";
         ++skipped;
-        return 0;
+        return;
     }
     std::vector<void*> devicePtrs;
-    std::vector<nert::TensorView> cudaIns;
+    std::vector<nert::TensorView> deviceIns;
     for (std::size_t i = 0; i < c.inData.size(); ++i) {
         const int64_t bytes = static_cast<int64_t>(c.inData[i].size() * sizeof(float));
-        void* device = cuda.allocator().allocate(bytes);
-        if (device == nullptr) {
+        void* deviceBuffer = device.allocator().allocate(bytes);
+        if (deviceBuffer == nullptr) {
             std::cout << "FAIL: device allocate failed for " << c.op << " " << c.label << '\n';
             ++failed;
-            return 1;
+            return;
         }
-        cuda.transfer().host_to_device(device, c.inData[i].data(), bytes);
-        devicePtrs.push_back(device);
+        device.transfer().host_to_device(deviceBuffer, c.inData[i].data(), bytes);
+        devicePtrs.push_back(deviceBuffer);
         nert::TensorView v;
-        v.data = device;
+        v.data = deviceBuffer;
         v.dtype = nert::DataType::Float32;
         v.dims = c.inDims[i];
-        cudaIns.push_back(v);
+        deviceIns.push_back(v);
     }
     std::vector<float> zeros(static_cast<std::size_t>(Count(c.outDims)), 0.0F);
     const int64_t outBytes = static_cast<int64_t>(zeros.size() * sizeof(float));
-    void* deviceOut = cuda.allocator().allocate(outBytes);
+    void* deviceOut = device.allocator().allocate(outBytes);
     if (deviceOut == nullptr) {
         std::cout << "FAIL: device allocate failed for " << c.op << " " << c.label << '\n';
+        for (void* buffer : devicePtrs) {
+            device.allocator().release(buffer);
+        }
         ++failed;
-        return 1;
+        return;
     }
     nert::TensorView outView;
     outView.data = deviceOut;
     outView.dtype = nert::DataType::Float32;
     outView.dims = c.outDims;
     for (int i = 0; i < 3; ++i) {
-        cuda.transfer().host_to_device(deviceOut, zeros.data(), outBytes);
-        cudaFn(c.node, cudaIns, {outView});
+        device.transfer().host_to_device(deviceOut, zeros.data(), outBytes);
+        deviceFn(c.node, deviceIns, {outView});
     }
-    const double gpuMs = TimeMs(
+    const double deviceMs = TimeMs(
         [&] {
-            cuda.transfer().host_to_device(deviceOut, zeros.data(), outBytes);
-            cudaFn(c.node, cudaIns, {outView});
+            device.transfer().host_to_device(deviceOut, zeros.data(), outBytes);
+            deviceFn(c.node, deviceIns, {outView});
         },
         10);
     std::vector<float> got(zeros.size(), 0.0F);
-    cuda.transfer().device_to_host(got.data(), deviceOut, outBytes);
-    for (void* device : devicePtrs) {
-        cuda.allocator().release(device);
+    device.transfer().device_to_host(got.data(), deviceOut, outBytes);
+    for (void* buffer : devicePtrs) {
+        device.allocator().release(buffer);
     }
-    cuda.allocator().release(deviceOut);
+    device.allocator().release(deviceOut);
 
     double maxDiff = 0.0;
     int mismatches = 0;
@@ -182,17 +207,16 @@ int RunCase(nert::Device& cuda, bool devicePresent, const Case& c, int& passed, 
             ++mismatches;
         }
     }
-    const double speedup = gpuMs > 0.0 ? cpuMs / gpuMs : 0.0;
-    std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << std::right << std::fixed
-              << std::setprecision(2) << std::setw(10) << cpuMs << std::setw(10) << gpuMs << std::setw(9)
-              << std::setprecision(1) << speedup << "x" << std::setw(12) << std::scientific << std::setprecision(2)
-              << maxDiff << "  " << (mismatches == 0 ? "PASS" : "FAIL") << '\n';
+    const double speedup = deviceMs > 0.0 ? cpuMs / deviceMs : 0.0;
+    std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << std::setw(9) << slot.name
+              << std::right << std::fixed << std::setprecision(2) << std::setw(10) << cpuMs << std::setw(10) << deviceMs
+              << std::setw(9) << std::setprecision(1) << speedup << "x" << std::setw(12) << std::scientific
+              << std::setprecision(2) << maxDiff << "  " << (mismatches == 0 ? "PASS" : "FAIL") << '\n';
     if (mismatches == 0) {
         ++passed;
-        return 0;
+        return;
     }
     ++failed;
-    return 1;
 }
 
 } // namespace
@@ -282,19 +306,45 @@ int main() {
         cases.push_back(std::move(c));
     }
 
-    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
-    const bool devicePresent = HasCudaDevice(cuda);
-    if (!devicePresent) {
-        std::cout << "SKIP: no CUDA device (device halves skipped, CPU halves still run)\n";
+    std::vector<DeviceSlot> devices = EnumerateDevices();
+    for (const DeviceSlot& slot : devices) {
+        if (!slot.present) {
+            std::cout << "SKIP: no " << slot.name << " device (its halves skipped, others still run)\n";
+        }
     }
-    std::cout << std::left << std::setw(12) << "op" << std::setw(28) << "case" << std::right << std::setw(10)
-              << "cpu_ms" << std::setw(10) << "gpu_ms" << std::setw(10) << "speedup" << std::setw(12) << "maxdiff"
-              << '\n';
+    std::cout << std::left << std::setw(12) << "op" << std::setw(28) << "case" << std::setw(9) << "device" << std::right
+              << std::setw(10) << "cpu_ms" << std::setw(10) << "dev_ms" << std::setw(10) << "speedup" << std::setw(12)
+              << "maxdiff" << '\n';
 
     int passed = 0, skipped = 0, failed = 0;
-    int status = 0;
     for (const Case& c : cases) {
-        status |= RunCase(cuda, devicePresent, c, passed, skipped, failed);
+        nert::KernelFn cpuFn = nert::CpuDevice().kernels().find(c.op);
+        if (cpuFn == nullptr) {
+            std::cout << std::left << std::setw(12) << c.op << std::setw(28) << c.label << "NO CPU ORACLE  FAIL\n";
+            ++failed;
+            continue;
+        }
+        std::vector<nert::TensorView> cpuIns;
+        for (std::size_t i = 0; i < c.inData.size(); ++i) {
+            nert::TensorView v;
+            v.data = const_cast<float*>(c.inData[i].data());
+            v.dtype = nert::DataType::Float32;
+            v.dims = c.inDims[i];
+            cpuIns.push_back(v);
+        }
+        std::vector<float> ref(static_cast<std::size_t>(Count(c.outDims)), 0.0F);
+        nert::TensorView refView;
+        refView.data = ref.data();
+        refView.dtype = nert::DataType::Float32;
+        refView.dims = c.outDims;
+        cpuFn(c.node, cpuIns, {refView});
+        const double firstMs = TimeMs([&] { cpuFn(c.node, cpuIns, {refView}); }, 1);
+        const int cpuIters = firstMs > 1500.0 ? 1 : 3;
+        const double cpuMs = cpuIters == 1 ? firstMs : TimeMs([&] { cpuFn(c.node, cpuIns, {refView}); }, cpuIters);
+
+        for (DeviceSlot& slot : devices) {
+            RunDeviceCase(slot, c, ref, cpuMs, passed, skipped, failed);
+        }
     }
     std::cout << (failed == 0 ? "PASSED " : "FAILED ") << passed << " cases (" << skipped << " skipped, " << failed
               << " failed)\n";
