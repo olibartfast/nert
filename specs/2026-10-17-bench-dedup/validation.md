@@ -18,4 +18,5 @@ format clean, bench stays opt-in and out of the `nert` link closure.
 |----|---------------|--------|------|-------|
 | Slice 1 | `bench/gemm,matmul,utils` deleted + flags dropped + README rewritten; OFF 8/8 + CUDA bench 11 pass/1 SKIP (Conv, no cuDNN) + format | pass | 2026-10-17 | `bench/` is now `runtime` only; numbers match README magnitude. |
 | Slice 2 | One driver, one fixture list, `device` column; CUDA 11 pass/1 SKIP, OpenCL 8 pass/4 SKIP, HIP 8 pass/4 SKIP; OFF 12/12 + bench-only configure (no device) builds nothing + format | pass | 2026-10-18 | CUDA/OCL/HIP numbers in `bench/README.md`; missing row/device SKIPs, never fails. |
+| Slice 3 | `test/device_test_helpers.hpp` shared by both GPU kernel suites + both device suites; OpenCL 2/2, HIP 2/2, OFF 12/12, format | pass | 2026-10-18 | 4 files -142 lines, +102-line header = net -40; matrix unchanged. |
 | — | — | pending | — | — |

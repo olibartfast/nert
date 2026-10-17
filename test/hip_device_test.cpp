@@ -6,6 +6,7 @@
 // throws naming the cause), so GTEST_SKIP still fires in the TEST body,
 // never in a helper.
 
+#include "device_test_helpers.hpp"
 #include "nert/device.hpp"
 
 #include <cstdint>
@@ -14,14 +15,7 @@
 
 namespace {
 
-bool HasHIPDevice() {
-    try {
-        (void)nert::HipDevice();
-        return true;
-    } catch (const nert::InferenceException&) {
-        return false;
-    }
-}
+bool HasHIPDevice() { return nert_test::DeviceAvailable(&nert::HipDevice); }
 
 } // namespace
 

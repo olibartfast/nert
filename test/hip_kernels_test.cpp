@@ -4,6 +4,7 @@
 // fails). Gemm never lands on HIP-NVIDIA (rocBLAS is the AMD half), so it
 // is the permanent no-row probe.
 
+#include "device_test_helpers.hpp"
 #include "nert/device.hpp"
 #include "nert/executor.hpp"
 #include "nert/graph.hpp"
@@ -17,83 +18,17 @@
 
 namespace {
 
-bool HasHIPDevice() {
-    try {
-        (void)nert::HipDevice();
-        return true;
-    } catch (const nert::InferenceException&) {
-        return false;
-    }
-}
+using nert_test::DeviceFloat;
+using nert_test::DeviceInt64;
+using nert_test::Download;
+using nert_test::DownloadInt64;
+using nert_test::HostFloat;
+using nert_test::HostInt64;
+using nert_test::MakeNode;
+using nert_test::Upload;
+using nert_test::UploadInt64;
 
-nert::TensorView HostFloat(std::vector<float>& data, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = data.empty() ? nullptr : data.data();
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::TensorView HostInt64(std::vector<int64_t>& data, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = data.empty() ? nullptr : data.data();
-    view.dtype = nert::DataType::Int64;
-    view.dims = std::move(dims);
-    return view;
-}
-
-void* Upload(nert::Device& hip, const std::vector<float>& host) {
-    void* device = hip.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(float)));
-    if (device == nullptr) {
-        throw std::runtime_error("Upload: device allocate failed");
-    }
-    hip.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(float)));
-    return device;
-}
-
-void* UploadInt64(nert::Device& hip, const std::vector<int64_t>& host) {
-    void* device = hip.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
-    if (device == nullptr) {
-        throw std::runtime_error("UploadInt64: device allocate failed");
-    }
-    hip.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
-    return device;
-}
-
-std::vector<float> Download(nert::Device& hip, void* device, std::size_t count) {
-    std::vector<float> host(count, 0.0F);
-    hip.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(float)));
-    return host;
-}
-
-std::vector<int64_t> DownloadInt64(nert::Device& hip, void* device, std::size_t count) {
-    std::vector<int64_t> host(count, 0);
-    hip.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(int64_t)));
-    return host;
-}
-
-nert::TensorView DeviceFloat(void* device, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = device;
-    view.dtype = nert::DataType::Float32;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::TensorView DeviceInt64(void* device, std::vector<int64_t> dims) {
-    nert::TensorView view;
-    view.data = device;
-    view.dtype = nert::DataType::Int64;
-    view.dims = std::move(dims);
-    return view;
-}
-
-nert::Node MakeNode(const std::string& name, const std::string& op) {
-    nert::Node node;
-    node.name = name;
-    node.op_type = op;
-    return node;
-}
+bool HasHIPDevice() { return nert_test::DeviceAvailable(&nert::HipDevice); }
 
 } // namespace
 
