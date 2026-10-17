@@ -266,6 +266,66 @@ class TestDevice final : public nert::Device {
     EmptyKernelTable empty_table_;
 };
 
+// Counts transfer traffic while delegating to the CPU transfer (memcpy
+// semantics, so numerics stay identical).
+class CountingTransfer final : public nert::Transfer {
+  public:
+    int h2d_calls = 0;
+    int d2h_calls = 0;
+    int64_t h2d_bytes = 0;
+    int64_t d2h_bytes = 0;
+
+    void host_to_device(void* dst, const void* src, int64_t bytes) override {
+        ++h2d_calls;
+        h2d_bytes += bytes;
+        cpu_device().transfer().host_to_device(dst, src, bytes);
+    }
+
+    void device_to_host(void* dst, const void* src, int64_t bytes) override {
+        ++d2h_calls;
+        d2h_bytes += bytes;
+        cpu_device().transfer().device_to_host(dst, src, bytes);
+    }
+};
+
+// A non-host test device: malloc-backed memory, CPU kernels, counted
+// traffic. Exercises the GPU executor path (resident initializers,
+// per-run input staging) with no hardware.
+class NonHostTestDevice final : public nert::Device {
+  public:
+    explicit NonHostTestDevice(const nert::KernelTable* table) : table_(table) {}
+
+    const char* name() const override { return "test-device"; }
+    nert::Allocator& allocator() override { return allocator_; }
+    nert::Transfer& transfer() override { return transfer_; }
+    const nert::KernelTable& kernels() const override { return *table_; }
+    bool is_host() const override { return false; }
+
+    const CountingAllocator& counting() const { return allocator_; }
+    const CountingTransfer& traffic() const { return transfer_; }
+
+  private:
+    CountingAllocator allocator_;
+    CountingTransfer transfer_;
+    const nert::KernelTable* table_;
+};
+
+void ThrowingAddKernel(const nert::Node&, const std::vector<nert::TensorView>&, const std::vector<nert::TensorView>&) {
+    throw nert::InferenceException("test-device: boom");
+}
+
+// A kernel table that throws on Add and forwards everything else to the CPU
+// table, used to prove staged inputs release on kernel failure.
+class ThrowOnAddTable final : public nert::KernelTable {
+  public:
+    nert::KernelFn find(const std::string& op_type) const override {
+        if (op_type == "Add") {
+            return &ThrowingAddKernel;
+        }
+        return nert::CpuDevice().kernels().find(op_type);
+    }
+};
+
 } // namespace
 
 // ===========================================================================
@@ -304,6 +364,64 @@ TEST(NertExecutor, ArenaAllocatedOnceAndReused) {
     }
     EXPECT_EQ(device.counting().allocate_calls, 1);
     EXPECT_EQ(device.counting().release_calls, 1);
+}
+
+// Initializers upload once at construction; each Run stages only the graph
+// inputs.Hermetic Add(x, c) + Relu with a 2-float constant: 8 weight bytes
+// once, 8 input bytes per run.
+TEST(NertExecutor, ResidentInitializersUploadOnceAcrossRuns) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    NonHostTestDevice device(&nert::CpuDevice().kernels());
+    {
+        nert::Model model(graph, {{"x", {2}}}, device);
+        // Construction: arena + one resident upload of `c`, nothing else.
+        EXPECT_EQ(device.counting().allocate_calls, 2);
+        EXPECT_EQ(device.traffic().h2d_calls, 1);
+        EXPECT_EQ(device.traffic().h2d_bytes, 8);
+
+        const nert::InferenceResult first = model.Run({{"x", {1.0F, -2.0F}}});
+        EXPECT_EQ(first.outputs.at("z"), (std::vector<float>{0.5F, 0.0F}));
+        // First run adds exactly one input staging (allocate + upload) and
+        // releases it at the end of Execute.
+        EXPECT_EQ(device.counting().allocate_calls, 3);
+        EXPECT_EQ(device.counting().release_calls, 1);
+        EXPECT_EQ(device.traffic().h2d_calls, 2);
+        EXPECT_EQ(device.traffic().h2d_bytes, 16);
+
+        const nert::InferenceResult second = model.Run({{"x", {1.0F, -2.0F}}});
+        EXPECT_EQ(second.outputs.at("z"), (std::vector<float>{0.5F, 0.0F}));
+        // Second run stages the input again but never re-uploads `c`.
+        EXPECT_EQ(device.counting().allocate_calls, 4);
+        EXPECT_EQ(device.counting().release_calls, 2);
+        EXPECT_EQ(device.traffic().h2d_calls, 3);
+        EXPECT_EQ(device.traffic().h2d_bytes, 24);
+    }
+    // Destruction releases the arena and the resident initializer: every
+    // allocation is balanced.
+    EXPECT_EQ(device.counting().allocate_calls, 4);
+    EXPECT_EQ(device.counting().release_calls, 4);
+}
+
+// A throwing kernel still releases the staged graph inputs: the per-run
+// guard owns them, not the happy path.
+TEST(NertExecutor, ThrowingKernelReleasesStagedInputs) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    ThrowOnAddTable throwing_table;
+    NonHostTestDevice device(&throwing_table);
+    {
+        nert::Model model(graph, {{"x", {2}}}, device);
+        EXPECT_EQ(device.counting().allocate_calls, 2);
+        try {
+            (void)model.Run({{"x", {1.0F, -2.0F}}});
+            FAIL() << "expected InferenceException from the throwing Add kernel";
+        } catch (const nert::InferenceException& e) {
+            EXPECT_NE(std::string(e.what()).find("boom"), std::string::npos) << e.what();
+        }
+        // The staged input released on unwind; arena + resident stay held.
+        EXPECT_EQ(device.counting().allocate_calls, 3);
+        EXPECT_EQ(device.counting().release_calls, 1);
+    }
+    EXPECT_EQ(device.counting().release_calls, 3);
 }
 
 TEST(NertExecutor, TypedRunInt64InputBoolOutput) {

@@ -17,4 +17,5 @@ behaviour change beyond the two fixes.
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
 | Slice A | Planner jump-to-end + overflow guards; exact-offset regression (a@0/b@1024/c@1088/arena 2112) + 2 overflow negatives; OFF 8/8 + format | pass | 2026-10-17 | 2 plan failures are missing-fixture (pre-existing, environmental). |
+| Slice B | Resident initializers + RAII staging; fake-device traffic tests (8B once + 8B/run, balanced on throw); OFF 8/8 + CUDA 9/9 + OCL 2/2 + HIP 2/2 + format | pass | 2026-10-17 | Only failures anywhere are missing-fixture (pre-existing, environmental). |
 | — | — | pending | — | — |

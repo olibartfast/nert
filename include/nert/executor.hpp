@@ -76,20 +76,35 @@ class Model {
     // Execute the nodes with the graph inputs already bound in `views`, then
     // bind initializers and node outputs; on return `views` resolves every
     // graph output (arena-backed views stay valid until the next run). On a
-    // non-host device the host-bound views are staged to device memory
-    // first (one upload each, no per-op round-trips) and the graph outputs
-    // are downloaded into `host_outputs` (caller-owned), so output views
-    // stay host-readable.
+    // non-host device the initializers are already resident (uploaded once
+    // in the constructor), so only the graph inputs are staged to device
+    // memory per run — one upload each, no per-op round-trips — and the
+    // graph outputs are downloaded into `host_outputs` (caller-owned), so
+    // output views stay host-readable.
     void Execute(std::map<std::string, TensorView>& views, std::map<std::string, std::vector<uint8_t>>& host_outputs);
 
     // The view bound to graph output `name` after Execute.
     static const TensorView& OutputView(const std::map<std::string, TensorView>& views, const std::string& name);
+
+    // Uploads every non-empty initializer once (non-host devices only).
+    // Throws InferenceException naming the initializer when its device
+    // allocation fails; leaves already-uploaded residents for the caller
+    // (the constructor) to release.
+    void UploadResidents();
+
+    // Releases every resident initializer buffer; safe to call when none
+    // were uploaded.
+    void ReleaseResidents();
 
     const Graph& graph_; // borrowed; must outlive the model
     Device* device_;     // the device chosen once for this graph
     InferredShapes shapes_;
     MemoryPlan plan_;
     void* arena_ = nullptr; // one allocation, shared by every arena tensor
+    // Device buffers holding the initializers, uploaded once in the
+    // constructor on non-host devices; empty on host devices (which read
+    // initializer storage in place) and for empty initializers.
+    std::map<std::string, void*> resident_;
 };
 
 } // namespace nert
