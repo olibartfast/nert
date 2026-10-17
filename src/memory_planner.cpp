@@ -136,6 +136,9 @@ MemoryPlan PlanMemory(const Graph& graph, const InferredShapes& shapes) {
         // A zero dim is an empty tensor (the leading slice of a shape vector,
         // say): it plans a zero-byte buffer, which never overlaps another. A
         // negative dim or an element type with no size is still rejected.
+        // Both multiplies are guarded: INT64_MAX / operand is checked first
+        // so a huge shape throws instead of overflowing (undefined behaviour
+        // the later `size < 0` check could not catch once wrapped positive).
         int64_t elements = 1;
         bool negative = false;
         for (const int64_t dim : shape->second.dims) {
@@ -143,9 +146,15 @@ MemoryPlan PlanMemory(const Graph& graph, const InferredShapes& shapes) {
                 negative = true;
                 break;
             }
+            if (dim > 0 && elements > INT64_MAX / dim) {
+                throw ModelLoadException("memory plan: element count overflows for tensor '" + name + "'");
+            }
             elements *= dim;
         }
         const int64_t element_bytes = dtype_bytes(shape->second.dtype);
+        if (!negative && element_bytes > 0 && elements > INT64_MAX / element_bytes) {
+            throw ModelLoadException("memory plan: byte size overflows for tensor '" + name + "'");
+        }
         const int64_t size = elements * element_bytes;
         if (negative || element_bytes <= 0 || size < 0) {
             throw ModelLoadException("memory plan: non-positive size for tensor '" + name + "'");
@@ -185,22 +194,25 @@ MemoryPlan PlanMemory(const Graph& graph, const InferredShapes& shapes) {
     std::vector<PlacedBuffer> placed;
     int64_t arena_end = 0;
     for (const ArenaTensor& tensor : tensors) {
+        // Jump past the furthest-ending conflicting buffer instead of
+        // stepping 64 bytes at a time: no offset below that end can be
+        // free, so the plan produced is exactly the same, in linear
+        // rather than quadratic time.
         int64_t offset = 0;
         for (;;) {
-            bool conflict = false;
+            int64_t next = -1;
             for (const PlacedBuffer& other : placed) {
                 if (!intervals_intersect(tensor.live, other.live)) {
                     continue;
                 }
                 if (byte_ranges_overlap(offset, tensor.size, other)) {
-                    conflict = true;
-                    break;
+                    next = std::max(next, align_up(other.offset + other.size, kAlignment));
                 }
             }
-            if (!conflict) {
+            if (next < 0) {
                 break;
             }
-            offset += kAlignment;
+            offset = next;
         }
 
         plan.buffers[tensor.name] = BufferAssignment{offset, tensor.size};
