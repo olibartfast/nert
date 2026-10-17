@@ -1,0 +1,177 @@
+// HIP pilot kernels (N1c-M2 on NVIDIA): hipified Relu/Add vs the CPU oracle.
+//
+// Needs a HIP-usable GPU at run time; without one every test SKIPs (never
+// fails). Gemm never lands on HIP-NVIDIA (rocBLAS is the AMD half), so it
+// is the permanent no-row probe.
+
+#include "nert/device.hpp"
+#include "nert/executor.hpp"
+#include "nert/graph.hpp"
+
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+
+bool HasHIPDevice() {
+    try {
+        (void)nert::HipDevice();
+        return true;
+    } catch (const nert::InferenceException&) {
+        return false;
+    }
+}
+
+nert::TensorView HostFloat(std::vector<float>& data, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = data.empty() ? nullptr : data.data();
+    view.dtype = nert::DataType::Float32;
+    view.dims = std::move(dims);
+    return view;
+}
+
+nert::TensorView HostInt64(std::vector<int64_t>& data, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = data.empty() ? nullptr : data.data();
+    view.dtype = nert::DataType::Int64;
+    view.dims = std::move(dims);
+    return view;
+}
+
+void* Upload(nert::Device& hip, const std::vector<float>& host) {
+    void* device = hip.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(float)));
+    if (device == nullptr) {
+        throw std::runtime_error("Upload: device allocate failed");
+    }
+    hip.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(float)));
+    return device;
+}
+
+void* UploadInt64(nert::Device& hip, const std::vector<int64_t>& host) {
+    void* device = hip.allocator().allocate(static_cast<int64_t>(host.size() * sizeof(int64_t)));
+    if (device == nullptr) {
+        throw std::runtime_error("UploadInt64: device allocate failed");
+    }
+    hip.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size() * sizeof(int64_t)));
+    return device;
+}
+
+std::vector<float> Download(nert::Device& hip, void* device, std::size_t count) {
+    std::vector<float> host(count, 0.0F);
+    hip.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(float)));
+    return host;
+}
+
+std::vector<int64_t> DownloadInt64(nert::Device& hip, void* device, std::size_t count) {
+    std::vector<int64_t> host(count, 0);
+    hip.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count * sizeof(int64_t)));
+    return host;
+}
+
+nert::TensorView DeviceFloat(void* device, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = device;
+    view.dtype = nert::DataType::Float32;
+    view.dims = std::move(dims);
+    return view;
+}
+
+nert::TensorView DeviceInt64(void* device, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = device;
+    view.dtype = nert::DataType::Int64;
+    view.dims = std::move(dims);
+    return view;
+}
+
+nert::Node MakeNode(const std::string& name, const std::string& op) {
+    nert::Node node;
+    node.name = name;
+    node.op_type = op;
+    return node;
+}
+
+} // namespace
+
+// Relu over {-2,-0.5,0,3}: negatives clamp, exact on both tables.
+TEST(NertHIPKernels, ReluExact) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<float> x = {-2.0F, -0.5F, 0.0F, 3.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("relu0", "Relu");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Relu")(node, {HostFloat(x, {4})}, {HostFloat(cpuOut, {4})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{0.0F, 0.0F, 0.0F, 3.0F}));
+
+    void* dx = Upload(hip, x);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(hip, gpuOut);
+    nert::HipDevice().kernels().find("Relu")(node, {DeviceFloat(dx, {4})}, {DeviceFloat(dy, {4})});
+    gpuOut = Download(hip, dy, 4);
+    hip.allocator().release(dx);
+    hip.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Add broadcasts [2,1] int64 against [1,3] exactly like the CPU oracle.
+TEST(NertHIPKernels, AddBroadcastInt64Exact) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+
+    std::vector<int64_t> a = {1, 2};
+    std::vector<int64_t> b = {10, 20, 30};
+    std::vector<int64_t> cpuOut(6, 0);
+    nert::Node node = MakeNode("add0", "Add");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Add")(node, {HostInt64(a, {2, 1}), HostInt64(b, {1, 3})},
+                                            {HostInt64(cpuOut, {2, 3})});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{11, 21, 31, 12, 22, 32}));
+
+    void* da = UploadInt64(hip, a);
+    void* db = UploadInt64(hip, b);
+    std::vector<int64_t> gpuOut(6, 0);
+    void* dy = UploadInt64(hip, gpuOut);
+    nert::HipDevice().kernels().find("Add")(node, {DeviceInt64(da, {2, 1}), DeviceInt64(db, {1, 3})},
+                                            {DeviceInt64(dy, {2, 3})});
+    gpuOut = DownloadInt64(hip, dy, 6);
+    hip.allocator().release(da);
+    hip.allocator().release(db);
+    hip.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Gemm never lands on HIP-NVIDIA: rejected at Run, naming node + op.
+TEST(NertHIPKernels, UnknownOpRejectsNamingNodeAndOp) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+
+    nert::Graph graph;
+    graph.inputs = {{"a", {nert::DataType::Float32, {}}}, {"b", {nert::DataType::Float32, {}}}};
+    nert::Node gemm = MakeNode("mm_bad", "Gemm");
+    gemm.inputs = {"a", "b"};
+    gemm.outputs = {"y"};
+    graph.nodes = {gemm};
+    graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
+
+    nert::Model hip(graph, {{"a", {2, 3}}, {"b", {3, 2}}}, nert::HipDevice());
+    try {
+        hip.Run({{"a", std::vector<float>(6, 1.0F)}, {"b", std::vector<float>(6, 1.0F)}});
+        FAIL() << "expected InferenceException for an op with no HIP kernel";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Gemm"), std::string::npos) << message;
+    }
+}
