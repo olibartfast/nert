@@ -309,3 +309,110 @@ TEST(NertOpenCLKernels, SoftmaxAxisZeroStable) {
         EXPECT_NEAR(gpu[0 * 2 + c] + gpu[1 * 2 + c] + gpu[2 * 2 + c], 1.0F, 1e-3) << "col " << c;
     }
 }
+
+// Reshape [2,3] -> [3,2] preserves flat order; the shape operand is read
+// back from device memory and validated on the host.
+TEST(NertOpenCLKernels, ReshapeFloatPreservesOrder) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {3, 2};
+    nert::Node node = MakeNode("reshape0", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(ocl, x);
+    void* dshape = UploadInt64(ocl, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {2})},
+                                                   {DeviceFloat(dy, {3, 2})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dshape);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape shape {0,-1} copies the matching input dim (2) and infers 3.
+TEST(NertOpenCLKernels, ReshapeZeroAndInferred) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {0, -1};
+    nert::Node node = MakeNode("reshape1", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(ocl, x);
+    void* dshape = UploadInt64(ocl, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {2})},
+                                                   {DeviceFloat(dy, {2, 3})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dshape);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape int64 copies raw elements unchanged.
+TEST(NertOpenCLKernels, ReshapeInt64Copies) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<int64_t> x = {7, -8, 9, 10};
+    nert::Node node = MakeNode("reshape2", "Reshape");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+
+    void* dx = UploadInt64(ocl, x);
+    std::vector<int64_t> gpuOut(4, 0);
+    void* dy = UploadInt64(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Reshape")(node, {DeviceInt64(dx, {2, 2})}, {DeviceInt64(dy, {4})});
+    gpuOut = DownloadInt64(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, x);
+}
+
+// Reshape whose target product differs from the element count is rejected,
+// naming the op and node.
+TEST(NertOpenCLKernels, ReshapeRejectsCountMismatch) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> shape = {4};
+    nert::Node node = MakeNode("reshape_bad", "Reshape");
+    node.inputs = {"x", "shape"};
+    node.outputs = {"y"};
+
+    void* dx = Upload(ocl, x);
+    void* dshape = UploadInt64(ocl, shape);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    try {
+        nert::OpenCLDevice().kernels().find("Reshape")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dshape, {1})},
+                                                       {DeviceFloat(dy, {4})});
+        FAIL() << "expected InferenceException";
+    } catch (const nert::InferenceException& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("Reshape"), std::string::npos) << message;
+        EXPECT_NE(message.find("reshape_bad"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dshape);
+    ocl.allocator().release(dy);
+}
