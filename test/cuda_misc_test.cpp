@@ -371,3 +371,269 @@ TEST(NertCudaMisc, ModRejectsZeroDivisor) {
     cuda.allocator().release(db);
     cuda.allocator().release(dy);
 }
+
+// ReduceMax axis 1 keepdims: {2,3} -> {2,1} row maxima, both tables.
+TEST(NertCudaMisc, ReduceMaxAxisExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 5.0F, 3.0F, 4.0F, 2.0F, 6.0F};
+    std::vector<int64_t> axes = {1};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("rm0", "ReduceMax");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceMax")(node, {HostFloat(x, {2, 3}), HostInt64(axes, {1})},
+                                                  {HostFloat(cpuOut, {2, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{5.0F, 6.0F}));
+
+    void* dx = Upload(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceMax")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {1})},
+                                                   {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// ReduceMax over all axes without keepdims: single max, both tables.
+TEST(NertCudaMisc, ReduceMaxGlobalNoKeepdims) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 5.0F, 3.0F, 4.0F, 2.0F, 6.0F};
+    std::vector<float> cpuOut(1, 0.0F);
+    nert::Node node = MakeNode("rm1", "ReduceMax");
+    node.attributes.emplace_back("keepdims", int64_t{0});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceMax")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(1, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceMax")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {})});
+    gpuOut = Download(cuda, dy, 1);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// ReduceMax rejects a duplicate axis, naming node + op.
+TEST(NertCudaMisc, ReduceMaxRejectsDuplicateAxis) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> axes = {1, -1};
+    std::vector<float> y(2, 0.0F);
+    nert::Node node = MakeNode("rm_bad", "ReduceMax");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("ReduceMax")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {2})},
+                                                       {DeviceFloat(dy, {2, 1})});
+        FAIL() << "expected InferenceException for a duplicate axis";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("rm_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("ReduceMax"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+}
+
+// TopK=2 axis 1 over {2,4}: values + indices match the oracle order.
+TEST(NertCudaMisc, TopKExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 5.0F, 3.0F, 4.0F, 7.0F, 2.0F, 8.0F, 6.0F};
+    std::vector<int64_t> k = {2};
+    std::vector<float> cpuVals(4, 0.0F);
+    std::vector<int64_t> cpuIdx(4, 0);
+    nert::Node node = MakeNode("tk0", "TopK");
+    node.inputs = {"x", "k"};
+    node.outputs = {"values", "indices"};
+    nert::CpuDevice().kernels().find("TopK")(node, {HostFloat(x, {2, 4}), HostInt64(k, {})},
+                                             {HostFloat(cpuVals, {2, 2}), HostInt64(cpuIdx, {2, 2})});
+    EXPECT_EQ(cpuVals, (std::vector<float>{5.0F, 4.0F, 8.0F, 7.0F}));
+    EXPECT_EQ(cpuIdx, (std::vector<int64_t>{1, 3, 2, 0}));
+
+    void* dx = Upload(cuda, x);
+    void* dk = UploadInt64(cuda, k);
+    std::vector<float> gpuVals(4, 0.0F);
+    std::vector<int64_t> gpuIdx(4, 0);
+    void* dyv = Upload(cuda, gpuVals);
+    void* dyi = UploadInt64(cuda, gpuIdx);
+    nert::CudaDevice().kernels().find("TopK")(node, {DeviceFloat(dx, {2, 4}), DeviceInt64(dk, {})},
+                                              {DeviceFloat(dyv, {2, 2}), DeviceInt64(dyi, {2, 2})});
+    gpuVals = Download(cuda, dyv, 4);
+    gpuIdx = DownloadInt64(cuda, dyi, 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dk);
+    cuda.allocator().release(dyv);
+    cuda.allocator().release(dyi);
+    EXPECT_EQ(gpuVals, cpuVals);
+    EXPECT_EQ(gpuIdx, cpuIdx);
+}
+
+// TopK rejects K exceeding the axis dim, naming node + op.
+TEST(NertCudaMisc, TopKRejectsBigK) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F};
+    std::vector<int64_t> k = {5};
+    std::vector<float> v(5, 0.0F);
+    std::vector<int64_t> idx(5, 0);
+    nert::Node node = MakeNode("tk_bad", "TopK");
+    node.inputs = {"x", "k"};
+    node.outputs = {"values", "indices"};
+    void* dx = Upload(cuda, x);
+    void* dk = UploadInt64(cuda, k);
+    void* dyv = Upload(cuda, v);
+    void* dyi = UploadInt64(cuda, idx);
+    try {
+        nert::CudaDevice().kernels().find("TopK")(node, {DeviceFloat(dx, {2}), DeviceInt64(dk, {})},
+                                                  {DeviceFloat(dyv, {5}), DeviceInt64(dyi, {5})});
+        FAIL() << "expected InferenceException for K exceeding the axis dim";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("tk_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("TopK"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dk);
+    cuda.allocator().release(dyv);
+    cuda.allocator().release(dyi);
+}
+
+// Resize nearest 2x over {1,1,2,2} with scales, both tables.
+TEST(NertCudaMisc, ResizeNearestExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> roi(8, 0.0F);
+    std::vector<float> scales = {1.0F, 1.0F, 2.0F, 2.0F};
+    std::vector<float> cpuOut(16, 0.0F);
+    nert::Node node = MakeNode("rz0", "Resize");
+    node.inputs = {"x", "roi", "scales"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Resize")(
+        node, {HostFloat(x, {1, 1, 2, 2}), HostFloat(roi, {8}), HostFloat(scales, {4})},
+        {HostFloat(cpuOut, {1, 1, 4, 4})});
+    const std::vector<float> expected = {1.0F, 1.0F, 2.0F, 2.0F, 1.0F, 1.0F, 2.0F, 2.0F,
+                                         3.0F, 3.0F, 4.0F, 4.0F, 3.0F, 3.0F, 4.0F, 4.0F};
+    EXPECT_EQ(cpuOut, expected);
+
+    void* dx = Upload(cuda, x);
+    void* dr = Upload(cuda, roi);
+    void* ds = Upload(cuda, scales);
+    std::vector<float> gpuOut(16, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Resize")(
+        node, {DeviceFloat(dx, {1, 1, 2, 2}), DeviceFloat(dr, {8}), DeviceFloat(ds, {4})},
+        {DeviceFloat(dy, {1, 1, 4, 4})});
+    gpuOut = Download(cuda, dy, 16);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dr);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, expected);
+}
+
+// Resize linear 2x over {1,1,1,4} asymmetric: [0,5,10,15,20,25,30,30].
+TEST(NertCudaMisc, ResizeLinearExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {0.0F, 10.0F, 20.0F, 30.0F};
+    std::vector<float> roi(8, 0.0F);
+    std::vector<float> scales = {1.0F, 1.0F, 1.0F, 2.0F};
+    std::vector<float> cpuOut(8, 0.0F);
+    nert::Node node = MakeNode("rz1", "Resize");
+    node.attributes.emplace_back("mode", std::string{"linear"});
+    node.attributes.emplace_back("coordinate_transformation_mode", std::string{"asymmetric"});
+    node.inputs = {"x", "roi", "scales"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Resize")(
+        node, {HostFloat(x, {1, 1, 1, 4}), HostFloat(roi, {8}), HostFloat(scales, {4})},
+        {HostFloat(cpuOut, {1, 1, 1, 8})});
+    const std::vector<float> expected = {0.0F, 5.0F, 10.0F, 15.0F, 20.0F, 25.0F, 30.0F, 30.0F};
+    ExpectNear(cpuOut, expected);
+
+    void* dx = Upload(cuda, x);
+    void* dr = Upload(cuda, roi);
+    void* ds = Upload(cuda, scales);
+    std::vector<float> gpuOut(8, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Resize")(
+        node, {DeviceFloat(dx, {1, 1, 1, 4}), DeviceFloat(dr, {8}), DeviceFloat(ds, {4})},
+        {DeviceFloat(dy, {1, 1, 1, 8})});
+    gpuOut = Download(cuda, dy, 8);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dr);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, expected);
+}
+
+// Resize rejects an unsupported mode, naming node + op.
+TEST(NertCudaMisc, ResizeRejectsBadMode) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(4, 1.0F);
+    std::vector<float> roi(8, 0.0F);
+    std::vector<float> scales = {1.0F, 1.0F, 2.0F, 2.0F};
+    std::vector<float> y(16, 0.0F);
+    nert::Node node = MakeNode("rz_bad", "Resize");
+    node.attributes.emplace_back("mode", std::string{"cubic"});
+    node.inputs = {"x", "roi", "scales"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* dr = Upload(cuda, roi);
+    void* ds = Upload(cuda, scales);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("Resize")(
+            node, {DeviceFloat(dx, {1, 1, 2, 2}), DeviceFloat(dr, {8}), DeviceFloat(ds, {4})},
+            {DeviceFloat(dy, {1, 1, 4, 4})});
+        FAIL() << "expected InferenceException for an unsupported mode";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("rz_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Resize"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dr);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(dy);
+}

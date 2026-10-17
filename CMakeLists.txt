@@ -135,7 +135,8 @@ if(NERT_ENABLE_CUDA)
                                 src/cuda/split.cu src/cuda/slice.cu src/cuda/transpose.cu
                                 src/cuda/gather.cu src/cuda/gather_elements.cu src/cuda/mat_mul.cu
                                 src/cuda/cast.cu src/cuda/equal.cu src/cuda/where.cu src/cuda/shape.cu
-                                src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/table.cu)
+                                src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/reduce_max.cu
+                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)

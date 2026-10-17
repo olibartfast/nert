@@ -4,8 +4,8 @@
 // unknown op types resolve to null so the executor rejects the node naming
 // op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/Sigmoid/Tanh/Softmax/
 // Reshape/Unsqueeze/Flatten/Expand/Concat/Split/Slice/Transpose/Gather/GatherElements/MatMul/Cast/Equal/Where/
-// Shape/ConstantOfShape/Mod (first-party, except MatMul via cuBLAS like Gemm), Conv (cuDNN, NERT_HAS_CUDNN builds
-// only).
+// Shape/ConstantOfShape/Mod/ReduceMax/TopK/Resize (first-party, except MatMul via cuBLAS like Gemm), Conv (cuDNN,
+// NERT_HAS_CUDNN builds only).
 
 #include "nert/device.hpp"
 
@@ -43,6 +43,9 @@ void Where(const Node& node, const std::vector<TensorView>& inputs, const std::v
 void Shape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void ConstantOfShape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Mod(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #ifdef NERT_HAS_CUDNN
 void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #endif
@@ -77,6 +80,9 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"Shape", &Shape},
         {"ConstantOfShape", &ConstantOfShape},
         {"Mod", &Mod},
+        {"ReduceMax", &ReduceMax},
+        {"TopK", &TopK},
+        {"Resize", &Resize},
 #ifdef NERT_HAS_CUDNN
         {"Conv", &Conv},
 #endif
