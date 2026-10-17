@@ -177,8 +177,8 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
 
 // An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
 // rejection, matching the pinned CPU behavior; see N1 validation notes).
-// Probe op is MatMul (CPU-covered, no CUDA row yet): when MatMul gains a CUDA
-// row, move this probe to the next CPU-covered op without one.
+// Probe op is Einsum: CPU-covered with shape inference, and no CUDA row is
+// planned anywhere, so this probe never needs moving again.
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
@@ -186,10 +186,11 @@ TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
 
     nert::Graph graph;
     graph.inputs = {{"a", {nert::DataType::Float32, {}}}, {"b", {nert::DataType::Float32, {}}}};
-    nert::Node matmul = MakeNode("mm_bad", "MatMul");
-    matmul.inputs = {"a", "b"};
-    matmul.outputs = {"y"};
-    graph.nodes = {matmul};
+    nert::Node einsum = MakeNode("ein_bad", "Einsum");
+    einsum.attributes.emplace_back("equation", std::string{"ij,jh->ih"});
+    einsum.inputs = {"a", "b"};
+    einsum.outputs = {"y"};
+    graph.nodes = {einsum};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
     nert::Model cuda(graph, {{"a", {2, 3}}, {"b", {3, 2}}}, nert::CudaDevice());
@@ -198,8 +199,8 @@ TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
         FAIL() << "expected InferenceException for an op with no CUDA kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("MatMul"), std::string::npos) << message;
+        EXPECT_NE(message.find("ein_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Einsum"), std::string::npos) << message;
     }
 }
 
@@ -320,6 +321,97 @@ TEST(NertCudaKernels, DivInt64ZeroThrows) {
         const std::string message = e.what();
         EXPECT_NE(message.find("div_bad"), std::string::npos) << message;
         EXPECT_NE(message.find("Div"), std::string::npos) << message;
+    }
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+}
+
+// MatMul broadcasts a {2,3} A over a {2,3,2} B: two hand-computed batches.
+TEST(NertCudaKernels, MatMulBatchedBroadcast) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> a = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<float> b = {1.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F, 2.0F, 0.0F, 0.0F, 2.0F, 1.0F, 0.0F};
+    std::vector<float> cpuOut(8, 0.0F);
+    nert::Node node = MakeNode("mm0", "MatMul");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("MatMul")(node, {HostFloat(a, {2, 3}), HostFloat(b, {2, 3, 2})},
+                                               {HostFloat(cpuOut, {2, 2, 2})});
+    const std::vector<float> expected = {4.0F, 5.0F, 10.0F, 11.0F, 5.0F, 4.0F, 14.0F, 10.0F};
+    EXPECT_EQ(cpuOut, expected);
+
+    void* da = Upload(cuda, a);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpuOut(8, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("MatMul")(node, {DeviceFloat(da, {2, 3}), DeviceFloat(db, {2, 3, 2})},
+                                                {DeviceFloat(dy, {2, 2, 2})});
+    gpuOut = Download(cuda, dy, 8);
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, expected);
+}
+
+// MatMul promotes a 1-D A: [1,2,3] x [[1,2],[3,4],[5,6]] = [22,28].
+TEST(NertCudaKernels, MatMulPromotedVector) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> a = {1.0F, 2.0F, 3.0F};
+    std::vector<float> b = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("mm1", "MatMul");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("MatMul")(node, {HostFloat(a, {3}), HostFloat(b, {3, 2})},
+                                               {HostFloat(cpuOut, {2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{22.0F, 28.0F}));
+
+    void* da = Upload(cuda, a);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("MatMul")(node, {DeviceFloat(da, {3}), DeviceFloat(db, {3, 2})},
+                                                {DeviceFloat(dy, {2})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, cpuOut);
+}
+
+// MatMul rejects a contraction mismatch, naming node + op.
+TEST(NertCudaKernels, MatMulRejectsMismatch) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> a(6, 1.0F);
+    std::vector<float> b(6, 1.0F);
+    std::vector<float> y(4, 0.0F);
+    nert::Node node = MakeNode("mm_bad", "MatMul");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    void* da = Upload(cuda, a);
+    void* db = Upload(cuda, b);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("MatMul")(node, {DeviceFloat(da, {2, 3}), DeviceFloat(db, {2, 2})},
+                                                    {DeviceFloat(dy, {2, 2})});
+        FAIL() << "expected InferenceException for a contraction mismatch";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("MatMul"), std::string::npos) << message;
     }
     cuda.allocator().release(da);
     cuda.allocator().release(db);
