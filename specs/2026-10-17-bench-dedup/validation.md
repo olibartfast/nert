@@ -16,4 +16,5 @@ format clean, bench stays opt-in and out of the `nert` link closure.
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
+| Slice 1 | `bench/gemm,matmul,utils` deleted + flags dropped + README rewritten; OFF 8/8 + CUDA bench 11 pass/1 SKIP (Conv, no cuDNN) + format | pass | 2026-10-17 | `bench/` is now `runtime` only; numbers match README magnitude. |
 | — | — | pending | — | — |
