@@ -46,6 +46,9 @@ TEST(NertCudaDevice, KernelTableServesPilotRows) {
     EXPECT_NE(cuda.kernels().find("Concat"), nullptr);
     EXPECT_NE(cuda.kernels().find("Split"), nullptr);
     EXPECT_NE(cuda.kernels().find("Slice"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Transpose"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Gather"), nullptr);
+    EXPECT_NE(cuda.kernels().find("GatherElements"), nullptr);
 #ifdef NERT_HAS_CUDNN
     EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
 #else
