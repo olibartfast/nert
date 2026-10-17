@@ -45,6 +45,9 @@ TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     const nert::Device& ocl = nert::OpenCLDevice();
     EXPECT_NE(ocl.kernels().find("Relu"), nullptr);
     EXPECT_NE(ocl.kernels().find("Add"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Mul"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Sub"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Div"), nullptr);
     EXPECT_EQ(ocl.kernels().find("Gemm"), nullptr);
 }
 
