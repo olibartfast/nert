@@ -249,18 +249,11 @@ if(NERT_IS_TOP_LEVEL)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nert)
 endif()
 
-# Bench harness (opt-in tooling under bench/, like tools/). OFF by default so
-# the runtime link closure and the default configure/build/test stay unchanged.
-# Exactly one device backend may be selected (default: CUDA); see
-# bench/README.md for the flag map.
-option(NERT_BUILD_BENCH "Build the standalone kernel benchmark harness" OFF)
-option(NERT_BENCH_USE_OPENCL "Bench: use the OpenCL C API backend" OFF)
-option(NERT_BENCH_USE_OPENCL_CPP "Bench: use the OpenCL C++ wrapper backend" OFF)
-if(NERT_BENCH_USE_OPENCL AND NERT_BENCH_USE_OPENCL_CPP)
-    message(FATAL_ERROR
-        "NERT_BENCH_USE_OPENCL and NERT_BENCH_USE_OPENCL_CPP are mutually "
-        "exclusive; enable at most one (default is CUDA).")
-endif()
+# Bench driver (opt-in tooling under bench/). OFF by default so the runtime
+# link closure and the default configure/build/test stay unchanged. See
+# bench/README.md. Only bench/runtime remains: it drives the shipped kernel
+# tables, so no backend-selection flags are needed.
+option(NERT_BUILD_BENCH "Build the shipped-kernel benchmark driver" OFF)
 if(NERT_BUILD_BENCH)
     add_subdirectory(bench)
 endif()
