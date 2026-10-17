@@ -169,6 +169,7 @@ if(NERT_ENABLE_OPENCL)
     endif()
     target_sources(nert PRIVATE src/opencl_device.cpp)
     target_sources(nert PRIVATE src/opencl/runtime.cpp src/opencl/relu.cpp src/opencl/add.cpp src/opencl/table.cpp)
+    target_sources(nert PRIVATE src/opencl/mul.cpp src/opencl/sub.cpp src/opencl/div.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)

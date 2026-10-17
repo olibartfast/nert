@@ -8,6 +8,7 @@
 #include "nert/executor.hpp"
 #include "nert/graph.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
@@ -173,4 +174,125 @@ TEST(NertOpenCLKernels, UnknownOpRejectsNamingNodeAndOp) {
         EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
         EXPECT_NE(message.find("Gemm"), std::string::npos) << message;
     }
+}
+
+// Mul broadcasts [2,1] float against [1,3] exactly like the CPU oracle.
+TEST(NertOpenCLKernels, MulBroadcastExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a = {1.5F, -2.0F};
+    std::vector<float> b = {2.0F, 0.5F, -1.0F};
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::Node node = MakeNode("mul0", "Mul");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Mul")(node, {HostFloat(a, {2, 1}), HostFloat(b, {1, 3})},
+                                            {HostFloat(cpuOut, {2, 3})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{3.0F, 0.75F, -1.5F, -4.0F, -1.0F, 2.0F}));
+
+    void* da = Upload(ocl, a);
+    void* db = Upload(ocl, b);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Mul")(node, {DeviceFloat(da, {2, 1}), DeviceFloat(db, {1, 3})},
+                                               {DeviceFloat(dy, {2, 3})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Sub over int64 matches the CPU oracle exactly, incl. negatives.
+TEST(NertOpenCLKernels, SubInt64Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<int64_t> a = {5, -1, 0};
+    std::vector<int64_t> b = {3, 2, -7};
+    std::vector<int64_t> cpuOut(3, 0);
+    nert::Node node = MakeNode("sub0", "Sub");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Sub")(node, {HostInt64(a, {3}), HostInt64(b, {3})}, {HostInt64(cpuOut, {3})});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{2, -3, 7}));
+
+    void* da = UploadInt64(ocl, a);
+    void* db = UploadInt64(ocl, b);
+    std::vector<int64_t> gpuOut(3, 0);
+    void* dy = UploadInt64(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Sub")(node, {DeviceInt64(da, {3}), DeviceInt64(db, {3})},
+                                               {DeviceInt64(dy, {3})});
+    gpuOut = DownloadInt64(ocl, dy, 3);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Div float follows IEEE: 1/0 = inf, -1/0 = -inf — like the oracle (NaN
+// compared by predicate, never by equality).
+TEST(NertOpenCLKernels, DivFloatIEEE) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a = {1.0F, -1.0F, 5.0F};
+    std::vector<float> b = {0.0F, 0.0F, 2.0F};
+    std::vector<float> cpuOut(3, 0.0F);
+    nert::Node node = MakeNode("div0", "Div");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Div")(node, {HostFloat(a, {3}), HostFloat(b, {3})}, {HostFloat(cpuOut, {3})});
+    EXPECT_EQ(cpuOut[2], 2.5F);
+
+    void* da = Upload(ocl, a);
+    void* db = Upload(ocl, b);
+    std::vector<float> gpuOut(3, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Div")(node, {DeviceFloat(da, {3}), DeviceFloat(db, {3})},
+                                               {DeviceFloat(dy, {3})});
+    gpuOut = Download(ocl, dy, 3);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut[2], cpuOut[2]);
+    EXPECT_TRUE(std::isinf(gpuOut[0]) && gpuOut[0] > 0);
+    EXPECT_TRUE(std::isinf(gpuOut[1]) && gpuOut[1] < 0);
+}
+
+// Div int64 with a zero divisor throws naming node + op, like the oracle.
+TEST(NertOpenCLKernels, DivInt64ZeroThrows) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<int64_t> a = {7, 8};
+    std::vector<int64_t> b = {2, 0};
+    std::vector<int64_t> y(2, 0);
+    nert::Node node = MakeNode("div_bad", "Div");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    void* da = UploadInt64(ocl, a);
+    void* db = UploadInt64(ocl, b);
+    void* dy = UploadInt64(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Div")(node, {DeviceInt64(da, {2}), DeviceInt64(db, {2})},
+                                                   {DeviceInt64(dy, {2})});
+        FAIL() << "expected InferenceException for int64 division by zero";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("div_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Div"), std::string::npos) << message;
+    }
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
 }
