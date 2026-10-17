@@ -24,12 +24,17 @@ and tests land.
    the legacy row (default OFF and host CUDA legs).
 4. Bench `Conv` with the frontend row; record both.
 
-## Slice C — fused corridor
+## Slice C — fused Conv bias
 
-1. Graph Conv → pointwise bias add → pointwise Relu for the ResNet
-   corridor shape; cache per geometry.
-2. Compare against legacy Conv(+bias) + Relu composed; same outputs
-   within the existing tolerance (target exact), bench the pair.
+1. Add the bias tensor to the cached graph when present (dims
+   `{1, C, 1, ...}`, stride `{C, 1, C, ...}` like the frontend samples)
+   and a pointwise ADD node; no separate bias kernel.
+2. Key the cache on bias presence; pack the bias pointer per call.
+3. Compare against the sliced row on the padded/grouped/bias fixtures;
+   bench the bias fixture before/after.
+
+Activation fusion (Conv→Relu as separate nodes) needs executor pattern
+matching and is out of scope here.
 
 ## Validation
 

@@ -163,6 +163,19 @@ if(NERT_ENABLE_CUDA)
         target_compile_definitions(nert PRIVATE NERT_HAS_CUDNN)
         target_include_directories(nert PRIVATE ${CUDNN_INCLUDE_DIR})
         target_link_libraries(nert PRIVATE ${CUDNN_LIBRARY})
+        # cuDNN Frontend (N1e slice B): header-only, opt-in through a pinned
+        # include root. Absent -> the legacy cudnnConvolutionForward row.
+        set(NERT_CUDNN_FRONTEND_DIR "" CACHE PATH
+            "cuDNN Frontend include root (e.g. cudnn-frontend/include)")
+        if(NERT_CUDNN_FRONTEND_DIR AND EXISTS "${NERT_CUDNN_FRONTEND_DIR}/cudnn_frontend.h")
+            target_sources(nert PRIVATE src/cuda/conv_frontend.cu)
+            target_include_directories(nert PRIVATE ${NERT_CUDNN_FRONTEND_DIR})
+            target_compile_definitions(nert PRIVATE NERT_HAS_CUDNN_FRONTEND)
+            target_link_libraries(nert PRIVATE CUDA::nvrtc)
+        elseif(NERT_CUDNN_FRONTEND_DIR)
+            message(WARNING
+                "NERT_CUDNN_FRONTEND_DIR does not contain cudnn_frontend.h; using the legacy Conv row")
+        endif()
     else()
         message(STATUS "cuDNN not found - CUDA Conv disabled (cuBLAS pilot only)")
     endif()

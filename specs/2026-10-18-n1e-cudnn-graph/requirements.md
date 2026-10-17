@@ -34,10 +34,13 @@ which is the actual N1e goal.
   as the fallback when the directory is absent. Evidence: bit-exact vs
   the CPU oracle and vs the legacy row, bench row, container + host
   legs, default-OFF untouched.
-- [R-3] **C — fused Conv+Bias+Activation.** One frontend graph for the
-  ResNet/YOLO corridor (Conv → bias add → Relu), compared against the
-  composed legacy rows; bench proves the fused win and no tolerance
-  change.
+- [R-3] **C — fuse Conv bias in-graph.** Bias is an optional Conv
+  input in ONNX, so it fuses without an executor pass: one frontend
+  graph runs Conv → pointwise bias add. Compared against the sliced
+  row's Conv + first-party bias kernel; bench proves the launch/copy
+  win and no tolerance change. Activation fusion (Conv→Relu as separate
+  nodes) needs an executor pattern-matching pass and gets its own
+  packet.
 - [R-4] **Pinned dependency.** `v1.31.0` only (never `develop`), no
   vendored headers, nothing in the OFF link closure.
 
