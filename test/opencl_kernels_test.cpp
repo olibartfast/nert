@@ -296,3 +296,81 @@ TEST(NertOpenCLKernels, DivInt64ZeroThrows) {
     ocl.allocator().release(db);
     ocl.allocator().release(dy);
 }
+
+// OpenCL activations run in float (libm + float accumulation), so they meet
+// the oracle within the M2+ tolerance bar, not bit for bit.
+void ExpectNearOcl(const std::vector<float>& got, const std::vector<float>& ref) {
+    ASSERT_EQ(got.size(), ref.size());
+    for (std::size_t i = 0; i < ref.size(); ++i) {
+        EXPECT_NEAR(got[i], ref[i], 1e-3 * (1.0 + std::fabs(ref[i]))) << "i=" << i;
+    }
+}
+
+std::vector<float> RunOcl(const std::string& op, nert::Node node, const std::vector<float>& x,
+                          const std::vector<int64_t>& dims) {
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> cpuOut(x.size(), 0.0F);
+    nert::CpuDevice().kernels().find(op)(node, {HostFloat(const_cast<std::vector<float>&>(x), dims)},
+                                         {HostFloat(cpuOut, dims)});
+    void* dx = Upload(ocl, x);
+    std::vector<float> zero(x.size(), 0.0F);
+    void* dy = Upload(ocl, zero);
+    nert::OpenCLDevice().kernels().find(op)(node, {DeviceFloat(dx, dims)}, {DeviceFloat(dy, dims)});
+    std::vector<float> gpuOut = Download(ocl, dy, x.size());
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    ExpectNearOcl(gpuOut, cpuOut);
+    return gpuOut;
+}
+
+// Sigmoid over {-2,-0.5,0,2} matches the oracle within tolerance.
+TEST(NertOpenCLKernels, SigmoidNear) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Node node = MakeNode("sig0", "Sigmoid");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    RunOcl("Sigmoid", node, {-2.0F, -0.5F, 0.0F, 2.0F}, {4});
+}
+
+// Tanh over {-2,-0.5,0,2} matches the oracle within tolerance.
+TEST(NertOpenCLKernels, TanhNear) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Node node = MakeNode("tanh0", "Tanh");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    RunOcl("Tanh", node, {-2.0F, -0.5F, 0.0F, 2.0F}, {4});
+}
+
+// Softmax default axis (-1) over [2,3]: each row is softmax([1,2,3]).
+TEST(NertOpenCLKernels, SoftmaxLastAxis) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Node node = MakeNode("sm0", "Softmax");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    const std::vector<float> gpu = RunOcl("Softmax", node, {1.0F, 2.0F, 3.0F, 1.0F, 2.0F, 3.0F}, {2, 3});
+    for (int r = 0; r < 2; ++r) {
+        EXPECT_NEAR(gpu[r * 3 + 0] + gpu[r * 3 + 1] + gpu[r * 3 + 2], 1.0F, 1e-3) << "row " << r;
+    }
+}
+
+// Softmax axis=0 over [3,2] with large values: stability via max subtraction.
+TEST(NertOpenCLKernels, SoftmaxAxisZeroStable) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Node node = MakeNode("sm1", "Softmax");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.attributes.emplace_back("axis", int64_t{0});
+    const std::vector<float> gpu =
+        RunOcl("Softmax", node, {1000.0F, 1000.0F, 1001.0F, 1001.0F, 1002.0F, 1002.0F}, {3, 2});
+    for (int c = 0; c < 2; ++c) {
+        EXPECT_NEAR(gpu[0 * 2 + c] + gpu[1 * 2 + c] + gpu[2 * 2 + c], 1.0F, 1e-3) << "col " << c;
+    }
+}
