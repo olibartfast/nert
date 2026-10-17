@@ -45,6 +45,7 @@ TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     EXPECT_NE(ocl.kernels().find("Sigmoid"), nullptr);
     EXPECT_NE(ocl.kernels().find("Tanh"), nullptr);
     EXPECT_NE(ocl.kernels().find("Softmax"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Reshape"), nullptr);
     EXPECT_EQ(ocl.kernels().find("Gemm"), nullptr);
 }
 
