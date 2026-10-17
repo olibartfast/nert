@@ -46,7 +46,8 @@ Expected: configure + build clean; all `engine_*` suites pass; format clean;
   manifests green on the same Neuriplo pin; `git diff --stat` reviewed for
   scope (new kernels + loader/shape/test entries only, no executor design
   changes, no existing test weakened). **Scope held per-slice
-  (kernel+loader/shape/test/CMake only); manifest runs still open.**
+  (kernel+loader/shape/test/CMake only); YOLO26n CPU parity done 2026-10-17
+  (see evidence log); transformer/DETR manifests still open.**
 - [x] [V-6] → constraints: `scripts/format.sh --check` clean; no new runtime
   dependency (`grep` link closure / CMakeLists review); opset-18-only loader
   unchanged (no silent opset widening).
@@ -61,6 +62,7 @@ Expected: configure + build clean; all `engine_*` suites pass; format clean;
 | V-3 | `NEURIPLO_MODEL_ZOO_MANIFEST=~/.cache/neuriplo-op-inventory/tier4_raft.manifest build-ne/backends/nert/test/nert_model_zoo_parity_test` | pass | 2026-10-10 | torchvision RAFT-large, opset 16→18, `parity`, real `bus.jpg` pair 256×320 in [-1,1] (+4 px shift); `max_abs_diff=6.94e-05`, `max_scaled_diff=6.10e-05`, atol 1e-3. Neuriplo build: NERT + ONNX_RUNTIME (ORT 1.28.0), `-DFETCHCONTENT_SOURCE_DIR_NERT=../nert-w-p4a`. |
 | V-6 | `scripts/format.sh --check` | pass | 2026-10-10 | 58 files; no new runtime dependency (stdlib-only kernel). |
 | V-6b | `scripts/format.sh --check` + link-closure review | pass | 2026-10-16 | 93 files; `nert` target stdlib-only (no new links); opset-18-only loader unchanged; excluded-file discipline held (no mass reformat). |
+| V-5a | YOLO26n CPU parity: nert `main` vs ORT 1.27.0 CPU on the Neuriplo `bus.jpg` fixture (opset 18, 485 nodes, 29 op types — all CPU-covered) | pass | 2026-10-17 | throwaway runner (`LoadGraphFromFile` + `Model`/`CpuDevice` + `Run`, 4m25s single-threaded): output0 300×6, max abs diff 5.19e-04; 6/6 confident rows agree — min IoU 0.9999987, max score diff 9.0e-06, classes match. Fixture: `neuriplo/build-parity/native_yolo_parity_fixture/`. Transformer/DETR manifests still open. |
 
 ## Deviations
 
