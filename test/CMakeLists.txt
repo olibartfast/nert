@@ -194,3 +194,16 @@ if(NERT_ENABLE_CUDA)
         target_compile_definitions(nert_cuda_conv_test PRIVATE NERT_HAS_CUDNN)
     endif()
 endif()
+
+# OpenCL device scaffold test (N1d-M1). Built only when the OpenCL device
+# layer is enabled; SKIPs at run time without an OpenCL GPU platform.
+if(NERT_ENABLE_OPENCL)
+    add_executable(nert_opencl_device_test opencl_device_test.cpp)
+    target_compile_features(nert_opencl_device_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_device_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_device_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_device COMMAND nert_opencl_device_test)
+endif()
