@@ -17,6 +17,7 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
+| N1g-5a | Cast/Equal/Where/Shape/ConstantOfShape/Mod CUDA vs CPU (dtype crosses, bcast, slices, fills, zero-divisor) + OFF 8/8 + ON 17/17 + format | pass | 2026-10-17 | RTX 3060 host leg; exact match. YOLO coverage now 369/485 (76.1%). |
 | N1g-4 | MatMul via cuBLAS (batched bcast, 1-D promotion, mismatch negative; probe moved MatMul->Einsum permanently) + OFF 8/8 + ON 16/16 + format | pass | 2026-10-17 | RTX 3060 host leg; tolerance compare (cuBLAS FMA vs double accum). YOLO coverage now 357/485 (73.6%). |
 | N1g-3 | Transpose/Gather/GatherElements CUDA vs CPU (swap/default/neg-wrap/picks, 3 negatives) + OFF 8/8 + ON 16/16 + format | pass | 2026-10-17 | RTX 3060 host leg; exact match; OOB flagged on device (Div precedent). YOLO coverage now 353/485 (72.8%). |
 | N1g-2 | Concat/Split/Slice CUDA vs CPU (neg-axis/equal/sizes/basic/stepped, 3 negatives) + OFF 8/8 + ON 15/15 + format | pass | 2026-10-17 | RTX 3060 host leg; exact match. YOLO coverage now 343/485 (70.7%). |
