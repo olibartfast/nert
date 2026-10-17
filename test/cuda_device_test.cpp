@@ -39,6 +39,10 @@ TEST(NertCudaDevice, KernelTableServesPilotRows) {
     EXPECT_NE(cuda.kernels().find("Sigmoid"), nullptr);
     EXPECT_NE(cuda.kernels().find("Tanh"), nullptr);
     EXPECT_NE(cuda.kernels().find("Softmax"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Reshape"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Unsqueeze"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Flatten"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Expand"), nullptr);
 #ifdef NERT_HAS_CUDNN
     EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
 #else
