@@ -146,6 +146,14 @@ if(NERT_ENABLE_CUDA)
         GTest::gtest
         GTest::gtest_main)
     add_test(NAME nert_cuda_pool COMMAND nert_cuda_pool_test)
+    add_executable(nert_cuda_shape_test cuda_shape_test.cpp)
+    target_compile_features(nert_cuda_shape_test PRIVATE cxx_std_17)
+    target_compile_options(nert_cuda_shape_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_cuda_shape_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_cuda_shape COMMAND nert_cuda_shape_test)
     add_executable(nert_cuda_activations_test cuda_activations_test.cpp)
     target_compile_features(nert_cuda_activations_test PRIVATE cxx_std_17)
     target_compile_options(nert_cuda_activations_test PRIVATE -Wall -Wextra -Wpedantic)
