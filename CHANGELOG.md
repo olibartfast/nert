@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   op-keyed table (cuBLAS `Gemm`, first-party `Relu`/`Add`, cuDNN `Conv`),
   matching the CPU oracle within tolerance. OFF link closure stays
   standard-library-only; CUDA/cuDNN link PRIVATE.
+- RF-DETR norm-corridor CUDA rows: `Sqrt`, `Erf`, `ReduceSum` (float32
+  double-accum + int64, incl. `noop_with_empty_axes` identity), and
+  `LayerNormalization` (per-row double-accum, scalar/per-element
+  Scale/B, optional Mean/InvStdDev) — 126 dispatch-gap nodes closed
+  against the CPU oracle at the bench tolerance.
 
 ## [0.1.0] - Unreleased
 

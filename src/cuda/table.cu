@@ -2,9 +2,11 @@
 //
 // One function-local static maps exact op-type strings to their kernels;
 // unknown op types resolve to null so the executor rejects the node naming
-// op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/GlobalAveragePool/Sigmoid/Tanh/Softmax/
+// op + node. Rows: Gemm (cuBLAS),
+// Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/GlobalAveragePool/Sigmoid/Tanh/Sqrt/Erf/Softmax/
 // Reshape/Unsqueeze/Flatten/Expand/Concat/Split/Slice/Transpose/Gather/GatherElements/MatMul/Cast/Equal/Where/
-// Shape/ConstantOfShape/Mod/ReduceMax/TopK/Resize (first-party, except MatMul via cuBLAS like Gemm), Conv (cuDNN,
+// Shape/ConstantOfShape/Mod/ReduceMax/ReduceSum/TopK/Resize/Sqrt/Erf/LayerNormalization (first-party, except MatMul via
+// cuBLAS like Gemm), Conv (cuDNN,
 // NERT_HAS_CUDNN builds only).
 
 #include "nert/device.hpp"
@@ -26,6 +28,10 @@ void AveragePool(const Node& node, const std::vector<TensorView>& inputs, const 
 void GlobalAveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Sigmoid(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Tanh(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sqrt(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Erf(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void LayerNormalization(const Node& node, const std::vector<TensorView>& inputs,
+                        const std::vector<TensorView>& outputs);
 void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Reshape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -45,6 +51,7 @@ void Shape(const Node& node, const std::vector<TensorView>& inputs, const std::v
 void ConstantOfShape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Mod(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #ifdef NERT_HAS_CUDNN
@@ -64,6 +71,9 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"GlobalAveragePool", &GlobalAveragePool},
         {"Sigmoid", &Sigmoid},
         {"Tanh", &Tanh},
+        {"Sqrt", &Sqrt},
+        {"Erf", &Erf},
+        {"LayerNormalization", &LayerNormalization},
         {"Softmax", &Softmax},
         {"Reshape", &Reshape},
         {"Unsqueeze", &Unsqueeze},
@@ -83,6 +93,7 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"ConstantOfShape", &ConstantOfShape},
         {"Mod", &Mod},
         {"ReduceMax", &ReduceMax},
+        {"ReduceSum", &ReduceSum},
         {"TopK", &TopK},
         {"Resize", &Resize},
 #ifdef NERT_HAS_CUDNN

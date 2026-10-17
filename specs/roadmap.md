@@ -84,7 +84,7 @@ Landed (2026-10-16/17, RTX 3060): N1a scaffold + pilot (Gemm/Relu/Add),
 N1b cuDNN Conv, N1e-1 elementwise (Mul/Sub/Div) + N1e-2 pools + N1e-3
 activations, N1f runtime-bench dedup, N1g-1..5b YOLO set + GPU GATE
 (YOLO26n fully dispatched, 6/6 rows), N1d-M1..M4 OpenCL (device + 8 ops),
-N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar).
+N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DETR norm corridor on CUDA (Sqrt/Erf/ReduceSum/LayerNormalization, 126 gap nodes, oracle-matched).
 Dev environment: `.devcontainer` (26.08 stack); host stays toolkit-minimal.
 
 Queued: portable-backend parity toward YOLO order (HIP activations next,

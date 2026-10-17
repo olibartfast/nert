@@ -141,13 +141,14 @@ if(NERT_ENABLE_CUDA)
     target_sources(nert PRIVATE src/cuda_device.cpp src/cuda/gemm.cu src/cuda/relu.cu src/cuda/add.cu
                                 src/cuda/mul.cu src/cuda/sub.cu src/cuda/div.cu src/cuda/max_pool.cu
                                 src/cuda/average_pool.cu src/cuda/global_average_pool.cu src/cuda/sigmoid.cu src/cuda/tanh.cu
+                                src/cuda/sqrt.cu src/cuda/erf.cu
                                 src/cuda/softmax.cu src/cuda/reshape.cu src/cuda/unsqueeze.cu
                                 src/cuda/flatten.cu src/cuda/expand.cu src/cuda/concat.cu
                                 src/cuda/split.cu src/cuda/slice.cu src/cuda/transpose.cu
                                 src/cuda/gather.cu src/cuda/gather_elements.cu src/cuda/mat_mul.cu
                                 src/cuda/cast.cu src/cuda/equal.cu src/cuda/where.cu src/cuda/shape.cu
-                                src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/reduce_max.cu
-                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/table.cu)
+                                src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/reduce_max.cu src/cuda/reduce_sum.cu
+                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/layer_normalization.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)

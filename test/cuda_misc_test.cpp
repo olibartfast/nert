@@ -458,7 +458,182 @@ TEST(NertCudaMisc, ReduceMaxRejectsDuplicateAxis) {
     cuda.allocator().release(dy);
 }
 
-// TopK=2 axis 1 over {2,4}: values + indices match the oracle order.
+// ReduceSum over axis 1 of [2,3]: {1+2+3, 4+5+6}, both tables.
+TEST(NertCudaMisc, ReduceSumAxisExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> axes = {1};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("rs0", "ReduceSum");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostFloat(x, {2, 3}), HostInt64(axes, {1})},
+                                                  {HostFloat(cpuOut, {2, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 15.0F}));
+
+    void* dx = Upload(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {1})},
+                                                   {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// ReduceSum int64 over all axes without keepdims: absent axes input, scalar out.
+TEST(NertCudaMisc, ReduceSumGlobalNoKeepdimsInt64) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<int64_t> x = {1, 2, 3, 4};
+    std::vector<int64_t> cpuOut(1, 0);
+    nert::Node node = MakeNode("rs1", "ReduceSum");
+    node.attributes.emplace_back("keepdims", int64_t{0});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostInt64(x, {2, 2})}, {HostInt64(cpuOut, {})});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{10}));
+
+    void* dx = UploadInt64(cuda, x);
+    std::vector<int64_t> gpuOut(1, 0);
+    void* dy = UploadInt64(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceInt64(dx, {2, 2})}, {DeviceInt64(dy, {})});
+    gpuOut = DownloadInt64(cuda, dy, 1);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// ReduceSum with noop_with_empty_axes and empty axes: identity copy, both tables.
+TEST(NertCudaMisc, ReduceSumNoopIdentity) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<int64_t> axes;
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("rs2", "ReduceSum");
+    node.attributes.emplace_back("noop_with_empty_axes", int64_t{1});
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostFloat(x, {2, 2}), HostInt64(axes, {0})},
+                                                  {HostFloat(cpuOut, {2, 2})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = Upload(cuda, x);
+    // Empty axes: no buffer to upload; the kernel must not touch it.
+    void* da = nullptr;
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 2}), DeviceInt64(da, {0})},
+                                                   {DeviceFloat(dy, {2, 2})});
+    gpuOut = Download(cuda, dy, 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// ReduceSum rejects a duplicate axis, naming node + op.
+TEST(NertCudaMisc, ReduceSumRejectsDuplicateAxis) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> axes = {1, -1};
+    std::vector<float> y(2, 0.0F);
+    nert::Node node = MakeNode("rs_bad", "ReduceSum");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {2})},
+                                                       {DeviceFloat(dy, {2, 1})});
+        FAIL() << "expected InferenceException for a duplicate axis";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("rs_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("ReduceSum"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+}
+
+// ReduceSum rejects an out-of-range axis, naming node + op.
+TEST(NertCudaMisc, ReduceSumRejectsBadAxis) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> axes = {5};
+    std::vector<float> y(6, 0.0F);
+    nert::Node node = MakeNode("rs_bad_axis", "ReduceSum");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {1})},
+                                                       {DeviceFloat(dy, {2, 3})});
+        FAIL() << "expected InferenceException for an out-of-range axis";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("rs_bad_axis"), std::string::npos) << message;
+        EXPECT_NE(message.find("ReduceSum"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+}
+
+// ReduceSum rejects a non-int64 axes tensor, naming node + op.
+TEST(NertCudaMisc, ReduceSumRejectsNonInt64Axes) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<float> axes = {1.0F};
+    std::vector<float> y(2, 0.0F);
+    nert::Node node = MakeNode("rs_bad_axes", "ReduceSum");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* da = Upload(cuda, axes);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3}), DeviceFloat(da, {1})},
+                                                       {DeviceFloat(dy, {2, 1})});
+        FAIL() << "expected InferenceException for a non-int64 axes tensor";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("rs_bad_axes"), std::string::npos) << message;
+        EXPECT_NE(message.find("ReduceSum"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+}
 TEST(NertCudaMisc, TopKExact) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
