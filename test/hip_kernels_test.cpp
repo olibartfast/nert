@@ -295,3 +295,81 @@ TEST(NertHIPKernels, DivInt64ZeroThrows) {
     hip.allocator().release(db);
     hip.allocator().release(dy);
 }
+
+// HIP activations run the same math as CUDA (double-accumulated softmax),
+// so they meet the oracle within the standard tolerance bar.
+void ExpectNearHip(const std::vector<float>& got, const std::vector<float>& ref) {
+    ASSERT_EQ(got.size(), ref.size());
+    for (std::size_t i = 0; i < ref.size(); ++i) {
+        EXPECT_NEAR(got[i], ref[i], 1e-3 * (1.0 + std::fabs(ref[i]))) << "i=" << i;
+    }
+}
+
+std::vector<float> RunHip(const std::string& op, nert::Node node, const std::vector<float>& x,
+                          const std::vector<int64_t>& dims) {
+    nert::Device& hip = const_cast<nert::Device&>(nert::HipDevice());
+    std::vector<float> cpuOut(x.size(), 0.0F);
+    nert::CpuDevice().kernels().find(op)(node, {HostFloat(const_cast<std::vector<float>&>(x), dims)},
+                                         {HostFloat(cpuOut, dims)});
+    void* dx = Upload(hip, x);
+    std::vector<float> zero(x.size(), 0.0F);
+    void* dy = Upload(hip, zero);
+    nert::HipDevice().kernels().find(op)(node, {DeviceFloat(dx, dims)}, {DeviceFloat(dy, dims)});
+    std::vector<float> gpuOut = Download(hip, dy, x.size());
+    hip.allocator().release(dx);
+    hip.allocator().release(dy);
+    ExpectNearHip(gpuOut, cpuOut);
+    return gpuOut;
+}
+
+// Sigmoid over {-2,-0.5,0,2} matches the oracle within tolerance.
+TEST(NertHIPKernels, SigmoidNear) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Node node = MakeNode("sig0", "Sigmoid");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    RunHip("Sigmoid", node, {-2.0F, -0.5F, 0.0F, 2.0F}, {4});
+}
+
+// Tanh over {-2,-0.5,0,2} matches the oracle within tolerance.
+TEST(NertHIPKernels, TanhNear) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Node node = MakeNode("tanh0", "Tanh");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    RunHip("Tanh", node, {-2.0F, -0.5F, 0.0F, 2.0F}, {4});
+}
+
+// Softmax default axis (-1) over [2,3]: each row is softmax([1,2,3]).
+TEST(NertHIPKernels, SoftmaxLastAxis) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Node node = MakeNode("sm0", "Softmax");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    const std::vector<float> gpu = RunHip("Softmax", node, {1.0F, 2.0F, 3.0F, 1.0F, 2.0F, 3.0F}, {2, 3});
+    for (int r = 0; r < 2; ++r) {
+        EXPECT_NEAR(gpu[r * 3 + 0] + gpu[r * 3 + 1] + gpu[r * 3 + 2], 1.0F, 1e-3) << "row " << r;
+    }
+}
+
+// Softmax axis=0 over [3,2] with large values: stability via max subtraction.
+TEST(NertHIPKernels, SoftmaxAxisZeroStable) {
+    if (!HasHIPDevice()) {
+        GTEST_SKIP() << "no HIP device";
+    }
+    nert::Node node = MakeNode("sm1", "Softmax");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.attributes.emplace_back("axis", int64_t{0});
+    const std::vector<float> gpu =
+        RunHip("Softmax", node, {1000.0F, 1000.0F, 1001.0F, 1001.0F, 1002.0F, 1002.0F}, {3, 2});
+    for (int c = 0; c < 2; ++c) {
+        EXPECT_NEAR(gpu[0 * 2 + c] + gpu[1 * 2 + c] + gpu[2 * 2 + c], 1.0F, 1e-3) << "col " << c;
+    }
+}
