@@ -85,4 +85,9 @@ const Device& CudaDevice();
 // is absent. M1 scaffold: the kernel table is empty until M2 rows land.
 const Device& OpenCLDevice();
 
+// The process-lifetime HIP device (allocator, transfers, HIP kernel table).
+// Only available with NERT_ENABLE_HIP=ON; without it the symbol is absent.
+// M1 scaffold: the kernel table is empty until M2 rows land.
+const Device& HipDevice();
+
 } // namespace nert
