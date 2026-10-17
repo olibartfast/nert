@@ -56,6 +56,9 @@ TEST(NertCudaDevice, KernelTableServesPilotRows) {
     EXPECT_NE(cuda.kernels().find("Shape"), nullptr);
     EXPECT_NE(cuda.kernels().find("ConstantOfShape"), nullptr);
     EXPECT_NE(cuda.kernels().find("Mod"), nullptr);
+    EXPECT_NE(cuda.kernels().find("ReduceMax"), nullptr);
+    EXPECT_NE(cuda.kernels().find("TopK"), nullptr);
+    EXPECT_NE(cuda.kernels().find("Resize"), nullptr);
 #ifdef NERT_HAS_CUDNN
     EXPECT_NE(cuda.kernels().find("Conv"), nullptr);
 #else
