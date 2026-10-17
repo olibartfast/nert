@@ -72,7 +72,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 19 | N1g-5a misc elementwise CUDA | `../nert-w-n1g5` / `wip/nert-n1g5` | OFF 8/8 + ON 17/17 (RTX 3060) + format | merged | done 2026-10-17: Cast/Equal/Where/Shape/ConstantOfShape/Mod; YOLO 369/485 (76.1%) |
 | 20 | N1g-5b reductions/resize CUDA | `../nert-w-n1g5b` / `wip/nert-n1g5b` | OFF 8/8 + ON 17/17 (RTX 3060) + format | merged | done 2026-10-17: ReduceMax/TopK/Resize; first-party YOLO set done, 383/485 (79.0%), Conv left |
 | 21 | N1g GATE YOLO on GPU | host main + `nert-gpu-gate` container (cuDNN) | GPU 93s, 6/6 rows IoU 0.9998039, score diff 3.74e-04 (deviation noted) | done 2026-10-17 | YOLO26n fully dispatched on CUDA; first deviation: pilot numerics vs naive oracle |
-| 22 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 22 | N1d-M1 OpenCL scaffold | `../nert-w-n1dm1` / `wip/nert-n1dm1` | OFF 8/8 + OCL-leg 9/9 (RTX 3060 NVIDIA platform) + format | merged | done 2026-10-17: OpenCLDevice + empty table; OpenCL-first recorded (Vulkan needs toolchain, HIP needs AMD hw) |
+| 23 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
