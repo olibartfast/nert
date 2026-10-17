@@ -215,3 +215,16 @@ if(NERT_ENABLE_OPENCL)
         GTest::gtest_main)
     add_test(NAME nert_opencl_kernels COMMAND nert_opencl_kernels_test)
 endif()
+
+# HIP device scaffold test (N1c-M1 on NVIDIA). Built only when the HIP device
+# layer is enabled; SKIPs at run time without a HIP-usable GPU.
+if(NERT_ENABLE_HIP)
+    add_executable(nert_hip_device_test hip_device_test.cpp)
+    target_compile_features(nert_hip_device_test PRIVATE cxx_std_17)
+    target_compile_options(nert_hip_device_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_hip_device_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_hip_device COMMAND nert_hip_device_test)
+endif()
