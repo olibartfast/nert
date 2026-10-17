@@ -17,8 +17,7 @@
 
 namespace nert {
 namespace hip_kernels {
-// M1: empty — every op resolves to null. M2+ rows land in src/hip/.
-KernelFn FindHIPKernel(const std::string& /*op_type*/) { return nullptr; }
+KernelFn FindHIPKernel(const std::string& op_type);
 } // namespace hip_kernels
 namespace {
 
@@ -89,9 +88,9 @@ class HIPTransfer final : public Transfer {
     }
 };
 
-// The operator lookup for the HIP device. M1: empty — every op resolves
-// to null so the executor rejects the node naming op + node. M2+ rows land
-// in src/hip/ (hipified from src/cuda/, hand-reviewed).
+// The operator lookup for the HIP device. It forwards to the HIP kernel
+// table in src/hip/table.cpp; ops without a row resolve to null so the
+// executor rejects the node naming op + node.
 class HIPKernelTable final : public KernelTable {
   public:
     KernelFn find(const std::string& op_type) const override { return hip_kernels::FindHIPKernel(op_type); }

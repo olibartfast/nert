@@ -37,15 +37,16 @@ TEST(NertHIPDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(hip).transfer());
 }
 
-// M1: the kernel table is empty, so every op resolves to null and the
-// executor rejects the node naming op + node (M2 rows change this).
-TEST(NertHIPDevice, KernelTableIsEmpty) {
+// M2 pilot rows resolve; anything else is still null so the executor
+// rejects the node naming op + node.
+TEST(NertHIPDevice, KernelTableServesPilotRows) {
     if (!HasHIPDevice()) {
         GTEST_SKIP() << "no HIP device";
     }
     const nert::Device& hip = nert::HipDevice();
-    EXPECT_EQ(hip.kernels().find("Relu"), nullptr);
-    EXPECT_EQ(hip.kernels().find("Add"), nullptr);
+    EXPECT_NE(hip.kernels().find("Relu"), nullptr);
+    EXPECT_NE(hip.kernels().find("Add"), nullptr);
+    EXPECT_EQ(hip.kernels().find("Gemm"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.
