@@ -55,7 +55,11 @@ void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const st
 void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #ifdef NERT_HAS_CUDNN
+#ifdef NERT_HAS_CUDNN_FRONTEND
+void ConvFrontend(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+#else
 void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+#endif
 #endif
 
 KernelFn FindCudaKernel(const std::string& op_type) {
@@ -97,7 +101,11 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"TopK", &TopK},
         {"Resize", &Resize},
 #ifdef NERT_HAS_CUDNN
+#ifdef NERT_HAS_CUDNN_FRONTEND
+        {"Conv", &ConvFrontend},
+#else
         {"Conv", &Conv},
+#endif
 #endif
     };
     const auto it = table.find(op_type);
