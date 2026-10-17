@@ -891,6 +891,7 @@ allowed_attributes()
             { "Clip", &kNoAttrs },
             { "Tile", &kNoAttrs },
             { "AveragePool", &averagepool_attrs() },
+            { "GlobalAveragePool", &kNoAttrs },
             { "ConvTranspose", &convtranspose_attrs() },
             { "Erf", &kNoAttrs },
             { "Sqrt", &kNoAttrs },
@@ -1362,7 +1363,7 @@ Node decode_node(const uint8_t* data, size_t size)
             "Reshape/Flatten/Mul/Div/Sub/Sigmoid/Shape/Equal/Where/Slice/"
             "Unsqueeze/Expand/Cast/Concat/ConstantOfShape/Gather/"
             "GatherElements/Mod/ReduceMax/Resize/Softmax/Split/TopK/Transpose/"
-            "Floor/Identity/Pow/Tile/AveragePool/ConvTranspose/Erf/Sqrt/Tanh/"
+            "Floor/Identity/Pow/Tile/AveragePool/GlobalAveragePool/ConvTranspose/Erf/Sqrt/Tanh/"
             "IsNaN/Squeeze/LayerNormalization/InstanceNormalization/Abs/Neg/Exp/Log/Cos/Sin/Clip/"
             "Greater/Less/And/Not/ReduceSum/Range/Pad/GridSample/Einsum/Elu/Max/Min/LessOrEqual/GreaterOrEqual/Or/ReduceL2/ArgMax/CumSum/EyeLike/ScatterND only)");
     }

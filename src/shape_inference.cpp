@@ -2159,6 +2159,20 @@ TensorInfo reducemax_shape(const StaticContext& ctx, const Node& node,
     return TensorInfo{DataType::Float32, out};
 }
 
+// GlobalAveragePool: [N, C, *spatial] to [N, C, 1, ..., 1]; no attributes.
+TensorInfo globalaveragepool_shape(const Node& node, const std::vector<const TensorInfo*>& inputs) {
+    if (inputs.empty() || inputs[0] == nullptr) {
+        fail(node, "GlobalAveragePool requires an input");
+    }
+    const std::vector<int64_t>& x = inputs[0]->dims;
+    if (x.size() < 2) {
+        fail(node, "GlobalAveragePool input must have batch and channel axes (rank at least 2)");
+    }
+    std::vector<int64_t> out = {x[0], x[1]};
+    out.insert(out.end(), x.size() - 2, 1);
+    return TensorInfo{DataType::Float32, out};
+}
+
 TensorInfo averagepool_shape(const Node& node,
     const std::vector<const TensorInfo*>& inputs)
 {
@@ -2660,6 +2674,9 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "AveragePool") {
         return {averagepool_shape(node, inputs)};
+    }
+    if (op == "GlobalAveragePool") {
+        return {globalaveragepool_shape(node, inputs)};
     }
     if (op == "ConvTranspose") {
         return {convtranspose_shape(node, inputs)};

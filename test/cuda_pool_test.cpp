@@ -190,3 +190,18 @@ TEST(NertCudaPool, AveragePoolRejectsRank3) {
     cuda.allocator().release(dx);
     cuda.allocator().release(dy);
 }
+
+// GlobalAveragePool over {1,2,2,2} 1..8: channel means {2.5, 6.5} on both
+// tables (double accumulation in the same order, so bit for bit).
+TEST(NertCudaPool, GlobalAveragePoolChannelMeansExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F};
+    nert::Node node = MakeNode("gap0", "GlobalAveragePool");
+    const std::vector<float> expected = {2.5F, 6.5F};
+    EXPECT_EQ(RunCpuPool("GlobalAveragePool", node, x, {1, 2, 2, 2}, {1, 2, 1, 1}), expected);
+    EXPECT_EQ(RunCudaPool(cuda, "GlobalAveragePool", node, x, {1, 2, 2, 2}, {1, 2, 1, 1}), expected);
+}

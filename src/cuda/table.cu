@@ -2,7 +2,7 @@
 //
 // One function-local static maps exact op-type strings to their kernels;
 // unknown op types resolve to null so the executor rejects the node naming
-// op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/Sigmoid/Tanh/Softmax/
+// op + node. Rows: Gemm (cuBLAS), Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/GlobalAveragePool/Sigmoid/Tanh/Softmax/
 // Reshape/Unsqueeze/Flatten/Expand/Concat/Split/Slice/Transpose/Gather/GatherElements/MatMul/Cast/Equal/Where/
 // Shape/ConstantOfShape/Mod/ReduceMax/TopK/Resize (first-party, except MatMul via cuBLAS like Gemm), Conv (cuDNN,
 // NERT_HAS_CUDNN builds only).
@@ -23,6 +23,7 @@ void Sub(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 void Div(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void MaxPool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void AveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void GlobalAveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Sigmoid(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Tanh(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -60,6 +61,7 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"Div", &Div},
         {"MaxPool", &MaxPool},
         {"AveragePool", &AveragePool},
+        {"GlobalAveragePool", &GlobalAveragePool},
         {"Sigmoid", &Sigmoid},
         {"Tanh", &Tanh},
         {"Softmax", &Softmax},

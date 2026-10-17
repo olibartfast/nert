@@ -14,10 +14,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
-
-#include <gtest/gtest.h>
 
 namespace {
 
@@ -157,8 +156,8 @@ TEST(NertKernels, ReshapeInfersMinusOne) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Reshape");
     ASSERT_NE(kernel, nullptr);
 
-    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f,
-        14.0f, 15.0f, 16.0f};
+    std::vector<float> in = {1.0f, 2.0f,  3.0f,  4.0f,  5.0f,  6.0f,  7.0f,  8.0f,
+                             9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f};
     std::vector<float> out(in.size(), 0.0f);
     std::vector<int64_t> shape = {1, 4, -1};
     nert::Node node = MakeNode("reshape_minus1", "Reshape");
@@ -423,8 +422,7 @@ TEST(NertKernels, ConvWithBias) {
     std::vector<float> b = {0.5f};
     std::vector<float> out(4, 0.0f);
     nert::Node node = MakeNode("conv_bias", "Conv");
-    std::vector<nert::TensorView> inputs = {FloatView(x, {1, 1, 3, 3}), FloatView(w, {1, 1, 2, 2}),
-                                              FloatView(b, {1})};
+    std::vector<nert::TensorView> inputs = {FloatView(x, {1, 1, 3, 3}), FloatView(w, {1, 1, 2, 2}), FloatView(b, {1})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1, 2, 2})};
 
     kernel(node, inputs, outputs);
@@ -457,7 +455,7 @@ TEST(NertKernels, ConvStrideAndPadding) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Conv");
     ASSERT_NE(kernel, nullptr);
 
-    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f,
+    std::vector<float> x = {1.0f, 2.0f,  3.0f,  4.0f,  5.0f,  6.0f,  7.0f,  8.0f,
                             9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f};
     std::vector<float> w = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     std::vector<float> out(4, 0.0f);
@@ -477,7 +475,7 @@ TEST(NertKernels, MaxPoolTwoByTwoStrideTwo) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("MaxPool");
     ASSERT_NE(kernel, nullptr);
 
-    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f,
+    std::vector<float> x = {1.0f, 2.0f,  3.0f,  4.0f,  5.0f,  6.0f,  7.0f,  8.0f,
                             9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f};
     std::vector<float> out(4, 0.0f);
     nert::Node node = MakeNode("pool_2x2", "MaxPool");
@@ -1680,7 +1678,7 @@ TEST(NertKernels, SlicePlainRange) {
     std::vector<int64_t> steps = {1};
     nert::Node node = MakeNode("slice0", "Slice");
     std::vector<nert::TensorView> inputs = {FloatView(in, {6}), Int64View(starts, {1}), Int64View(ends, {1}),
-                                              Int64View(axes, {1}), Int64View(steps, {1})};
+                                            Int64View(axes, {1}), Int64View(steps, {1})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {3})};
 
     kernel(node, inputs, outputs);
@@ -1701,7 +1699,7 @@ TEST(NertKernels, SliceClampAndStepInt64) {
     std::vector<int64_t> steps = {1, 2};
     nert::Node node = MakeNode("slice1", "Slice");
     std::vector<nert::TensorView> inputs = {Int64View(in, {2, 5}), Int64View(starts, {2}), Int64View(ends, {2}),
-                                              Int64View(axes, {2}), Int64View(steps, {2})};
+                                            Int64View(axes, {2}), Int64View(steps, {2})};
     std::vector<nert::TensorView> outputs = {Int64View(out, {2, 2})};
 
     kernel(node, inputs, outputs);
@@ -1724,7 +1722,7 @@ TEST(NertKernels, SliceNegativeStepsReverse) {
     std::vector<int64_t> steps = {-1, -2};
     nert::Node node = MakeNode("slice_neg", "Slice");
     std::vector<nert::TensorView> inputs = {FloatView(in, {2, 5}), Int64View(starts, {2}), Int64View(ends, {2}),
-                                              Int64View(axes, {2}), Int64View(steps, {2})};
+                                            Int64View(axes, {2}), Int64View(steps, {2})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {2, 2})};
 
     kernel(node, inputs, outputs);
@@ -1746,7 +1744,7 @@ TEST(NertKernels, SliceNegativeStepInt64) {
     std::vector<int64_t> steps = {-3};
     nert::Node node = MakeNode("slice_neg64", "Slice");
     std::vector<nert::TensorView> inputs = {Int64View(in, {7}), Int64View(starts, {1}), Int64View(ends, {1}),
-                                              Int64View(axes, {1}), Int64View(steps, {1})};
+                                            Int64View(axes, {1}), Int64View(steps, {1})};
     std::vector<nert::TensorView> outputs = {Int64View(out, {2})};
 
     kernel(node, inputs, outputs);
@@ -1865,14 +1863,13 @@ TEST(NertKernels, ResizeNearestDouble) {
     std::vector<float> out(16, 0.0f);
     std::vector<float> scales = {1.0f, 1.0f, 2.0f, 2.0f};
     nert::Node node = MakeNode("resize0", "Resize");
-    std::vector<nert::TensorView> inputs = {FloatView(in, {1, 1, 2, 2}), nert::TensorView{},
-                                              FloatView(scales, {4})};
+    std::vector<nert::TensorView> inputs = {FloatView(in, {1, 1, 2, 2}), nert::TensorView{}, FloatView(scales, {4})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1, 4, 4})};
 
     kernel(node, inputs, outputs);
 
     EXPECT_EQ(out, (std::vector<float>{1.0f, 1.0f, 2.0f, 2.0f, 1.0f, 1.0f, 2.0f, 2.0f, 3.0f, 3.0f, 4.0f, 4.0f, 3.0f,
-                                        3.0f, 4.0f, 4.0f}));
+                                       3.0f, 4.0f, 4.0f}));
 }
 
 // Resize triples one axis of a [1,2] row; int64 data path.
@@ -1884,8 +1881,7 @@ TEST(NertKernels, ResizeTripleWidthInt64) {
     std::vector<int64_t> out(6, 0);
     std::vector<float> scales = {1.0f, 3.0f};
     nert::Node node = MakeNode("resize1", "Resize");
-    std::vector<nert::TensorView> inputs = {Int64View(in, {1, 2}), nert::TensorView{},
-                                              FloatView(scales, {2})};
+    std::vector<nert::TensorView> inputs = {Int64View(in, {1, 2}), nert::TensorView{}, FloatView(scales, {2})};
     std::vector<nert::TensorView> outputs = {Int64View(out, {1, 6})};
 
     kernel(node, inputs, outputs);
@@ -2251,7 +2247,7 @@ TEST(NertKernelsNegative, SliceRejectsNonPositiveStep) {
     std::vector<int64_t> steps = {0};
     nert::Node node = MakeNode("slice_step", "Slice");
     std::vector<nert::TensorView> inputs = {FloatView(in, {3}), Int64View(starts, {1}), Int64View(ends, {1}),
-                                              Int64View(axes, {1}), Int64View(steps, {1})};
+                                            Int64View(axes, {1}), Int64View(steps, {1})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {3})};
 
     try {
@@ -2354,7 +2350,7 @@ TEST(NertKernelsNegative, ResizeRejectsSizesInput) {
     std::vector<int64_t> sizes = {1, 4};
     nert::Node node = MakeNode("resize_bad", "Resize");
     std::vector<nert::TensorView> inputs = {FloatView(in, {1, 2}), nert::TensorView{}, FloatView(scales, {2}),
-                                              Int64View(sizes, {2})};
+                                            Int64View(sizes, {2})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 4})};
 
     try {
@@ -2374,8 +2370,7 @@ TEST(NertKernelsNegative, ResizeRejectsScalesRankMismatch) {
     std::vector<float> out(4, 0.0f);
     std::vector<float> scales = {2.0f, 2.0f, 2.0f};
     nert::Node node = MakeNode("resize_scales", "Resize");
-    std::vector<nert::TensorView> inputs = {FloatView(in, {1, 2}), nert::TensorView{},
-                                              FloatView(scales, {3})};
+    std::vector<nert::TensorView> inputs = {FloatView(in, {1, 2}), nert::TensorView{}, FloatView(scales, {3})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 4})};
 
     try {
@@ -2789,6 +2784,43 @@ TEST(NertKernels, AveragePoolCountIncludePad) {
     EXPECT_EQ(out, (std::vector<float>{0.25f, 0.5f, 0.75f, 1.0f}));
 }
 
+// GlobalAveragePool over {1,2,2,2} 1..8 averages each channel plane:
+// {(1+2+3+4)/4, (5+6+7+8)/4} = {2.5, 6.5}.
+TEST(NertKernels, GlobalAveragePoolChannelMeans) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("GlobalAveragePool");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<float> out(2, 0.0f);
+    nert::Node node = MakeNode("gap0", "GlobalAveragePool");
+    std::vector<nert::TensorView> inputs = {FloatView(x, {1, 2, 2, 2})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 2, 1, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{2.5f, 6.5f}));
+}
+
+// GlobalAveragePool rejects a rank-1 input, naming node + op.
+TEST(NertKernels, GlobalAveragePoolRankOneRejected) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("GlobalAveragePool");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(1, 0.0f);
+    nert::Node node = MakeNode("gap_bad", "GlobalAveragePool");
+    std::vector<nert::TensorView> inputs = {FloatView(x, {4})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1})};
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException for a rank-1 GlobalAveragePool input";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("gap_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("GlobalAveragePool"), std::string::npos) << message;
+    }
+}
+
 // ConvTranspose with a 2x2 all-ones kernel and stride 2 expands each input
 // pixel into a 2x2 block, plus the bias.
 TEST(NertKernels, ConvTransposeStrideTwoUpsamples) {
@@ -2801,8 +2833,7 @@ TEST(NertKernels, ConvTransposeStrideTwoUpsamples) {
     std::vector<float> out(16, 0.0f);
     nert::Node node = MakeNode("deconv_s2", "ConvTranspose");
     node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
-    std::vector<nert::TensorView> inputs = {
-        FloatView(x, {1, 1, 2, 2}), FloatView(w, {1, 1, 2, 2}), FloatView(b, {1})};
+    std::vector<nert::TensorView> inputs = {FloatView(x, {1, 1, 2, 2}), FloatView(w, {1, 1, 2, 2}), FloatView(b, {1})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1, 4, 4})};
 
     kernel(node, inputs, outputs);
@@ -2846,7 +2877,7 @@ TEST(NertKernels, ResizeFromSizesInput) {
     node.attributes.emplace_back("coordinate_transformation_mode", std::string("asymmetric"));
     node.attributes.emplace_back("nearest_mode", std::string("floor"));
     std::vector<nert::TensorView> inputs = {FloatView(x, {1, 1, 1, 2}), nert::TensorView{}, nert::TensorView{},
-                                              Int64View(sizes, {4})};
+                                            Int64View(sizes, {4})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1, 1, 4})};
 
     kernel(node, inputs, outputs);
@@ -2974,18 +3005,29 @@ TEST(NertKernels, InstanceNormalizationPerChannelPlanes) {
     std::vector<float> y(16, 0.0f);
     nert::Node node = MakeNode("in0", "InstanceNormalization");
     node.attributes.emplace_back("epsilon", 1e-12f);
-    std::vector<nert::TensorView> inputs = {FloatView(x, {2, 2, 2, 2}), FloatView(scale, {2}),
-                                              FloatView(bias, {2})};
+    std::vector<nert::TensorView> inputs = {FloatView(x, {2, 2, 2, 2}), FloatView(scale, {2}), FloatView(bias, {2})};
     std::vector<nert::TensorView> outputs = {FloatView(y, {2, 2, 2, 2})};
 
     kernel(node, inputs, outputs);
 
     const float s5 = std::sqrt(5.0f);
     const float s3 = std::sqrt(3.0f);
-    const std::vector<float> expected = {
-        0.5f - 6.0f / s5, 0.5f - 2.0f / s5, 0.5f + 2.0f / s5, 0.5f + 6.0f / s5, 3.0f, 3.0f, 3.0f, 3.0f,
-        0.5f - 2.0f / s3, 0.5f - 2.0f / s3, 0.5f - 2.0f / s3, 0.5f + 6.0f / s3, 3.0f + 3.0f / s5,
-        3.0f + 1.0f / s5, 3.0f - 1.0f / s5, 3.0f - 3.0f / s5};
+    const std::vector<float> expected = {0.5f - 6.0f / s5,
+                                         0.5f - 2.0f / s5,
+                                         0.5f + 2.0f / s5,
+                                         0.5f + 6.0f / s5,
+                                         3.0f,
+                                         3.0f,
+                                         3.0f,
+                                         3.0f,
+                                         0.5f - 2.0f / s3,
+                                         0.5f - 2.0f / s3,
+                                         0.5f - 2.0f / s3,
+                                         0.5f + 6.0f / s3,
+                                         3.0f + 3.0f / s5,
+                                         3.0f + 1.0f / s5,
+                                         3.0f - 1.0f / s5,
+                                         3.0f - 3.0f / s5};
     for (std::size_t i = 0; i < expected.size(); ++i) {
         EXPECT_NEAR(y[i], expected[i], 1e-5f) << "index " << i;
     }
@@ -3049,7 +3091,7 @@ TEST(NertKernels, ResizeLinearTransforms) {
     node.attributes.emplace_back("mode", std::string("linear"));
     node.attributes.emplace_back("coordinate_transformation_mode", std::string("align_corners"));
     std::vector<nert::TensorView> inputs = {FloatView(x, {1, 2}), nert::TensorView{}, nert::TensorView{},
-                                              Int64View(sizes, {2})};
+                                            Int64View(sizes, {2})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {1, 4})};
     kernel(node, inputs, outputs);
     EXPECT_EQ(out, (std::vector<float>{0.0f, 1.0f, 2.0f, 3.0f}));
@@ -3477,7 +3519,7 @@ std::vector<float> RunPad(const std::string& mode, std::vector<float> in, std::v
     node.attributes.emplace_back("mode", std::string(mode));
     std::vector<float> constantCopy = constant != nullptr ? *constant : std::vector<float>{};
     std::vector<nert::TensorView> inputs = {FloatView(in, {1, static_cast<int64_t>(in.size())}),
-                                              Int64View(pads, {static_cast<int64_t>(pads.size())})};
+                                            Int64View(pads, {static_cast<int64_t>(pads.size())})};
     if (constant != nullptr) {
         inputs.push_back(FloatView(constantCopy, {}));
     }
@@ -3664,7 +3706,7 @@ void ExpectNear(const std::vector<float>& actual, const std::vector<float>& expe
     }
 }
 
-}  // namespace
+} // namespace
 
 // Bilinear, align_corners 0: (0.25, 0.25) maps to pixel (0.75, 0.75), weights .0625/.1875/.1875/.5625.
 TEST(NertKernels, GridSampleBilinearAlignCornersZero) {
@@ -4541,7 +4583,7 @@ TEST(NertKernels, ScatterNDRowScatter) {
     std::vector<float> out(8, -1.0f);
     nert::Node node = MakeNode("snd0", "ScatterND");
     std::vector<nert::TensorView> inputs = {FloatView(data, {4, 2}), Int64View(indices, {2, 1}),
-                                              FloatView(updates, {2, 2})};
+                                            FloatView(updates, {2, 2})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {4, 2})};
 
     kernel(node, inputs, outputs);
@@ -4560,8 +4602,7 @@ TEST(NertKernels, ScatterNDNegativeIndexInt64) {
     std::vector<int64_t> updates = {99};
     std::vector<int64_t> out(3, -1);
     nert::Node node = MakeNode("snd_neg", "ScatterND");
-    std::vector<nert::TensorView> inputs = {Int64View(data, {3}), Int64View(indices, {1, 1}),
-                                              Int64View(updates, {1})};
+    std::vector<nert::TensorView> inputs = {Int64View(data, {3}), Int64View(indices, {1, 1}), Int64View(updates, {1})};
     std::vector<nert::TensorView> outputs = {Int64View(out, {3})};
 
     kernel(node, inputs, outputs);
@@ -4579,8 +4620,7 @@ TEST(NertKernelsNegative, ScatterNDRejectsIndexOutOfRange) {
     std::vector<float> updates = {9.0f};
     std::vector<float> out(2, 0.0f);
     nert::Node node = MakeNode("snd_bad", "ScatterND");
-    std::vector<nert::TensorView> inputs = {FloatView(data, {2}), Int64View(indices, {1, 1}),
-                                              FloatView(updates, {1})};
+    std::vector<nert::TensorView> inputs = {FloatView(data, {2}), Int64View(indices, {1, 1}), FloatView(updates, {1})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {2})};
 
     try {
