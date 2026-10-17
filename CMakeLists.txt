@@ -71,6 +71,7 @@ add_library(nert STATIC
     src/kernels/pow.cpp
     src/kernels/tile.cpp
     src/kernels/average_pool.cpp
+    src/kernels/global_average_pool.cpp
     src/kernels/grid_sample.cpp
     src/kernels/einsum.cpp
     src/kernels/conv_transpose.cpp
@@ -129,7 +130,7 @@ if(NERT_ENABLE_CUDA)
     target_include_directories(nert PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
     target_sources(nert PRIVATE src/cuda_device.cpp src/cuda/gemm.cu src/cuda/relu.cu src/cuda/add.cu
                                 src/cuda/mul.cu src/cuda/sub.cu src/cuda/div.cu src/cuda/max_pool.cu
-                                src/cuda/average_pool.cu src/cuda/sigmoid.cu src/cuda/tanh.cu
+                                src/cuda/average_pool.cu src/cuda/global_average_pool.cu src/cuda/sigmoid.cu src/cuda/tanh.cu
                                 src/cuda/softmax.cu src/cuda/reshape.cu src/cuda/unsqueeze.cu
                                 src/cuda/flatten.cu src/cuda/expand.cu src/cuda/concat.cu
                                 src/cuda/split.cu src/cuda/slice.cu src/cuda/transpose.cu
