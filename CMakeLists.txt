@@ -3,13 +3,23 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+# Own version comes from versions.env (sibling convention); the fallback
+# keeps FetchContent consumers working when the file is absent.
+set(NERT_VERSION "0.2.0")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/versions.env")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/versions.env" NERT_VERSION_LINE REGEX "^NERT_VERSION=")
+    if(NERT_VERSION_LINE MATCHES "^NERT_VERSION=(.+)$")
+        set(NERT_VERSION "${CMAKE_MATCH_1}")
+    endif()
+endif()
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(NERT_IS_TOP_LEVEL ON)
 else()
     set(NERT_IS_TOP_LEVEL OFF)
 endif()
 
-project(nert VERSION 0.2.0 LANGUAGES CXX)
+project(nert VERSION ${NERT_VERSION} LANGUAGES CXX)
 
 if(NERT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 17)
