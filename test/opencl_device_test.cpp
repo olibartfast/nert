@@ -36,15 +36,16 @@ TEST(NertOpenCLDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(ocl).transfer());
 }
 
-// M1: the kernel table is empty, so every op resolves to null and the
-// executor rejects the node naming op + node (M2 rows change this).
-TEST(NertOpenCLDevice, KernelTableIsEmpty) {
+// M2 pilot rows resolve; anything else is still null so the executor
+// rejects the node naming op + node.
+TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
     }
     const nert::Device& ocl = nert::OpenCLDevice();
-    EXPECT_EQ(ocl.kernels().find("Relu"), nullptr);
-    EXPECT_EQ(ocl.kernels().find("Add"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Relu"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Add"), nullptr);
+    EXPECT_EQ(ocl.kernels().find("Gemm"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.
