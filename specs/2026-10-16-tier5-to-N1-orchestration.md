@@ -83,7 +83,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 30 | task-models packet | main (planner) | packet only, no code | committed | done 2026-10-17: ResNet/DETR/OWL phases + Q-1..Q-3 open; Q-1 gates new GPU rows |
 | 31 | plumb-A linear planner | `../nert-w-plumba` / `wip/nert-plumba` | OFF 8/8 + format | merged | done 2026-10-17: jump-to-end, overflow guards, exact-offset regression |
 | 32 | plumb-B resident weights | `../nert-w-plumbb` / `wip/nert-plumbb` | OFF 8/8 + CUDA 9/9 + OCL 2/2 + HIP 2/2 + format | merged | done 2026-10-17: upload-once initializers, RAII staging, traffic tests |
-| 33 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 33 | N1c-M4 HIP activations (NVIDIA) | `../nert-w-n1cm4` / `wip/nert-n1cm4` | OFF 8/8 + HIP-leg 10/10 (RTX 3060) + format | merged | done 2026-10-17: TDD red-green per op, hipify + review, double-accum softmax |
+| 34 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
