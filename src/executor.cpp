@@ -55,21 +55,56 @@ const TensorInfo& ShapeOf(const InferredShapes& shapes, const std::string& name)
     return it->second;
 }
 
+// Per-run device buffers that release themselves on scope exit, so a
+// throwing kernel cannot leak staged inputs.
+class StagedBuffers {
+  public:
+    explicit StagedBuffers(Device* device) : device_(device) {}
+
+    StagedBuffers(const StagedBuffers&) = delete;
+    StagedBuffers& operator=(const StagedBuffers&) = delete;
+
+    ~StagedBuffers() {
+        for (void* buffer : buffers_) {
+            device_->allocator().release(buffer);
+        }
+    }
+
+    void push_back(void* buffer) { buffers_.push_back(buffer); }
+
+  private:
+    Device* device_;
+    std::vector<void*> buffers_;
+};
+
 } // namespace
 
 Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& device)
     : graph_(graph), device_(const_cast<Device*>(&device)), shapes_(InferShapes(graph, input_dims)),
       plan_(PlanMemory(graph, shapes_)) {
-    if (plan_.arena_size > 0) {
-        arena_ = device_->allocator().allocate(plan_.arena_size);
-        if (arena_ == nullptr) {
-            throw InferenceException("executor: could not allocate the " + std::to_string(plan_.arena_size) +
-                                     "-byte arena");
+    try {
+        if (plan_.arena_size > 0) {
+            arena_ = device_->allocator().allocate(plan_.arena_size);
+            if (arena_ == nullptr) {
+                throw InferenceException("executor: could not allocate the " + std::to_string(plan_.arena_size) +
+                                         "-byte arena");
+            }
         }
+        UploadResidents();
+    } catch (...) {
+        // The destructor never runs for a failed construction, so release
+        // the partial state here before the exception escapes.
+        ReleaseResidents();
+        if (arena_ != nullptr) {
+            device_->allocator().release(arena_);
+            arena_ = nullptr;
+        }
+        throw;
     }
 }
 
 Model::~Model() {
+    ReleaseResidents();
     if (arena_ != nullptr) {
         device_->allocator().release(arena_);
     }
@@ -223,6 +258,38 @@ int64_t StagedBytes(const TensorView& view) {
     return ElementCount(view.dims) * static_cast<int64_t>(elem);
 }
 
+void Model::UploadResidents() {
+    if (device_->is_host()) {
+        return;
+    }
+    for (const auto& entry : graph_.initializers) {
+        const Initializer& init = entry.second;
+        TensorView view;
+        view.dtype = init.dtype;
+        view.dims = init.dims;
+        view.data = InitializerData(const_cast<Initializer&>(init));
+        // Empty initializers stay host-bound (kernels see the same nulls as
+        // on CPU); Execute still validates the non-empty-but-null case.
+        if (StagedBytes(view) == 0) {
+            continue;
+        }
+        const int64_t bytes = StagedBytes(view);
+        void* device_buffer = device_->allocator().allocate(bytes);
+        if (device_buffer == nullptr) {
+            throw InferenceException("executor: could not stage initializer '" + entry.first + "' on the device");
+        }
+        device_->transfer().host_to_device(device_buffer, view.data, bytes);
+        resident_.emplace(entry.first, device_buffer);
+    }
+}
+
+void Model::ReleaseResidents() {
+    for (const auto& entry : resident_) {
+        device_->allocator().release(entry.second);
+    }
+    resident_.clear();
+}
+
 void Model::Execute(std::map<std::string, TensorView>& views,
                     std::map<std::string, std::vector<uint8_t>>& host_outputs) {
     for (const auto& entry : graph_.initializers) {
@@ -235,15 +302,30 @@ void Model::Execute(std::map<std::string, TensorView>& views,
         if (view.data == nullptr && ElementCount(init.dims) != 0) {
             throw InferenceException("executor: initializer '" + entry.first + "' has no values of its dtype");
         }
+        // On non-host devices the bytes already live on the device from
+        // construction; empty initializers stay host-bound either way.
+        const auto resident = resident_.find(entry.first);
+        if (resident != resident_.end()) {
+            view.data = resident->second;
+        }
         views.emplace(entry.first, std::move(view));
     }
 
-    std::vector<void*> staged;
+    StagedBuffers staged(device_);
     if (!device_->is_host()) {
-        // Whole-graph staging: every host-bound view is uploaded once and
-        // repointed at device memory, so kernels run with no per-op host
-        // round-trips by design.
+        // Per-run staging covers the graph inputs only: initializers are
+        // resident from construction, so a second Run uploads no weights.
         for (auto& staged_entry : views) {
+            bool is_input = false;
+            for (const auto& input : graph_.inputs) {
+                if (input.first == staged_entry.first) {
+                    is_input = true;
+                    break;
+                }
+            }
+            if (!is_input) {
+                continue;
+            }
             TensorView& view = staged_entry.second;
             const int64_t bytes = StagedBytes(view);
             if (bytes == 0) {
@@ -301,8 +383,10 @@ void Model::Execute(std::map<std::string, TensorView>& views,
 
     if (!device_->is_host()) {
         // Graph outputs are downloaded once into caller-owned host buffers so
-        // the result extraction above keeps reading host memory; aliased
-        // inputs/initializers download from their staged copies.
+        // the result extraction above keeps reading host memory; outputs
+        // aliasing resident initializers download from those copies.
+        // Staged input buffers release themselves when `staged` unwinds,
+        // including when a kernel throws above.
         for (const auto& entry : graph_.outputs) {
             const auto produced = views.find(entry.first);
             if (produced == views.end()) {
@@ -317,9 +401,6 @@ void Model::Execute(std::map<std::string, TensorView>& views,
             host.resize(static_cast<std::size_t>(bytes));
             device_->transfer().device_to_host(host.data(), view.data, bytes);
             view.data = host.data();
-        }
-        for (void* device_buffer : staged) {
-            device_->allocator().release(device_buffer);
         }
     }
 }
