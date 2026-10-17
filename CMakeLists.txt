@@ -203,6 +203,7 @@ if(NERT_ENABLE_HIP)
     target_sources(nert PRIVATE src/hip_device.cpp)
     target_sources(nert PRIVATE src/hip/relu.cu src/hip/add.cu src/hip/table.cpp)
     target_sources(nert PRIVATE src/hip/mul.cu src/hip/sub.cu src/hip/div.cu)
+    target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/tanh.cu src/hip/softmax.cu)
     # The HIP dialect compiles with nvcc on the NVIDIA target (what
     # hipcc -platform=nvidia does). .cu files pick up CUDA automatically;
     # the .cpp device file needs it set explicitly.

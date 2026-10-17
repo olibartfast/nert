@@ -49,6 +49,9 @@ TEST(NertHIPDevice, KernelTableServesPilotRows) {
     EXPECT_NE(hip.kernels().find("Mul"), nullptr);
     EXPECT_NE(hip.kernels().find("Sub"), nullptr);
     EXPECT_NE(hip.kernels().find("Div"), nullptr);
+    EXPECT_NE(hip.kernels().find("Sigmoid"), nullptr);
+    EXPECT_NE(hip.kernels().find("Tanh"), nullptr);
+    EXPECT_NE(hip.kernels().find("Softmax"), nullptr);
     EXPECT_EQ(hip.kernels().find("Gemm"), nullptr);
 }
 
