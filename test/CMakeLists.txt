@@ -162,6 +162,14 @@ if(NERT_ENABLE_CUDA)
         GTest::gtest
         GTest::gtest_main)
     add_test(NAME nert_cuda_concat COMMAND nert_cuda_concat_test)
+    add_executable(nert_cuda_index_test cuda_index_test.cpp)
+    target_compile_features(nert_cuda_index_test PRIVATE cxx_std_17)
+    target_compile_options(nert_cuda_index_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_cuda_index_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_cuda_index COMMAND nert_cuda_index_test)
     add_executable(nert_cuda_activations_test cuda_activations_test.cpp)
     target_compile_features(nert_cuda_activations_test PRIVATE cxx_std_17)
     target_compile_options(nert_cuda_activations_test PRIVATE -Wall -Wextra -Wpedantic)
