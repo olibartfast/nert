@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LayerNormalization` (per-row double-accum, scalar/per-element
   Scale/B, optional Mean/InvStdDev) — 126 dispatch-gap nodes closed
   against the CPU oracle at the bench tolerance.
+- R6 + Tier-5 CUDA rows (31 kernels): `Sin`/`Cos`/`Exp`/`Elu`/`Log`/
+  `Floor`/`IsNaN`, `Abs`/`Neg`/`Pow`, `Greater`/`Less`/`GreaterOrEqual`/
+  `LessOrEqual`/`And`/`Or`/`Not`, `Max`/`Min`/`Clip`,
+  `Identity`/`Squeeze`/`Tile`/`Range`/`EyeLike`/`Pad`,
+  `ReduceMean`/`ReduceL2`/`ArgMax`/`CumSum`/`ScatterND` — closing the
+  R6a/R6b RF-DETR gaps and the Tier-5 open-vocab CUDA-missing set
+  (GridSample and Einsum excluded) at the bench tolerance.
 
 ## [0.1.0] - Unreleased
 

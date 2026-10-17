@@ -5,9 +5,10 @@
 // op + node. Rows: Gemm (cuBLAS),
 // Relu/Add/Mul/Sub/Div/MaxPool/AveragePool/GlobalAveragePool/Sigmoid/Tanh/Sqrt/Erf/Softmax/
 // Reshape/Unsqueeze/Flatten/Expand/Concat/Split/Slice/Transpose/Gather/GatherElements/MatMul/Cast/Equal/Where/
-// Shape/ConstantOfShape/Mod/ReduceMax/ReduceSum/TopK/Resize/Sqrt/Erf/LayerNormalization (first-party, except MatMul via
-// cuBLAS like Gemm), Conv (cuDNN,
-// NERT_HAS_CUDNN builds only).
+// Shape/ConstantOfShape/Mod/ReduceMax/ReduceSum/TopK/Resize/Sqrt/Erf/LayerNormalization/Sin/Cos/Exp/Elu/Log/Floor/
+// IsNaN/Abs/Neg/Pow/Greater/Less/GreaterOrEqual/LessOrEqual/And/Or/Not/Max/Min/Clip/Tile/Identity/Squeeze/Range/
+// EyeLike/Pad/ReduceMean/ReduceL2/ArgMax/CumSum/ScatterND (first-party, except MatMul via cuBLAS like Gemm), Conv
+// (cuDNN, NERT_HAS_CUDNN builds only).
 
 #include "nert/device.hpp"
 
@@ -32,6 +33,37 @@ void Sqrt(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 void Erf(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void LayerNormalization(const Node& node, const std::vector<TensorView>& inputs,
                         const std::vector<TensorView>& outputs);
+void Sin(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Cos(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Exp(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Elu(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Log(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Floor(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void IsNaN(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Neg(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Pow(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Greater(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Less(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void GreaterOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void LessOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void And(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Not(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Max(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Min(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Clip(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Identity(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Squeeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Tile(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Range(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void EyeLike(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Pad(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ArgMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void CumSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Reshape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -74,6 +106,37 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"Sqrt", &Sqrt},
         {"Erf", &Erf},
         {"LayerNormalization", &LayerNormalization},
+        {"Sin", &Sin},
+        {"Cos", &Cos},
+        {"Exp", &Exp},
+        {"Elu", &Elu},
+        {"Log", &Log},
+        {"Floor", &Floor},
+        {"IsNaN", &IsNaN},
+        {"Abs", &Abs},
+        {"Neg", &Neg},
+        {"Pow", &Pow},
+        {"Greater", &Greater},
+        {"Less", &Less},
+        {"GreaterOrEqual", &GreaterOrEqual},
+        {"LessOrEqual", &LessOrEqual},
+        {"And", &And},
+        {"Or", &Or},
+        {"Not", &Not},
+        {"Max", &Max},
+        {"Min", &Min},
+        {"Clip", &Clip},
+        {"Identity", &Identity},
+        {"Squeeze", &Squeeze},
+        {"Tile", &Tile},
+        {"Range", &Range},
+        {"EyeLike", &EyeLike},
+        {"Pad", &Pad},
+        {"ReduceMean", &ReduceMean},
+        {"ReduceL2", &ReduceL2},
+        {"ArgMax", &ArgMax},
+        {"CumSum", &CumSum},
+        {"ScatterND", &ScatterND},
         {"Softmax", &Softmax},
         {"Reshape", &Reshape},
         {"Unsqueeze", &Unsqueeze},
