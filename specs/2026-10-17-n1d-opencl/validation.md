@@ -13,4 +13,4 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
-| — | — | pending | — | — |
+| M1 | OpenCLDevice names/seam/empty-table/1KiB round trip on NVIDIA CUDA platform + OFF 8/8 + OCL-leg 9/9 + format | pass | 2026-10-17 | host leg; NERT_ENABLE_OPENCL independent of CUDA flag. |

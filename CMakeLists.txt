@@ -156,6 +156,23 @@ if(NERT_ENABLE_CUDA)
     endif()
 endif()
 
+# OpenCL device layer (Phase N1d), opt-in like CUDA: NERT_ENABLE_OPENCL=ON
+# requires the OpenCL headers + ICD loader and links OpenCL into `nert`;
+# OFF (default) leaves the link closure standard-library-only. Independent
+# of NERT_ENABLE_CUDA; both may be on at once (distinct devices).
+option(NERT_ENABLE_OPENCL "Build NERT with the OpenCL device layer" OFF)
+if(NERT_ENABLE_OPENCL)
+    find_package(OpenCL)
+    if(NOT OpenCL_FOUND)
+        message(FATAL_ERROR
+            "NERT_ENABLE_OPENCL=ON requires the OpenCL headers and ICD loader; none were found.")
+    endif()
+    target_sources(nert PRIVATE src/opencl_device.cpp)
+    # PRIVATE: no OpenCL type leaks through the public headers, so consumers
+    # stay toolkit-free.
+    target_link_libraries(nert PRIVATE OpenCL::OpenCL)
+endif()
+
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects
 # (Neuriplo) that set it.
 if(NERT_BUILD_TESTS OR BUILD_INFERENCE_ENGINE_TESTS)
