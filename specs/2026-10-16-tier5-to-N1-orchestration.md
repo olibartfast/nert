@@ -76,7 +76,8 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 23 | N1d-M2 OpenCL pilot kernels | `../nert-w-n1dm2` / `wip/nert-n1dm2` | OFF 8/8 + OCL-leg 10/10 (RTX 3060 NVIDIA platform) + format | merged | done 2026-10-17: runtime/cache, Relu/Add, Gemm permanent probe |
 | 24 | N1d-M3 OpenCL Mul/Sub/Div | `../nert-w-n1dm3` / `wip/nert-n1dm3` | OFF 8/8 + OCL-leg 10/10 (RTX 3060 NVIDIA platform) + format | merged | done 2026-10-17: bcast templated from Add, Div-int64 device-flag/host-report |
 | 25 | N1c-M1 HIP scaffold (NVIDIA) | `../nert-w-n1cm1` / `wip/nert-n1cm1` | OFF 8/8 + HIP-leg 9/9 (RTX 3060, nvcc 12.0 + rootless hip-dev 6.2) + format | merged | done 2026-10-17: HipDevice + empty table; hipify proof (relu.cu) in packet; AMD half still queued |
-| 26 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 26 | N1c-M2 HIP pilot kernels (NVIDIA) | `../nert-w-n1cm2` / `wip/nert-n1cm2` | OFF 8/8 + HIP-leg 10/10 (RTX 3060) + format | merged | done 2026-10-17: hipify-perl + hand-review, Relu/Add, Gemm permanent probe |
+| 27 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
