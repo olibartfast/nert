@@ -54,5 +54,14 @@ proven on the RTX 3060 via the HIP NVIDIA backend.
 
 - Same bars: OFF untouched, format clean, no `src/kernels`/loader/
   shape/executor diffs, SKIP contract intact.
+- GPU-agnostic HIP (maintainer directive 2026-10-17): `src/hip/` must
+  build and run under both backends without source changes. Concretely:
+  grid-stride loops only (no warp/wavefront-size assumption — 256-thread
+  blocks are safe on both), no `__shfl__`/`__ballot__`/PTX/cluster
+  intrinsics, only portable HIP runtime API (`hipMalloc`, `hipMemcpy`,
+  `hipDeviceSynchronize`, `hipGetLastError`, `atomicExch` on `int`),
+  `<<<>>>` launches (accepted by nvcc and hipcc), and zero
+  `__HIP_PLATFORM_*` branches in sources — backend selection lives in
+  CMake only. Audited 2026-10-17 (N1c-M3): clean.
 - Scratch toolchain (`/tmp/opencode/rocm/`, `/tmp/opencode/hipify/`)
   is never committed; CMake consumes it via `HIP_INCLUDE_DIR`.

@@ -46,6 +46,9 @@ TEST(NertHIPDevice, KernelTableServesPilotRows) {
     const nert::Device& hip = nert::HipDevice();
     EXPECT_NE(hip.kernels().find("Relu"), nullptr);
     EXPECT_NE(hip.kernels().find("Add"), nullptr);
+    EXPECT_NE(hip.kernels().find("Mul"), nullptr);
+    EXPECT_NE(hip.kernels().find("Sub"), nullptr);
+    EXPECT_NE(hip.kernels().find("Div"), nullptr);
     EXPECT_EQ(hip.kernels().find("Gemm"), nullptr);
 }
 
