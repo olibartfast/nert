@@ -131,7 +131,8 @@ if(NERT_ENABLE_CUDA)
                                 src/cuda/mul.cu src/cuda/sub.cu src/cuda/div.cu src/cuda/max_pool.cu
                                 src/cuda/average_pool.cu src/cuda/sigmoid.cu src/cuda/tanh.cu
                                 src/cuda/softmax.cu src/cuda/reshape.cu src/cuda/unsqueeze.cu
-                                src/cuda/flatten.cu src/cuda/expand.cu src/cuda/table.cu)
+                                src/cuda/flatten.cu src/cuda/expand.cu src/cuda/concat.cu
+                                src/cuda/split.cu src/cuda/slice.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
