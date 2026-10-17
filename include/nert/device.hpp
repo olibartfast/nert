@@ -80,4 +80,9 @@ const Device& CpuDevice();
 // resolves to null) until the pilot kernels land.
 const Device& CudaDevice();
 
+// The process-lifetime OpenCL device (allocator, transfers, OpenCL kernel
+// table). Only available with NERT_ENABLE_OPENCL=ON; without it the symbol
+// is absent. M1 scaffold: the kernel table is empty until M2 rows land.
+const Device& OpenCLDevice();
+
 } // namespace nert
