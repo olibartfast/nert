@@ -1,72 +1,29 @@
-# NERT bench harness
+# NERT bench driver
 
-Standalone tooling for testing and timing individual kernels against a
-CPU oracle and a device backend. `bench/` mirrors the layout of the
-[gpu-playground](https://github.com/olibartfast/gpu-playground) reference but
-lives outside the runtime: nothing here is linked into the `nert` library, and
-the runtime stays stdlib-only ([C-2]).
+Standalone tooling for timing shipped kernels against the CPU oracle.
+`bench/` lives outside the runtime: nothing here is linked into the
+`nert` library, and the runtime stays stdlib-only.
 
-This is a stub; the full layout/usage guide lands with G5.
-
-## Layout (playground → nert)
-
-| playground | nert | notes |
-| --- | --- | --- |
-| `source/utils/` | `bench/utils/` | vendored timing/helpers, all headers `.hpp` |
-| `source/<kernel>/` | `bench/<kernel>/` | per-kernel harness (`main.cpp`, `cuda/`, `opencl/`, `opencl_cpp/`) |
-| `GPU_ENABLE_*` | `NERT_BENCH_USE_*` | per-backend configure switch |
-| `USE_OPENCL*` | `NERT_BENCH_USE_OPENCL*` | OpenCL C / C++ backend selection |
+`bench/runtime/main.cpp` implements zero kernel logic: one fixture per
+op (shapes + attrs + fixed-seed data) drives the runtime's own device
+tables, times both sides (`steady_clock` around the internally
+synchronized calls), compares within `1e-3·(1+|ref|)`, and prints
+`op | case | cpu_ms | gpu_ms | speedup | maxdiff`. New kernel coverage
+means a new fixture — never a copied kernel.
 
 ## Flags
 
 | flag | default | meaning |
 | --- | --- | --- |
-| `NERT_BUILD_BENCH` | `OFF` | build the bench harness at all |
-| `NERT_BENCH_USE_OPENCL` | `OFF` | OpenCL C API backend (mutually exclusive with the C++ one) |
-| `NERT_BENCH_USE_OPENCL_CPP` | `OFF` | OpenCL C++ wrapper backend |
+| `NERT_BUILD_BENCH` | `OFF` | build the bench driver at all |
 
-With `NERT_BUILD_BENCH=ON` and neither OpenCL flag set, the CUDA backend is
-selected. Enabling both OpenCL flags is a configure-time `FATAL_ERROR`.
+Bench is opt-in precisely so the default build needs nothing beyond a
+C++17 compiler. Which devices get benched is decided by the device
+flags (`NERT_ENABLE_CUDA`, and later OpenCL/HIP): a device that is not
+compiled in simply has no bench half, and a missing GPU at run time
+prints `SKIP:` and still exits 0, so CPU-only runners stay green.
 
 ## Commands
-
-```bash
-cmake -S . -B build                       # default: no bench, runtime unchanged
-cmake -S . -B build -DNERT_BUILD_BENCH=ON # enable the harness
-cmake --build build
-ctest --test-dir build -R bench_ --output-on-failure
-```
-
-## Kernels: gemm pilot (vendored copies)
-
-The `gemm` / `matmul` harnesses below measure **vendored kernel copies**,
-not shipped code (`cpu/gemm.cpp` duplicates the runtime oracle by design;
-`cuda/gemm.cpp` is a tiled kernel while the runtime ships cuBLAS). They
-remain the algorithm playground and still serve the OpenCL bench legs,
-which have no runtime device until N1d — but they are NOT runtime
-benchmarks. For shipped-kernel numbers use `bench/runtime` (next
-section); deleting the vendored CUDA copies is a follow-up tied to N1d.
-
-```bash
-# CUDA path (default when bench is ON)
-cmake -S . -B build-cuda -DNERT_BUILD_BENCH=ON && cmake --build build-cuda --target nert_bench_gemm
-./build-cuda/bench/gemm/nert_bench_gemm
-
-# OpenCL C API
-cmake -S . -B build-ocl -DNERT_BUILD_BENCH=ON -DNERT_BENCH_USE_OPENCL=ON && cmake --build build-ocl --target nert_bench_gemm
-./build-ocl/bench/gemm/nert_bench_gemm
-
-# OpenCL C++ wrapper
-cmake -S . -B build-oclcpp -DNERT_BUILD_BENCH=ON -DNERT_BENCH_USE_OPENCL_CPP=ON && cmake --build build-oclcpp --target nert_bench_gemm
-./build-oclcpp/bench/gemm/nert_bench_gemm
-```
-
-Expected on a GPU runner (RTX 3060, 2026-10-16): small test prints
-`[[58,64],[139,154]]`, all 5 large seeds PASSED with max abs diff `0.00`,
-exit `0`. CUDA large is ~300x the naive CPU oracle; OpenCL legs ~2.3x
-(they rebuild + transfer per call — honestly reported, not tuned).
-
-## Runtime bench: shipped kernels, no duplicated code
 
 ```bash
 cmake -S . -B build-cuda -DNERT_ENABLE_CUDA=ON -DNERT_BUILD_BENCH=ON
@@ -74,15 +31,6 @@ cmake --build build-cuda --target nert_bench_runtime
 ./build-cuda/bench/runtime/nert_bench_runtime
 # or: ctest --test-dir build-cuda -R bench_runtime --output-on-failure
 ```
-
-`bench/runtime/main.cpp` implements zero kernel logic: one fixture per op
-(shapes + attrs + fixed-seed data) drives the runtime's own
-`CpuDevice`/`CudaDevice` tables, times both (`steady_clock` around the
-internally synchronized calls), compares within `1e-3·(1+|ref|)`, and
-prints `op | case | cpu_ms | gpu_ms | speedup | maxdiff`. New kernel
-coverage = new fixture. Built only with `NERT_ENABLE_CUDA=ON` (OFF builds
-carry no `CudaDevice` symbol); without a GPU, or for a missing CUDA row
-(e.g. Conv without cuDNN), the case prints `SKIP:` and still exits 0.
 
 Reference numbers (RTX 3060, 2026-10-16, 11 passed / 1 skipped):
 
@@ -101,25 +49,12 @@ Reference numbers (RTX 3060, 2026-10-16, 11 passed / 1 skipped):
 | Softmax | [256,4096] | 58.92 | 20.22 | 2.9x | 0 |
 | Conv | — | SKIP (no CUDA row: no cuDNN on this leg) | | | |
 
-Softmax is only 2.9x: one thread per row with double accumulation on both
-sides, honestly reported, not tuned.
+Softmax is only 2.9x: one thread per row with double accumulation on
+both sides, honestly reported, not tuned.
 
-## SDK prerequisites
+## History
 
-Bench is opt-in precisely so the default build needs nothing beyond a C++17
-compiler: with `NERT_BUILD_BENCH=OFF` (the default) no CUDA or OpenCL SDK is
-touched and the CMake 3.16 floor holds. With `NERT_BUILD_BENCH=ON`, both the CUDA toolkit and the OpenCL SDK
-are required at configure time (all helper headers are compile-checked
-together via `bench_utils_headers`); a missing SDK fails naming the bench
-flag. Bench also needs CMake >= 3.17 (CUDAToolkit module; explicit
-`FATAL_ERROR` otherwise) while the runtime keeps its 3.16 floor. Which device actually runs is still chosen by the backend flags below,
-and every device half runtime-SKIPs without a GPU, so CPU-only runners with
-the SDKs installed stay green.
-
-## `SKIP:` contract
-
-Device halves exit `0` and print a `SKIP:` line when no usable GPU (or SDK) is
-present, so CPU-only CI stays green; the CPU oracle half still runs and still
-fails on a genuine mismatch.
-
-[C-2]: ../specs/2026-10-16-kernel-bench-harness/requirements.md
+Before 2026-10-17 `bench/` also held per-kernel harnesses (`gemm`,
+`matmul`) that timed vendored kernel copies instead of shipped code.
+They were deleted once the OpenCL and HIP runtime devices landed, since
+the reason to keep them (bench legs with no runtime device) was gone.
