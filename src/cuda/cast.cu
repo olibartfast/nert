@@ -1,8 +1,9 @@
 // Cast on CUDA: element conversion, one thread per element.
 //
-// Mirrors the CPU oracle: f32/i64/bool input, required int 'to' attr (1/7/9),
-// output dtype/shape checks. Every conversion is a plain static_cast, which
-// reproduces the oracle's bool<->numeric rules exactly.
+// Mirrors the CPU oracle: f32/i64/bool input, required int 'to' attr
+// (1/6/7/9), output dtype/shape checks. Every conversion is a plain
+// static_cast except to=6 (INT32), which is emulated on int64 lanes with
+// portable saturation exactly like the CPU row (NaN becomes 0).
 
 #include "nert/device.hpp"
 
@@ -16,6 +17,7 @@ namespace cuda_kernels {
 namespace {
 
 constexpr int64_t kElemFloat = 1;
+constexpr int64_t kElemInt32 = 6;
 constexpr int64_t kElemInt64 = 7;
 constexpr int64_t kElemBool = 9;
 
@@ -36,9 +38,36 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
     return count;
 }
 
+__device__ int64_t SaturateInt32Device(float value) {
+    const double v = static_cast<double>(value);
+    if (isnan(v)) {
+        return 0;
+    }
+    if (v >= 2147483647.0) {
+        return 2147483647LL;
+    }
+    if (v <= -2147483648.0) {
+        return -2147483648LL;
+    }
+    return static_cast<int64_t>(v);
+}
+
 template <typename In, typename Out> __global__ void CastKernel(const In* x, Out* y, int64_t count) {
     for (int64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += blockDim.x * gridDim.x) {
         y[i] = static_cast<Out>(x[i]);
+    }
+}
+
+__global__ void CastFloatToInt32Kernel(const float* x, int64_t* y, int64_t count) {
+    for (int64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += blockDim.x * gridDim.x) {
+        y[i] = SaturateInt32Device(x[i]);
+    }
+}
+
+__global__ void CastInt64ToInt32Kernel(const int64_t* x, int64_t* y, int64_t count) {
+    for (int64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += blockDim.x * gridDim.x) {
+        const int64_t v = x[i];
+        y[i] = v > 2147483647LL ? 2147483647LL : (v < -2147483648LL ? -2147483648LL : v);
     }
 }
 
@@ -81,6 +110,9 @@ void Cast(const Node& node, const std::vector<TensorView>& inputs, const std::ve
     DataType want = DataType::Unknown;
     if (to == kElemFloat) {
         want = DataType::Float32;
+    } else if (to == kElemInt32) {
+        // Emulated on int64 lanes (see file doc).
+        want = DataType::Int64;
     } else if (to == kElemInt64) {
         want = DataType::Int64;
     } else if (to == kElemBool) {
@@ -117,7 +149,19 @@ void Cast(const Node& node, const std::vector<TensorView>& inputs, const std::ve
         }
     } else if (want == DataType::Int64) {
         auto* yi = static_cast<int64_t*>(y);
-        if (in.dtype == DataType::Float32) {
+        if (to == kElemInt32 && in.dtype == DataType::Float32) {
+            const int block = 256;
+            const int grid = static_cast<int>((outCount + block - 1) / block);
+            CastFloatToInt32Kernel<<<grid, block>>>(static_cast<const float*>(x), yi, outCount);
+            CheckCuda(cudaGetLastError(), "CastFloatToInt32Kernel launch", context);
+            CheckCuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize", context);
+        } else if (to == kElemInt32 && in.dtype == DataType::Int64) {
+            const int block = 256;
+            const int grid = static_cast<int>((outCount + block - 1) / block);
+            CastInt64ToInt32Kernel<<<grid, block>>>(static_cast<const int64_t*>(x), yi, outCount);
+            CheckCuda(cudaGetLastError(), "CastInt64ToInt32Kernel launch", context);
+            CheckCuda(cudaDeviceSynchronize(), "cudaDeviceSynchronize", context);
+        } else if (in.dtype == DataType::Float32) {
             LaunchCast(static_cast<const float*>(x), yi, outCount, context);
         } else if (in.dtype == DataType::Int64) {
             LaunchCast(static_cast<const int64_t*>(x), yi, outCount, context);

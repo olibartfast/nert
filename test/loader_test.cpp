@@ -868,6 +868,25 @@ TEST_F(EngineLoader, HermeticSliceTopKLoads)
     ASSERT_EQ(graph.nodes[1].attributes.size(), 3U);
 }
 
+// Hermetic positive: Cast `to = 6` (INT32) loads; it is emulated on int64
+// lanes so the graph dtype is Int64 (see the Cast kernel doc).
+TEST_F(EngineLoader, HermeticCastToInt32Loads)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("cast_i32", "Cast", {"x"}, {"c"},
+                      {encode_attribute_int("to", 6)}));
+    put_sub(body, 1, encode_node("cast_f", "Cast", {"c"}, {"y"},
+                      {encode_attribute_int("to", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {4}));
+    put_sub(body, 12, encode_value_info("y", 1, {4}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("cast_int32.onnx", encode_model(body)));
+    ASSERT_EQ(graph.nodes.size(), 2U);
+    EXPECT_EQ(std::get<std::int64_t>(graph.nodes[0].attributes.front().value),
+        6);
+}
+
 // Hermetic positive: Cast `to` may also be BOOL (9).
 TEST_F(EngineLoader, HermeticCastToBoolLoads)
 {
@@ -1188,13 +1207,13 @@ TEST_F(EngineLoaderNegative, MissingModelFileNamesPath)
     EXPECT_NE(message.find(path), std::string::npos) << "message: " << message;
 }
 
-// Cast `to` outside {FLOAT, INT64} rejects with node + op context.
+// Cast `to` outside {FLOAT, INT32, INT64, BOOL} rejects with node + op context.
 
 TEST_F(EngineLoaderNegative, CastToOutsidePolicyRejected)
 {
     std::string body;
     put_sub(body, 1, encode_node("cast_bad", "Cast", {"x"}, {"y"},
-        {encode_attribute_int("to", 6)})); // INT32
+        {encode_attribute_int("to", 2)})); // UINT8
     put_sub(body, 11, encode_value_info("x", 1, {4}));
     put_sub(body, 12, encode_value_info("y", 1, {4}));
 

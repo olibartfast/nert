@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -766,6 +767,27 @@ TEST(NertKernels, CastBoolToFloat) {
     kernel(node, inputs, outputs);
 
     EXPECT_EQ(out, (std::vector<float>{1.0f, 0.0f}));
+}
+
+// Cast to=6 emulates int32 on int64 lanes: truncation toward zero with
+// saturation at the int32 range (NaN becomes 0). Matches ORT bit for bit
+// in range; past the range it follows portable saturation (ARM ORT)
+// rather than the x86 hardware-conversion quirk — see the kernel doc.
+TEST(NertKernels, CastFloatToInt32Emulation) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Cast");
+    ASSERT_NE(kernel, nullptr);
+
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    std::vector<float> in = {1.9f, -2.7f, 0.0f, 3e9f, -3e9f, nan};
+    std::vector<int64_t> out(in.size(), 0);
+    nert::Node node = MakeNode("cast6", "Cast");
+    node.attributes.emplace_back("to", int64_t{6});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {static_cast<int64_t>(in.size())})};
+    std::vector<nert::TensorView> outputs = {Int64View(out, {static_cast<int64_t>(out.size())})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{1, -2, 0, 2147483647LL, -2147483648LL, 0}));
 }
 
 // Softmax over the default last axis normalizes each row of [2,3].
@@ -3804,14 +3826,63 @@ TEST(NertKernels, EinsumTranspose) {
     EXPECT_EQ(out, (std::vector<float>{1.0f, 4.0f, 2.0f, 5.0f, 3.0f, 6.0f}));
 }
 
-// Einsum with an ellipsis is rejected, naming the op.
-TEST(NertKernelsNegative, EinsumRejectsEllipsis) {
+// second operand: y[b,i,j] = sum_k x[b,i,k]*z[b,j,k].
+TEST(NertKernels, EinsumEllipsisBatchMatMul) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Einsum");
+    ASSERT_NE(kernel, nullptr);
+    std::vector<float> x = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> z = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f};
+    std::vector<float> out(8, 0.0f);
+    nert::Node node = MakeNode("es", "Einsum");
+    node.attributes.emplace_back("equation", std::string("...pd,...qd->...pq"));
+    std::vector<nert::TensorView> inputs = {FloatView(x, {1, 2, 3}), FloatView(z, {1, 4, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 2, 4})};
+    kernel(node, inputs, outputs);
+    EXPECT_EQ(out, (std::vector<float>{14.0f, 32.0f, 50.0f, 68.0f, 32.0f, 77.0f, 122.0f, 167.0f}));
+}
+
+// Einsum "...i,...i->...i" broadcasts the shorter ellipsis: x[3] against
+// z[2,3] multiplies elementwise across both rows.
+TEST(NertKernels, EinsumEllipsisBroadcasts) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Einsum");
+    ASSERT_NE(kernel, nullptr);
+    std::vector<float> x = {1.0f, 2.0f, 3.0f};
+    std::vector<float> z = {10.0f, 20.0f, 30.0f, 100.0f, 200.0f, 300.0f};
+    std::vector<float> out(6, 0.0f);
+    nert::Node node = MakeNode("es", "Einsum");
+    node.attributes.emplace_back("equation", std::string("...i,...i->...i"));
+    std::vector<nert::TensorView> inputs = {FloatView(x, {3}), FloatView(z, {2, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 3})};
+    kernel(node, inputs, outputs);
+    EXPECT_EQ(out, (std::vector<float>{10.0f, 40.0f, 90.0f, 100.0f, 400.0f, 900.0f}));
+}
+
+// Einsum with malformed dots ("..i") is rejected, naming the op.
+TEST(NertKernelsNegative, EinsumRejectsMalformedDots) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Einsum");
     ASSERT_NE(kernel, nullptr);
     std::vector<float> a = {1.0f, 2.0f};
     std::vector<float> out(2, 0.0f);
     nert::Node node = MakeNode("es_bad", "Einsum");
-    node.attributes.emplace_back("equation", std::string("...i->...i"));
+    node.attributes.emplace_back("equation", std::string("..i,i->i"));
+    std::vector<nert::TensorView> inputs = {FloatView(a, {2}), FloatView(a, {2})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2})};
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const nert::InferenceException& error) {
+        EXPECT_NE(std::string(error.what()).find("Einsum"), std::string::npos) << error.what();
+    }
+}
+
+// Einsum with an ellipsis but no explicit output is rejected, naming the op.
+TEST(NertKernelsNegative, EinsumRejectsImplicitEllipsisOutput) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Einsum");
+    ASSERT_NE(kernel, nullptr);
+    std::vector<float> a = {1.0f, 2.0f};
+    std::vector<float> out(2, 0.0f);
+    nert::Node node = MakeNode("es_bad", "Einsum");
+    node.attributes.emplace_back("equation", std::string("...i"));
     std::vector<nert::TensorView> inputs = {FloatView(a, {2})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {2})};
     try {
@@ -4630,4 +4701,109 @@ TEST(NertKernelsNegative, ScatterNDRejectsIndexOutOfRange) {
         EXPECT_NE(std::string(error.what()).find("ScatterND"), std::string::npos) << error.what();
         EXPECT_NE(std::string(error.what()).find("snd_bad"), std::string::npos) << error.what();
     }
+}
+
+// Flatten bool (OWLv2's text attention mask) copies bytes in flat order.
+TEST(NertKernels, FlattenBoolCopies) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Flatten");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> in = {1, 0, 1, 1};
+    std::vector<std::uint8_t> out(4, 0);
+    nert::Node node = MakeNode("flatten_b", "Flatten");
+    node.attributes.emplace_back("axis", int64_t{-1});
+    std::vector<nert::TensorView> inputs = {BoolView(in, {2, 2})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {4, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<std::uint8_t>{1, 0, 1, 1}));
+}
+
+// Gather bool data (OWLv2's text attention mask) selects bytes unchanged.
+TEST(NertKernels, GatherBoolData) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Gather");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> in = {1, 0, 1};
+    std::vector<int64_t> indices = {2, 0};
+    std::vector<std::uint8_t> out(2, 0);
+    nert::Node node = MakeNode("gather_b", "Gather");
+    node.attributes.emplace_back("axis", int64_t{0});
+    std::vector<nert::TensorView> inputs = {BoolView(in, {3}), Int64View(indices, {2})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<std::uint8_t>{1, 1}));
+}
+
+// Concat bool rows along axis 0 copies bytes unchanged.
+TEST(NertKernels, ConcatBoolRows) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Concat");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> a = {1, 0};
+    std::vector<std::uint8_t> b = {0, 1};
+    std::vector<std::uint8_t> out(4, 0);
+    nert::Node node = MakeNode("cc_b", "Concat");
+    node.attributes.emplace_back("axis", int64_t{0});
+    std::vector<nert::TensorView> inputs = {BoolView(a, {1, 2}), BoolView(b, {1, 2})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {2, 2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<std::uint8_t>{1, 0, 0, 1}));
+}
+
+// Slice bool data selects bytes unchanged.
+TEST(NertKernels, SliceBoolRange) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Slice");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> in = {1, 0, 1, 1};
+    std::vector<int64_t> starts = {1};
+    std::vector<int64_t> ends = {3};
+    std::vector<std::uint8_t> out(2, 0);
+    nert::Node node = MakeNode("sl_b", "Slice");
+    std::vector<nert::TensorView> inputs = {BoolView(in, {4}), Int64View(starts, {1}), Int64View(ends, {1})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<std::uint8_t>{0, 1}));
+}
+
+// Transpose bool data with perm {1,0} reorders bytes.
+TEST(NertKernels, TransposeBoolPerm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Transpose");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> in = {1, 0, 1, 0, 1, 0};
+    std::vector<std::uint8_t> out(6, 0);
+    nert::Node node = MakeNode("tr_b", "Transpose");
+    node.attributes.emplace_back("perm", std::vector<int64_t>{1, 0});
+    std::vector<nert::TensorView> inputs = {BoolView(in, {2, 3})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {3, 2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<std::uint8_t>{1, 0, 0, 1, 1, 0}));
+}
+
+// Unsqueeze bool data only changes the shape; byte order is preserved.
+TEST(NertKernels, UnsqueezeBoolAxes) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Unsqueeze");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<std::uint8_t> in = {1, 0, 1, 0, 1, 0};
+    std::vector<int64_t> axes = {0};
+    std::vector<std::uint8_t> out(6, 0);
+    nert::Node node = MakeNode("un_b", "Unsqueeze");
+    std::vector<nert::TensorView> inputs = {BoolView(in, {2, 3}), Int64View(axes, {1})};
+    std::vector<nert::TensorView> outputs = {BoolView(out, {1, 2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, in);
 }

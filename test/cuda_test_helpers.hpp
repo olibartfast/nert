@@ -74,6 +74,29 @@ std::vector<int64_t> DownloadInt64(nert::Device& cuda, void* device, std::size_t
     return host;
 }
 
+nert::TensorView HostBool(std::vector<std::uint8_t>& data, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = data.empty() ? nullptr : data.data();
+    view.dtype = nert::DataType::Bool;
+    view.dims = std::move(dims);
+    return view;
+}
+
+void* UploadBool(nert::Device& cuda, const std::vector<std::uint8_t>& host) {
+    void* device = cuda.allocator().allocate(static_cast<int64_t>(host.size()));
+    if (device == nullptr) {
+        throw std::runtime_error("UploadBool: device allocate failed");
+    }
+    cuda.transfer().host_to_device(device, host.data(), static_cast<int64_t>(host.size()));
+    return device;
+}
+
+std::vector<std::uint8_t> DownloadBool(nert::Device& cuda, void* device, std::size_t count) {
+    std::vector<std::uint8_t> host(count, 0);
+    cuda.transfer().device_to_host(host.data(), device, static_cast<int64_t>(count));
+    return host;
+}
+
 nert::TensorView DeviceFloat(void* device, std::vector<int64_t> dims) {
     nert::TensorView view;
     view.data = device;
@@ -86,6 +109,14 @@ nert::TensorView DeviceInt64(void* device, std::vector<int64_t> dims) {
     nert::TensorView view;
     view.data = device;
     view.dtype = nert::DataType::Int64;
+    view.dims = std::move(dims);
+    return view;
+}
+
+nert::TensorView DeviceBool(void* device, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.data = device;
+    view.dtype = nert::DataType::Bool;
     view.dims = std::move(dims);
     return view;
 }

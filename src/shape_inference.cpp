@@ -12,6 +12,8 @@
 
 #include "nert/shapes.hpp"
 
+#include "nert/einsum.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -1933,6 +1935,10 @@ TensorInfo cast_shape(const Node& node,
     if (to == 1) {
         return TensorInfo{DataType::Float32, inputs[0]->dims};
     }
+    if (to == 6) {
+        // INT32 is emulated on int64 lanes (see the Cast kernel doc).
+        return TensorInfo{DataType::Int64, inputs[0]->dims};
+    }
     if (to == 7) {
         return TensorInfo{DataType::Int64, inputs[0]->dims};
     }
@@ -2414,22 +2420,12 @@ TensorInfo gridsample_shape(const Node& node,
 }
 
 // Einsum: output dims from the label sizes bound by the operands.
-TensorInfo einsum_shape(const Node& node,
-    const std::vector<const TensorInfo*>& inputs)
+// Einsum: output dims from the label sizes bound by the operands. The
+// `fresh` labels (empty on the plain path) broadcast against size 1.
+TensorInfo einsum_plain_shape(const Node& node, const std::vector<const TensorInfo*>& inputs,
+    const std::string& text, const nert::einsum::Expansion& expansion)
 {
-    const std::string raw = attr_str(node, "equation", "");
-    std::string text;
-    for (const char c : raw) {
-        if (c != ' ') {
-            text.push_back(c);
-        }
-    }
-    if (text.empty()) {
-        fail(node, "Einsum requires an 'equation' attribute");
-    }
-    if (text.find('.') != std::string::npos) {
-        fail(node, "Einsum equation must not use an ellipsis");
-    }
+    const std::vector<char>& fresh = expansion.fresh;
     const size_t arrow = text.find("->");
     const bool has_output = arrow != std::string::npos;
     const std::string lhs = has_output ? text.substr(0, arrow) : text;
@@ -2459,19 +2455,36 @@ TensorInfo einsum_shape(const Node& node,
         if (inputs[i]->dtype != DataType::Float32) {
             fail(node, "Einsum inputs must be Float32");
         }
-        if (inputs[i]->dims.size() != subs[i].size()) {
+        const std::size_t left = i < expansion.lefts.size() ? expansion.lefts[i] : subs[i].size();
+        const std::size_t pad = i < expansion.pads.size() ? expansion.pads[i] : 0;
+        std::vector<nert::einsum::MappedDim> mapped;
+        if (!nert::einsum::MapOperand(subs[i], left, pad, expansion.width, inputs[i]->dims, mapped)) {
             fail(node, "Einsum operand rank does not match its subscript");
         }
-        for (size_t j = 0; j < subs[i].size(); ++j) {
-            const char c = subs[i][j];
+        for (const nert::einsum::MappedDim& entry : mapped) {
+            const char c = entry.label;
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
                 fail(node, "Einsum equation has an invalid character");
             }
             ++counts[c];
-            const auto inserted = sizes.emplace(c, inputs[i]->dims[j]);
-            if (!inserted.second && inserted.first->second != inputs[i]->dims[j]) {
-                fail(node, std::string("Einsum label '") + c +
-                    "' is bound to two different sizes");
+            if (entry.virtual_pad) {
+                const auto inserted = sizes.emplace(c, 1);
+                if (!inserted.second && inserted.first->second != 1) {
+                    inserted.first->second = std::max<int64_t>(inserted.first->second, 1);
+                }
+                continue;
+            }
+            const auto inserted = sizes.emplace(c, entry.dim);
+            if (!inserted.second && inserted.first->second != entry.dim) {
+                // Ellipsis batch dims broadcast against size 1; user labels
+                // keep the strict equal-size rule.
+                const bool is_fresh =
+                    std::find(fresh.begin(), fresh.end(), c) != fresh.end();
+                if (!is_fresh || (inserted.first->second != 1 && entry.dim != 1)) {
+                    fail(node, std::string("Einsum label '") + c +
+                        "' is bound to two different sizes");
+                }
+                inserted.first->second = std::max(inserted.first->second, entry.dim);
             }
         }
     }
@@ -2498,6 +2511,50 @@ TensorInfo einsum_shape(const Node& node,
         out.push_back(sizes.at(c));
     }
     return TensorInfo{DataType::Float32, out};
+}
+
+TensorInfo einsum_shape(const Node& node,
+    const std::vector<const TensorInfo*>& inputs)
+{
+    const std::string raw = attr_str(node, "equation", "");
+    std::string text;
+    for (const char c : raw) {
+        if (c != ' ') {
+            text.push_back(c);
+        }
+    }
+    if (text.empty()) {
+        fail(node, "Einsum requires an 'equation' attribute");
+    }
+    if (text.find('.') == std::string::npos) {
+        return einsum_plain_shape(node, inputs, text, nert::einsum::Expansion{});
+    }
+    // Ellipsis path: expand against the operand ranks, then run the plain
+    // shape logic with the fresh labels marked broadcastable. Implicit
+    // output with ellipsis is rejected like in the kernel.
+    if (text.find("->") == std::string::npos) {
+        fail(node, "Einsum implicit output with ellipsis is not supported");
+    }
+    std::vector<std::size_t> ranks;
+    for (const TensorInfo* in : inputs) {
+        if (in == nullptr) {
+            fail(node, "missing required input");
+        }
+        ranks.push_back(in->dims.size());
+    }
+    const nert::einsum::Expansion expansion = nert::einsum::ExpandEllipsis(text, ranks);
+    if (!expansion.ok) {
+        fail(node, std::string("Einsum ") + expansion.error);
+    }
+    std::string expanded;
+    for (std::size_t i = 0; i < expansion.inputs.size(); ++i) {
+        if (i != 0) {
+            expanded.push_back(',');
+        }
+        expanded += expansion.inputs[i];
+    }
+    expanded += "->" + expansion.output;
+    return einsum_plain_shape(node, inputs, expanded, expansion);
 }
 
 std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& node,

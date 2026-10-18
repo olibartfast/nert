@@ -1,10 +1,18 @@
 // Cast: element conversion between float32, int64, and bool per the `to` attr.
 //
-// ONNX element-type codes: 1 = FLOAT, 7 = INT64, 9 = BOOL. Float-to-integer
-// truncates toward zero; any nonzero value converts to boolean true.
+// ONNX element-type codes: 1 = FLOAT, 7 = INT64, 9 = BOOL, 6 = INT32.
+// Float-to-integer truncates toward zero; any nonzero value converts to
+// boolean true. There is no int32 storage anywhere in the engine, so
+// `to = 6` is emulated on int64 lanes: values truncate toward zero and
+// saturate at the int32 range (NaN becomes 0). That differs from x86 ORT
+// past the int32 range (hardware conversion yields INT32_MIN there, while
+// ARM ORT saturates like here), but in-range values — everything real
+// models produce — are bit-identical on every platform. OWLv2's lone
+// int32 Cast feeds ArgMax, where only order matters.
 
 #include "kernels.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -27,8 +35,25 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
 }
 
 constexpr int64_t kElemFloat = 1;
+constexpr int64_t kElemInt32 = 6;
 constexpr int64_t kElemInt64 = 7;
 constexpr int64_t kElemBool = 9;
+
+// Saturating float-to-int32 conversion returned on an int64 lane (see file
+// doc). Truncates toward zero; clamps past the int32 range; NaN becomes 0.
+int64_t SaturateInt32(float value) {
+    const double v = static_cast<double>(value);
+    if (std::isnan(v)) {
+        return 0;
+    }
+    if (v >= 2147483647.0) {
+        return 2147483647LL;
+    }
+    if (v <= -2147483648.0) {
+        return -2147483648LL;
+    }
+    return static_cast<int64_t>(v);
+}
 
 // Reads the required integer `to` attribute.
 int64_t ToAttribute(const Node& node, const std::string& context) {
@@ -61,6 +86,9 @@ void Cast(const Node& node, const std::vector<TensorView>& inputs, const std::ve
     DataType want = DataType::Unknown;
     if (to == kElemFloat) {
         want = DataType::Float32;
+    } else if (to == kElemInt32) {
+        // Emulated on int64 lanes (see file doc).
+        want = DataType::Int64;
     } else if (to == kElemInt64) {
         want = DataType::Int64;
     } else if (to == kElemBool) {
@@ -101,7 +129,23 @@ void Cast(const Node& node, const std::vector<TensorView>& inputs, const std::ve
         }
     } else if (want == DataType::Int64) {
         int64_t* y = static_cast<int64_t*>(out.data);
-        if (in.dtype == DataType::Float32) {
+        if (to == kElemInt32 && in.dtype == DataType::Float32) {
+            const float* x = static_cast<const float*>(in.data);
+            for (int64_t i = 0; i < outCount; ++i) {
+                y[i] = SaturateInt32(x[i]);
+            }
+        } else if (to == kElemInt32 && in.dtype == DataType::Int64) {
+            const int64_t* x = static_cast<const int64_t*>(in.data);
+            for (int64_t i = 0; i < outCount; ++i) {
+                if (x[i] > 2147483647LL) {
+                    y[i] = 2147483647LL;
+                } else if (x[i] < -2147483648LL) {
+                    y[i] = -2147483648LL;
+                } else {
+                    y[i] = x[i];
+                }
+            }
+        } else if (in.dtype == DataType::Float32) {
             const float* x = static_cast<const float*>(in.data);
             for (int64_t i = 0; i < outCount; ++i) {
                 y[i] = static_cast<int64_t>(x[i]);

@@ -708,6 +708,20 @@ TEST_F(EngineShapes, CastChangesDtype) {
     EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
 }
 
+// Cast `to = 6` (INT32) is emulated on int64 lanes: dtype Int64, same dims.
+TEST_F(EngineShapes, CastInt32EmulatesInt64) {
+    std::string body;
+    put_sub(body, 1, encode_node("c0", "Cast", {"x"}, {"y"}, {encode_attribute_int("to", 6)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const nert::Graph graph = load_graph("cast_int32.onnx", encode_model(body));
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3}}});
+    ASSERT_EQ(shapes.tensors.count("y"), 1U);
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
+    EXPECT_EQ(shapes.tensors.at("y").dtype, nert::DataType::Int64);
+}
+
 // Resize (nearest): [1,3,8,8] with scales [1,1,2,2] -> [1,3,16,16].
 
 TEST_F(EngineShapes, ResizeScalesNearest) {
@@ -2208,6 +2222,19 @@ TEST_F(EngineShapes, EinsumOutputShape) {
 
     const nert::InferredShapes shapes = nert::InferShapes(graph, {{"a", {2, 3, 4, 5}}, {"b", {2, 6, 3}}});
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 6, 4, 5}));
+}
+
+// Einsum "...pd,...qd->...pq" infers the batch width from the operands.
+TEST_F(EngineShapes, EinsumEllipsisOutputShape) {
+    nert::Graph graph;
+    graph.inputs.push_back({"a", nert::TensorInfo{nert::DataType::Float32, {1, 2, 3}}});
+    graph.inputs.push_back({"b", nert::TensorInfo{nert::DataType::Float32, {1, 4, 3}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
+    graph.nodes.push_back(make_graph_node("es", "Einsum", {"a", "b"}, {"y"}));
+    graph.nodes.back().attributes.emplace_back("equation", std::string("...pd,...qd->...pq"));
+
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"a", {1, 2, 3}}, {"b", {1, 4, 3}}});
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 2, 4}));
 }
 
 // An Einsum label bound to two different sizes fails, naming the node.

@@ -241,3 +241,79 @@ TEST(NertCudaIndex, GatherElementsRejectsOutOfRange) {
     cuda.allocator().release(di);
     cuda.allocator().release(dy);
 }
+
+// Gather bool data selects raw bytes on device (OWLv2 attention mask).
+TEST(NertCudaIndex, GatherBoolData) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> x = {1, 0, 1};
+    std::vector<int64_t> idx = {2, 0};
+    std::vector<std::uint8_t> cpuOut(2, 0);
+    nert::Node node = MakeNode("gb0", "Gather");
+    node.attributes.emplace_back("axis", int64_t{0});
+    node.inputs = {"x", "idx"};
+    node.outputs = {"y"};
+    nert::TensorView cpuX;
+    cpuX.data = x.data();
+    cpuX.dtype = nert::DataType::Bool;
+    cpuX.dims = {3};
+    nert::TensorView cpuY;
+    cpuY.data = cpuOut.data();
+    cpuY.dtype = nert::DataType::Bool;
+    cpuY.dims = {2};
+    nert::CpuDevice().kernels().find("Gather")(node, {cpuX, HostInt64(idx, {2})}, {cpuY});
+    EXPECT_EQ(cpuOut, (std::vector<std::uint8_t>{1, 1}));
+
+    void* dx = cuda.allocator().allocate(3);
+    ASSERT_NE(dx, nullptr);
+    cuda.transfer().host_to_device(dx, x.data(), 3);
+    void* di = UploadInt64(cuda, idx);
+    std::vector<std::uint8_t> zero(2, 0);
+    void* dy = cuda.allocator().allocate(2);
+    ASSERT_NE(dy, nullptr);
+    cuda.transfer().host_to_device(dy, zero.data(), 2);
+    nert::TensorView in;
+    in.data = dx;
+    in.dtype = nert::DataType::Bool;
+    in.dims = {3};
+    nert::TensorView out;
+    out.data = dy;
+    out.dtype = nert::DataType::Bool;
+    out.dims = {2};
+    nert::CudaDevice().kernels().find("Gather")(node, {in, DeviceInt64(di, {2})}, {out});
+    std::vector<std::uint8_t> gpu(2, 0);
+    cuda.transfer().device_to_host(gpu.data(), dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(di);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpu, cpuOut);
+}
+
+// Transpose bool data reorders bytes on device.
+TEST(NertCudaIndex, TransposeBoolPerm) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> x = {1, 0, 1, 0, 1, 0};
+    std::vector<std::uint8_t> cpuOut(6, 0);
+    nert::Node node = MakeNode("tr_b", "Transpose");
+    node.attributes.emplace_back("perm", std::vector<int64_t>{1, 0});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Transpose")(node, {HostBool(x, {2, 3})}, {HostBool(cpuOut, {3, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<std::uint8_t>{1, 0, 0, 1, 1, 0}));
+
+    void* dx = UploadBool(cuda, x);
+    std::vector<std::uint8_t> zero(6, 0);
+    void* dy = UploadBool(cuda, zero);
+    nert::CudaDevice().kernels().find("Transpose")(node, {DeviceBool(dx, {2, 3})}, {DeviceBool(dy, {3, 2})});
+    std::vector<std::uint8_t> gpuOut = DownloadBool(cuda, dy, 6);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}

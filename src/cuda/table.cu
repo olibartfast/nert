@@ -91,6 +91,7 @@ void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::
 void ConvFrontend(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #else
 void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #endif
 #endif
 
@@ -141,6 +142,7 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"ArgMax", &ArgMax},
         {"CumSum", &CumSum},
         {"ScatterND", &ScatterND},
+        {"Einsum", &Einsum},
         {"Softmax", &Softmax},
         {"Reshape", &Reshape},
         {"Unsqueeze", &Unsqueeze},

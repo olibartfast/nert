@@ -35,7 +35,7 @@ std::vector<int64_t> Strides(const std::vector<int64_t>& dims) {
 
 template <typename T>
 void TransposeTyped(const T* x, T* y, const std::vector<int64_t>& perm, const std::vector<int64_t>& in_strides,
-    const std::vector<int64_t>& out_strides, int64_t out_count, int64_t rank) {
+                    const std::vector<int64_t>& out_strides, int64_t out_count, int64_t rank) {
     for (int64_t i = 0; i < out_count; ++i) {
         int64_t remaining = i;
         int64_t offset = 0;
@@ -58,8 +58,8 @@ void Transpose(const Node& node, const std::vector<TensorView>& inputs, const st
     }
     const TensorView& in = inputs[0];
     const TensorView& out = outputs[0];
-    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64 && in.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     if (out.dtype != in.dtype) {
         throw InferenceException(context + ": output dtype must match the input dtype");
@@ -112,10 +112,13 @@ void Transpose(const Node& node, const std::vector<TensorView>& inputs, const st
     const std::vector<int64_t> out_strides = Strides(out.dims);
     if (in.dtype == DataType::Float32) {
         TransposeTyped<float>(static_cast<const float*>(in.data), static_cast<float*>(out.data), perm, in_strides,
-            out_strides, count, rank);
+                              out_strides, count, rank);
+    } else if (in.dtype == DataType::Int64) {
+        TransposeTyped<int64_t>(static_cast<const int64_t*>(in.data), static_cast<int64_t*>(out.data), perm, in_strides,
+                                out_strides, count, rank);
     } else {
-        TransposeTyped<int64_t>(static_cast<const int64_t*>(in.data), static_cast<int64_t*>(out.data), perm,
-            in_strides, out_strides, count, rank);
+        TransposeTyped<bool>(static_cast<const bool*>(in.data), static_cast<bool*>(out.data), perm, in_strides,
+                             out_strides, count, rank);
     }
 }
 

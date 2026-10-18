@@ -42,8 +42,8 @@ void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std:
     }
     const TensorView& in = inputs[0];
     const TensorView& out = outputs[0];
-    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64 && in.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     if (out.dtype != in.dtype) {
         throw InferenceException(context + ": output dtype must match the input dtype");
@@ -88,8 +88,9 @@ void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std:
     if (in_count == 0) {
         return;
     }
-    const std::size_t bytes =
-        static_cast<std::size_t>(in_count) * (in.dtype == DataType::Float32 ? sizeof(float) : sizeof(int64_t));
+    const std::size_t bytes = static_cast<std::size_t>(in_count) * (in.dtype == DataType::Float32 ? sizeof(float)
+                                                                    : in.dtype == DataType::Int64 ? sizeof(int64_t)
+                                                                                                  : sizeof(bool));
     CheckCuda(cudaMemcpy(out.data, in.data, bytes, cudaMemcpyDeviceToDevice), "cudaMemcpy", context);
 }
 

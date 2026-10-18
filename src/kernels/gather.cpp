@@ -26,8 +26,8 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
 }
 
 template <typename T>
-void GatherTyped(const T* x, const int64_t* idx, T* y, int64_t axis, int64_t outer, int64_t inner,
-    int64_t index_count, int64_t dim, const std::string& context) {
+void GatherTyped(const T* x, const int64_t* idx, T* y, int64_t axis, int64_t outer, int64_t inner, int64_t index_count,
+                 int64_t dim, const std::string& context) {
     for (int64_t o = 0; o < outer; ++o) {
         for (int64_t j = 0; j < index_count; ++j) {
             int64_t k = idx[j];
@@ -54,8 +54,8 @@ void Gather(const Node& node, const std::vector<TensorView>& inputs, const std::
     const TensorView& in = inputs[0];
     const TensorView& indices = inputs[1];
     const TensorView& out = outputs[0];
-    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64 && in.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     if (out.dtype != in.dtype) {
         throw InferenceException(context + ": output dtype must match the input dtype");
@@ -118,10 +118,13 @@ void Gather(const Node& node, const std::vector<TensorView>& inputs, const std::
     const int64_t* idx = static_cast<const int64_t*>(indices.data);
     if (in.dtype == DataType::Float32) {
         GatherTyped<float>(static_cast<const float*>(in.data), idx, static_cast<float*>(out.data), axis, outer, inner,
-            index_count, dim, context);
-    } else {
+                           index_count, dim, context);
+    } else if (in.dtype == DataType::Int64) {
         GatherTyped<int64_t>(static_cast<const int64_t*>(in.data), idx, static_cast<int64_t*>(out.data), axis, outer,
-            inner, index_count, dim, context);
+                             inner, index_count, dim, context);
+    } else {
+        GatherTyped<bool>(static_cast<const bool*>(in.data), idx, static_cast<bool*>(out.data), axis, outer, inner,
+                          index_count, dim, context);
     }
 }
 

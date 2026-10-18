@@ -329,3 +329,67 @@ TEST(NertCudaConcat, SliceRejectsZeroStep) {
     cuda.allocator().release(dstp);
     cuda.allocator().release(dy);
 }
+
+// Concat bool rows copies bytes unchanged on device.
+TEST(NertCudaConcat, ConcatBoolRows) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> a = {1, 0};
+    std::vector<std::uint8_t> b = {0, 1};
+    std::vector<std::uint8_t> cpuOut(4, 0);
+    nert::Node node = MakeNode("cc_b", "Concat");
+    node.attributes.emplace_back("axis", int64_t{0});
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Concat")(node, {HostBool(a, {1, 2}), HostBool(b, {1, 2})},
+                                               {HostBool(cpuOut, {2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<std::uint8_t>{1, 0, 0, 1}));
+
+    void* da = UploadBool(cuda, a);
+    void* db = UploadBool(cuda, b);
+    std::vector<std::uint8_t> zero(4, 0);
+    void* dy = UploadBool(cuda, zero);
+    nert::CudaDevice().kernels().find("Concat")(node, {DeviceBool(da, {1, 2}), DeviceBool(db, {1, 2})},
+                                                {DeviceBool(dy, {2, 2})});
+    std::vector<std::uint8_t> gpuOut = DownloadBool(cuda, dy, 4);
+    cuda.allocator().release(da);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Slice bool data selects bytes unchanged on device.
+TEST(NertCudaConcat, SliceBoolRange) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> in = {1, 0, 1, 1};
+    std::vector<int64_t> starts = {1};
+    std::vector<int64_t> ends = {3};
+    std::vector<std::uint8_t> cpuOut(2, 0);
+    nert::Node node = MakeNode("sl_b", "Slice");
+    node.inputs = {"x", "starts", "ends"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Slice")(node, {HostBool(in, {4}), HostInt64(starts, {1}), HostInt64(ends, {1})},
+                                              {HostBool(cpuOut, {2})});
+    EXPECT_EQ(cpuOut, (std::vector<std::uint8_t>{0, 1}));
+
+    void* dx = UploadBool(cuda, in);
+    void* ds = UploadInt64(cuda, starts);
+    void* de = UploadInt64(cuda, ends);
+    std::vector<std::uint8_t> zero(2, 0);
+    void* dy = UploadBool(cuda, zero);
+    nert::CudaDevice().kernels().find("Slice")(node, {DeviceBool(dx, {4}), DeviceInt64(ds, {1}), DeviceInt64(de, {1})},
+                                               {DeviceBool(dy, {2})});
+    std::vector<std::uint8_t> gpuOut = DownloadBool(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(de);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}

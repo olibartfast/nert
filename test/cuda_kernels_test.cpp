@@ -177,30 +177,33 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
 
 // An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
 // rejection, matching the pinned CPU behavior; see N1 validation notes).
-// Probe op is Einsum: CPU-covered with shape inference, and no CUDA row is
-// planned anywhere, so this probe never needs moving again.
+// Probe op is InstanceNormalization: CPU-covered with shape inference, and
+// no CUDA row exists, so this probe never needs moving again.
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
     }
 
     nert::Graph graph;
-    graph.inputs = {{"a", {nert::DataType::Float32, {}}}, {"b", {nert::DataType::Float32, {}}}};
-    nert::Node einsum = MakeNode("ein_bad", "Einsum");
-    einsum.attributes.emplace_back("equation", std::string{"ij,jh->ih"});
-    einsum.inputs = {"a", "b"};
-    einsum.outputs = {"y"};
-    graph.nodes = {einsum};
+    graph.inputs = {{"a", {nert::DataType::Float32, {}}},
+                    {"b", {nert::DataType::Float32, {}}},
+                    {"c", {nert::DataType::Float32, {}}}};
+    nert::Node bad = MakeNode("in_bad", "InstanceNormalization");
+    bad.inputs = {"a", "b", "c"};
+    bad.outputs = {"y"};
+    graph.nodes = {bad};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model cuda(graph, {{"a", {2, 3}}, {"b", {3, 2}}}, nert::CudaDevice());
+    nert::Model cuda(graph, {{"a", {2, 3}}, {"b", {3}}, {"c", {3}}}, nert::CudaDevice());
     try {
-        cuda.Run({{"a", std::vector<float>(6, 1.0F)}, {"b", std::vector<float>(6, 1.0F)}});
+        cuda.Run({{"a", std::vector<float>(6, 1.0F)},
+                  {"b", std::vector<float>(3, 1.0F)},
+                  {"c", std::vector<float>(3, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no CUDA kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("ein_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("Einsum"), std::string::npos) << message;
+        EXPECT_NE(message.find("in_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("InstanceNormalization"), std::string::npos) << message;
     }
 }
 

@@ -2,7 +2,7 @@
 //
 // The `axis` attribute defaults to 1; negative values count back from
 // rank + 1, so -1 keeps a trailing singleton. The buffer copies flat in
-// order. Data is float32 or int64.
+// order. Data is float32, int64, or bool.
 
 #include "kernels.hpp"
 
@@ -35,8 +35,8 @@ void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std:
     }
     const TensorView& in = inputs[0];
     const TensorView& out = outputs[0];
-    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64 && in.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     if (out.dtype != in.dtype) {
         throw InferenceException(context + ": output dtype must match the input dtype");
@@ -78,8 +78,9 @@ void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std:
     if (in_count > 0 && (in.data == nullptr || out.data == nullptr)) {
         throw InferenceException(context + ": null buffer");
     }
-    const std::size_t bytes =
-        static_cast<std::size_t>(in_count) * (in.dtype == DataType::Float32 ? sizeof(float) : sizeof(int64_t));
+    const std::size_t bytes = static_cast<std::size_t>(in_count) * (in.dtype == DataType::Float32 ? sizeof(float)
+                                                                    : in.dtype == DataType::Int64 ? sizeof(int64_t)
+                                                                                                  : sizeof(bool));
     if (in_count > 0) {
         std::memcpy(out.data, in.data, bytes);
     }

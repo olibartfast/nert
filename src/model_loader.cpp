@@ -24,6 +24,7 @@
 
 #include "wire_reader.hpp" // private src-local reader
 
+#include "nert/einsum.hpp"
 #include "nert/model_loader.hpp"
 
 namespace nert {
@@ -100,6 +101,7 @@ constexpr int kField_Dim_Param = 2;
 // value-info entries; bool is accepted for boolean intermediate value-info
 // entries. Graph inputs and outputs stay float32-only.
 constexpr int64_t kElemType_OnnxFloat = 1;
+constexpr int64_t kElemType_OnnxInt32 = 6; // emulated on int64 lanes (see Cast kernel)
 constexpr int64_t kElemType_OnnxInt64 = 7;
 constexpr int64_t kElemType_OnnxBool = 9;
 constexpr int64_t kElemType_OnnxDouble = 11;
@@ -1181,11 +1183,11 @@ void validate_attr_policy(Node& node)
                 prefix + ": Cast requires a 'to' attribute");
         }
         const int64_t v = need_int(to);
-        if (v != kElemType_OnnxFloat && v != kElemType_OnnxInt64 &&
-            v != kElemType_OnnxBool) {
+        if (v != kElemType_OnnxFloat && v != kElemType_OnnxInt32 &&
+            v != kElemType_OnnxInt64 && v != kElemType_OnnxBool) {
             throw ModelLoadException(prefix +
-                ": attribute 'to' must be 1 (FLOAT), 7 (INT64), or 9 (BOOL)"
-                " here (found " + std::to_string(v) + ")");
+                ": attribute 'to' must be 1 (FLOAT), 6 (INT32), 7 (INT64),"
+                " or 9 (BOOL) here (found " + std::to_string(v) + ")");
         }
         return;
     }
@@ -1274,10 +1276,19 @@ void validate_attr_policy(Node& node)
             throw ModelLoadException(
                 prefix + ": Einsum requires a string 'equation' attribute");
         }
-        if (v->find("...") != std::string::npos ||
-            v->find('.') != std::string::npos) {
+        // Rank-dependent checks (counts, broadcast consistency) happen in
+        // shape inference and the kernel; here only the dot syntax is
+        // validated, shared with both through nert/einsum.hpp.
+        std::string text;
+        for (char c : *v) {
+            if (c != ' ') {
+                text.push_back(c);
+            }
+        }
+        const std::string syntax = nert::einsum::EllipsisSyntaxError(text);
+        if (!syntax.empty()) {
             throw ModelLoadException(
-                prefix + ": Einsum equation must not use an ellipsis here");
+                prefix + ": Einsum equation " + syntax + " here");
         }
         return;
     }

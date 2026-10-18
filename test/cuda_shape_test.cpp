@@ -314,3 +314,78 @@ TEST(NertCudaShape, ExpandRejectsNonBroadcastable) {
     cuda.allocator().release(ds);
     cuda.allocator().release(dy);
 }
+
+// Flatten bool copies raw bytes on device (OWLv2's text attention mask).
+TEST(NertCudaShape, FlattenBoolCopies) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> x = {1, 0, 1, 1};
+    std::vector<std::uint8_t> cpuOut(4, 0);
+    nert::Node node = MakeNode("flb", "Flatten");
+    node.attributes.emplace_back("axis", int64_t{-1});
+    nert::TensorView cpuIn;
+    cpuIn.data = x.data();
+    cpuIn.dtype = nert::DataType::Bool;
+    cpuIn.dims = {2, 2};
+    nert::TensorView cpuY;
+    cpuY.data = cpuOut.data();
+    cpuY.dtype = nert::DataType::Bool;
+    cpuY.dims = {4, 1};
+    nert::CpuDevice().kernels().find("Flatten")(node, {cpuIn}, {cpuY});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = cuda.allocator().allocate(4);
+    ASSERT_NE(dx, nullptr);
+    cuda.transfer().host_to_device(dx, x.data(), 4);
+    std::vector<std::uint8_t> zero(4, 0);
+    void* dy = cuda.allocator().allocate(4);
+    ASSERT_NE(dy, nullptr);
+    cuda.transfer().host_to_device(dy, zero.data(), 4);
+    nert::TensorView in;
+    in.data = dx;
+    in.dtype = nert::DataType::Bool;
+    in.dims = {2, 2};
+    nert::TensorView out;
+    out.data = dy;
+    out.dtype = nert::DataType::Bool;
+    out.dims = {4, 1};
+    nert::CudaDevice().kernels().find("Flatten")(node, {in}, {out});
+    std::vector<std::uint8_t> gpu(4, 0);
+    cuda.transfer().device_to_host(gpu.data(), dy, 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpu, cpuOut);
+}
+
+// Unsqueeze bool data only changes the shape; byte order is preserved.
+TEST(NertCudaShape, UnsqueezeBoolAxes) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<std::uint8_t> x = {1, 0, 1, 0, 1, 0};
+    std::vector<int64_t> axes = {0};
+    std::vector<std::uint8_t> cpuOut(6, 0);
+    nert::Node node = MakeNode("un_b", "Unsqueeze");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Unsqueeze")(node, {HostBool(x, {2, 3}), HostInt64(axes, {1})},
+                                                  {HostBool(cpuOut, {1, 2, 3})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = UploadBool(cuda, x);
+    void* da = UploadInt64(cuda, axes);
+    std::vector<std::uint8_t> zero(6, 0);
+    void* dy = UploadBool(cuda, zero);
+    nert::CudaDevice().kernels().find("Unsqueeze")(node, {DeviceBool(dx, {2, 3}), DeviceInt64(da, {1})},
+                                                   {DeviceBool(dy, {1, 2, 3})});
+    std::vector<std::uint8_t> gpuOut = DownloadBool(cuda, dy, 6);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}

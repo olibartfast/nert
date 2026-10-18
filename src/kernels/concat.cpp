@@ -42,7 +42,7 @@ int64_t IntAttribute(const Node& node, const std::string& name, int64_t fallback
 
 template <typename T>
 void ConcatTyped(const std::vector<TensorView>& inputs, T* out, int64_t axis, int64_t outer, int64_t inner,
-    int64_t out_extent) {
+                 int64_t out_extent) {
     int64_t written = 0;
     for (const TensorView& view : inputs) {
         const T* x = static_cast<const T*>(view.data);
@@ -67,8 +67,8 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
         throw InferenceException(context + ": expected at least one input and one output");
     }
     const TensorView& first = inputs[0];
-    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64 && first.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     const TensorView& out = outputs[0];
     if (out.dtype != first.dtype) {
@@ -132,8 +132,10 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
     const int64_t out_extent = expected[static_cast<std::size_t>(axis)];
     if (first.dtype == DataType::Float32) {
         ConcatTyped<float>(inputs, static_cast<float*>(out.data), axis, outer, inner, out_extent);
-    } else {
+    } else if (first.dtype == DataType::Int64) {
         ConcatTyped<int64_t>(inputs, static_cast<int64_t*>(out.data), axis, outer, inner, out_extent);
+    } else {
+        ConcatTyped<bool>(inputs, static_cast<bool*>(out.data), axis, outer, inner, out_extent);
     }
 }
 

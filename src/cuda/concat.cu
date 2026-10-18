@@ -75,8 +75,8 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
         throw InferenceException(context + ": expected at least one input and one output");
     }
     const TensorView& first = inputs[0];
-    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64 && first.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     const TensorView& out = outputs[0];
     if (out.dtype != first.dtype) {
@@ -141,7 +141,9 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
         inner *= expected[static_cast<std::size_t>(i)];
     }
     const int64_t out_extent = expected[static_cast<std::size_t>(axis)];
-    const std::size_t element = first.dtype == DataType::Float32 ? sizeof(float) : sizeof(int64_t);
+    const std::size_t element = first.dtype == DataType::Float32 ? sizeof(float)
+                                : first.dtype == DataType::Int64 ? sizeof(int64_t)
+                                                                 : sizeof(bool);
     ConcatCopy(inputs, out.data, axis, outer, inner, out_extent, element, context);
 }
 

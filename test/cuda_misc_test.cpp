@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -1576,4 +1577,162 @@ TEST(NertCudaMisc, ScatterNDRejectsBadIndex) {
     cuda.allocator().release(di);
     cuda.allocator().release(du);
     cuda.allocator().release(dy);
+}
+
+// ConstantOfShape with an empty shape vector creates a scalar (OWLv2's
+// empty text-model tensor): the CPU oracle allows zero-length shape inputs.
+TEST(NertCudaMisc, ConstantOfShapeEmptyShapeScalar) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    nert::Node node = MakeNode("cos_empty", "ConstantOfShape");
+    node.attributes.emplace_back("value", 7.5F);
+    node.inputs = {"shape"};
+    node.outputs = {"y"};
+    nert::TensorView cpuShape;
+    cpuShape.data = nullptr;
+    cpuShape.dtype = nert::DataType::Int64;
+    cpuShape.dims = {0};
+    std::vector<float> cpuOut(1, 0.0F);
+    nert::TensorView cpuY;
+    cpuY.data = cpuOut.data();
+    cpuY.dtype = nert::DataType::Float32;
+    cpuY.dims = {};
+    nert::CpuDevice().kernels().find("ConstantOfShape")(node, {cpuShape}, {cpuY});
+    EXPECT_EQ(cpuOut, (std::vector<float>{7.5F}));
+
+    nert::TensorView cudaShape;
+    cudaShape.data = nullptr;
+    cudaShape.dtype = nert::DataType::Int64;
+    cudaShape.dims = {0};
+    std::vector<float> zero(1, 0.0F);
+    void* dy = cuda.allocator().allocate(static_cast<int64_t>(sizeof(float)));
+    ASSERT_NE(dy, nullptr);
+    cuda.transfer().host_to_device(dy, zero.data(), static_cast<int64_t>(sizeof(float)));
+    nert::TensorView cudaY;
+    cudaY.data = dy;
+    cudaY.dtype = nert::DataType::Float32;
+    cudaY.dims = {};
+    nert::CudaDevice().kernels().find("ConstantOfShape")(node, {cudaShape}, {cudaY});
+    std::vector<float> gpuOut(1, 0.0F);
+    cuda.transfer().device_to_host(gpuOut.data(), dy, static_cast<int64_t>(sizeof(float)));
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Cast to=6 emulates int32 on int64 lanes: truncation + saturation, NaN -> 0,
+// identical to the CPU oracle on both the float and int64 input paths.
+TEST(NertCudaMisc, CastInt32Emulation) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    std::vector<float> xf = {1.9F, -2.7F, 0.0F, 3e9F, -3e9F, nan};
+    nert::Node node = MakeNode("cast6", "Cast");
+    node.attributes.emplace_back("to", int64_t{6});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    std::vector<int64_t> cpuOut(6, 0);
+    nert::TensorView cpuY;
+    cpuY.data = cpuOut.data();
+    cpuY.dtype = nert::DataType::Int64;
+    cpuY.dims = {6};
+    nert::CpuDevice().kernels().find("Cast")(node, {HostFloat(xf, {6})}, {cpuY});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{1, -2, 0, 2147483647LL, -2147483648LL, 0}));
+
+    void* dxf = Upload(cuda, xf);
+    std::vector<int64_t> zero(6, 0);
+    void* dy = UploadInt64(cuda, zero);
+    nert::CudaDevice().kernels().find("Cast")(node, {DeviceFloat(dxf, {6})}, {DeviceInt64(dy, {6})});
+    std::vector<int64_t> gpuOut = DownloadInt64(cuda, dy, 6);
+    cuda.allocator().release(dxf);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+
+    std::vector<int64_t> xi = {3, -4, 5000000000LL, -5000000000LL};
+    std::vector<int64_t> cpuInt(4, 0);
+    nert::TensorView cpuIntY;
+    cpuIntY.data = cpuInt.data();
+    cpuIntY.dtype = nert::DataType::Int64;
+    cpuIntY.dims = {4};
+    nert::CpuDevice().kernels().find("Cast")(node, {HostInt64(xi, {4})}, {cpuIntY});
+    EXPECT_EQ(cpuInt, (std::vector<int64_t>{3, -4, 2147483647LL, -2147483648LL}));
+
+    void* dxi = UploadInt64(cuda, xi);
+    std::vector<int64_t> zeroInt(4, 0);
+    void* dyi = UploadInt64(cuda, zeroInt);
+    nert::CudaDevice().kernels().find("Cast")(node, {DeviceInt64(dxi, {4})}, {DeviceInt64(dyi, {4})});
+    std::vector<int64_t> gpuInt = DownloadInt64(cuda, dyi, 4);
+    cuda.allocator().release(dxi);
+    cuda.allocator().release(dyi);
+    EXPECT_EQ(gpuInt, cpuInt);
+}
+
+// Einsum CUDA matches the CPU oracle on matrix product, DETR-style
+// bchw,bnc, ellipsis batch matmul + broadcast, trace, and transpose.
+TEST(NertCudaMisc, EinsumMatchesOracle) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    struct Case {
+        std::string equation;
+        std::vector<std::vector<float>> data;
+        std::vector<std::vector<int64_t>> dims;
+        std::vector<int64_t> outDims;
+    };
+    std::vector<Case> cases = {
+        {"ij,jk->ik", {{1.0F, 2.0F, 3.0F, 4.0F}, {5.0F, 6.0F, 7.0F, 8.0F}}, {{2, 2}, {2, 2}}, {2, 2}},
+        {"bchw,bnc->bnhw",
+         {{1.0F, 2.0F, 3.0F, 4.0F}, {1.0F, 0.0F, 1.0F, 1.0F}},
+         {{1, 2, 1, 2}, {1, 2, 2}},
+         {1, 2, 1, 2}},
+        {"...pd,...qd->...pq",
+         {{1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F},
+          {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F, 10.0F, 11.0F, 12.0F}},
+         {{1, 2, 3}, {1, 4, 3}},
+         {1, 2, 4}},
+        {"...i,...i->...i", {{1.0F, 2.0F, 3.0F}, {10.0F, 20.0F, 30.0F, 100.0F, 200.0F, 300.0F}}, {{3}, {2, 3}}, {2, 3}},
+        {"ii->", {{1.0F, 2.0F, 3.0F, 4.0F}}, {{2, 2}}, {}},
+        {"ij->ji", {{1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F}}, {{2, 3}}, {3, 2}},
+    };
+
+    for (const Case& c : cases) {
+        nert::Node node = MakeNode("es", "Einsum");
+        node.attributes.emplace_back("equation", c.equation);
+        int64_t outCount = 1;
+        for (int64_t d : c.outDims) {
+            outCount *= d;
+        }
+
+        std::vector<std::vector<float>> host = c.data;
+        std::vector<nert::TensorView> cpuIns;
+        for (std::size_t i = 0; i < host.size(); ++i) {
+            cpuIns.push_back(HostFloat(host[i], c.dims[i]));
+        }
+        std::vector<float> cpuOut(static_cast<std::size_t>(outCount), 0.0F);
+        nert::CpuDevice().kernels().find("Einsum")(node, cpuIns, {HostFloat(cpuOut, c.outDims)});
+
+        std::vector<void*> deviceIns;
+        std::vector<nert::TensorView> cudaIns;
+        for (std::size_t i = 0; i < host.size(); ++i) {
+            void* device = Upload(cuda, host[i]);
+            deviceIns.push_back(device);
+            cudaIns.push_back(DeviceFloat(device, c.dims[i]));
+        }
+        std::vector<float> zero(static_cast<std::size_t>(outCount), 0.0F);
+        void* deviceOut = Upload(cuda, zero);
+        nert::CudaDevice().kernels().find("Einsum")(node, cudaIns, {DeviceFloat(deviceOut, c.outDims)});
+        std::vector<float> gpuOut = Download(cuda, deviceOut, static_cast<std::size_t>(outCount));
+        for (void* device : deviceIns) {
+            cuda.allocator().release(device);
+        }
+        cuda.allocator().release(deviceOut);
+        EXPECT_EQ(gpuOut, cpuOut) << "equation " << c.equation;
+    }
 }
