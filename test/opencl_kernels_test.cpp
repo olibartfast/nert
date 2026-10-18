@@ -416,3 +416,396 @@ TEST(NertOpenCLKernels, ReshapeRejectsCountMismatch) {
     ocl.allocator().release(dshape);
     ocl.allocator().release(dy);
 }
+
+// Transpose [2,3] default (reverse) vs oracle.
+TEST(NertOpenCLKernels, TransposeDefaultExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::Node node = MakeNode("tr0", "Transpose");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Transpose")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {3, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{1.0F, 4.0F, 2.0F, 5.0F, 3.0F, 6.0F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Transpose")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {3, 2})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Transpose int64 with explicit perm {2, 0, 1} vs oracle.
+TEST(NertOpenCLKernels, TransposePermInt64Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<int64_t> x = {0, 1, 2, 3, 4, 5, 6, 7};
+    std::vector<int64_t> cpuOut(8, 0);
+    nert::Node node = MakeNode("tr1", "Transpose");
+    node.attributes.emplace_back("perm", std::vector<int64_t>{2, 0, 1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Transpose")(node, {HostInt64(x, {2, 2, 2})}, {HostInt64(cpuOut, {2, 2, 2})});
+
+    void* dx = UploadInt64(ocl, x);
+    std::vector<int64_t> gpuOut(8, 0);
+    void* dy = UploadInt64(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Transpose")(node, {DeviceInt64(dx, {2, 2, 2})}, {DeviceInt64(dy, {2, 2, 2})});
+    gpuOut = DownloadInt64(ocl, dy, 8);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Transpose rejects a non-permutation, naming node + op.
+TEST(NertOpenCLKernels, TransposeRejectsBadPerm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<float> y(6, 0.0F);
+    nert::Node node = MakeNode("tr_bad", "Transpose");
+    node.attributes.emplace_back("perm", std::vector<int64_t>{0, 0});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Transpose")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 3})});
+        FAIL() << "expected InferenceException for a non-permutation";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("tr_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Transpose"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
+// Gather axis 1 with a negative index vs oracle.
+TEST(NertOpenCLKernels, GatherAxisNegIndexExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> idx = {0, -1};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("ga0", "Gather");
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.inputs = {"x", "idx"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Gather")(node, {HostFloat(x, {2, 3}), HostInt64(idx, {2})},
+                                               {HostFloat(cpuOut, {2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{1.0F, 3.0F, 4.0F, 6.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* di = UploadInt64(ocl, idx);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Gather")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(di, {2})},
+                                                  {DeviceFloat(dy, {2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(di);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Gather rejects an out-of-range index, naming node + op.
+TEST(NertOpenCLKernels, GatherRejectsOutOfRange) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> idx = {5};
+    std::vector<float> y(2, 0.0F);
+    nert::Node node = MakeNode("ga_bad", "Gather");
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.inputs = {"x", "idx"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* di = UploadInt64(ocl, idx);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Gather")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(di, {1})},
+                                                      {DeviceFloat(dy, {2, 1})});
+        FAIL() << "expected InferenceException for an out-of-range index";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("ga_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Gather"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(di);
+    ocl.allocator().release(dy);
+}
+
+// Slice [2,4] rows 1..2 of axis 1 with negative end, both tables.
+TEST(NertOpenCLKernels, SliceNegEndExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F};
+    std::vector<int64_t> starts = {1};
+    std::vector<int64_t> ends = {-1};
+    std::vector<int64_t> axes = {1};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("sl0", "Slice");
+    node.inputs = {"x", "starts", "ends", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Slice")(
+        node, {HostFloat(x, {2, 4}), HostInt64(starts, {1}), HostInt64(ends, {1}), HostInt64(axes, {1})},
+        {HostFloat(cpuOut, {2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{2.0F, 3.0F, 6.0F, 7.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* ds = UploadInt64(ocl, starts);
+    void* de = UploadInt64(ocl, ends);
+    void* dax = UploadInt64(ocl, axes);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Slice")(
+        node, {DeviceFloat(dx, {2, 4}), DeviceInt64(ds, {1}), DeviceInt64(de, {1}), DeviceInt64(dax, {1})},
+        {DeviceFloat(dy, {2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(ds);
+    ocl.allocator().release(de);
+    ocl.allocator().release(dax);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Slice rejects a zero step, naming node + op.
+TEST(NertOpenCLKernels, SliceRejectsZeroStep) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> starts = {0};
+    std::vector<int64_t> ends = {2};
+    std::vector<int64_t> axes = {0};
+    std::vector<int64_t> steps = {0};
+    std::vector<float> y(6, 0.0F);
+    nert::Node node = MakeNode("sl_bad", "Slice");
+    node.inputs = {"x", "starts", "ends", "axes", "steps"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* ds = UploadInt64(ocl, starts);
+    void* de = UploadInt64(ocl, ends);
+    void* da = UploadInt64(ocl, axes);
+    void* dt = UploadInt64(ocl, steps);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Slice")(node,
+                                                     {DeviceFloat(dx, {2, 3}), DeviceInt64(ds, {1}),
+                                                      DeviceInt64(de, {1}), DeviceInt64(da, {1}), DeviceInt64(dt, {1})},
+                                                     {DeviceFloat(dy, {2, 3})});
+        FAIL() << "expected InferenceException for a zero step";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("sl_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Slice"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(ds);
+    ocl.allocator().release(de);
+    ocl.allocator().release(da);
+    ocl.allocator().release(dt);
+    ocl.allocator().release(dy);
+}
+
+// Concat two [2,2] along axis -1, both tables.
+TEST(NertOpenCLKernels, ConcatNegAxisExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> b = {5.0F, 6.0F, 7.0F, 8.0F};
+    std::vector<float> cpuOut(8, 0.0F);
+    nert::Node node = MakeNode("cc0", "Concat");
+    node.attributes.emplace_back("axis", int64_t{-1});
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Concat")(node, {HostFloat(a, {2, 2}), HostFloat(b, {2, 2})},
+                                               {HostFloat(cpuOut, {2, 4})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{1.0F, 2.0F, 5.0F, 6.0F, 3.0F, 4.0F, 7.0F, 8.0F}));
+
+    void* da = Upload(ocl, a);
+    void* db = Upload(ocl, b);
+    std::vector<float> gpuOut(8, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Concat")(node, {DeviceFloat(da, {2, 2}), DeviceFloat(db, {2, 2})},
+                                                  {DeviceFloat(dy, {2, 4})});
+    gpuOut = Download(ocl, dy, 8);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Concat rejects off-axis disagreement, naming node + op.
+TEST(NertOpenCLKernels, ConcatRejectsOffAxisMismatch) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a(4, 1.0F);
+    std::vector<float> b(6, 2.0F);
+    std::vector<float> y(10, 0.0F);
+    nert::Node node = MakeNode("cc_bad", "Concat");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    void* da = Upload(ocl, a);
+    void* db = Upload(ocl, b);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Concat")(node, {DeviceFloat(da, {2, 2}), DeviceFloat(db, {3, 2})},
+                                                      {DeviceFloat(dy, {5, 2})});
+        FAIL() << "expected InferenceException for off-axis disagreement";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("cc_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Concat"), std::string::npos) << message;
+    }
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+}
+
+// Shape start=1 end=-1 over [2,3,4] -> [3], both tables.
+TEST(NertOpenCLKernels, ShapeSliceExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(24, 1.0F);
+    std::vector<int64_t> cpuOut(1, 0);
+    nert::Node node = MakeNode("sh0", "Shape");
+    node.attributes.emplace_back("start", int64_t{1});
+    node.attributes.emplace_back("end", int64_t{-1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Shape")(node, {HostFloat(x, {2, 3, 4})}, {HostInt64(cpuOut, {1})});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{3}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<int64_t> gpuOut(1, 0);
+    void* dy = UploadInt64(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Shape")(node, {DeviceFloat(dx, {2, 3, 4})}, {DeviceInt64(dy, {1})});
+    gpuOut = DownloadInt64(ocl, dy, 1);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Shape rejects a non-int64 output, naming node + op.
+TEST(NertOpenCLKernels, ShapeRejectsNonInt64Out) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<float> y(3, 0.0F);
+    nert::Node node = MakeNode("sh_bad", "Shape");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Shape")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {3})});
+        FAIL() << "expected InferenceException for a non-int64 output";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("sh_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Shape"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
+// Unsqueeze [2,3] axes {0,-1} -> [1,2,3,1], both tables.
+TEST(NertOpenCLKernels, UnsqueezeNegAxesExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> axes = {0, -1};
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::Node node = MakeNode("us0", "Unsqueeze");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Unsqueeze")(node, {HostFloat(x, {2, 3}), HostInt64(axes, {2})},
+                                                  {HostFloat(cpuOut, {1, 2, 3, 1})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = Upload(ocl, x);
+    void* da = UploadInt64(ocl, axes);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Unsqueeze")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {2})},
+                                                     {DeviceFloat(dy, {1, 2, 3, 1})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(da);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Unsqueeze rejects duplicate axes, naming node + op.
+TEST(NertOpenCLKernels, UnsqueezeRejectsDupAxes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(6, 1.0F);
+    std::vector<int64_t> axes = {1, -3};
+    std::vector<float> y(6, 0.0F);
+    nert::Node node = MakeNode("us_bad", "Unsqueeze");
+    node.inputs = {"x", "axes"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* da = UploadInt64(ocl, axes);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Unsqueeze")(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(da, {2})},
+                                                         {DeviceFloat(dy, {1, 2, 3})});
+        FAIL() << "expected InferenceException for duplicate axes";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("us_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Unsqueeze"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(da);
+    ocl.allocator().release(dy);
+}
+

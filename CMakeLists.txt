@@ -197,6 +197,9 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/mul.cpp src/opencl/sub.cpp src/opencl/div.cpp)
     target_sources(nert PRIVATE src/opencl/sigmoid.cpp src/opencl/tanh.cpp src/opencl/softmax.cpp)
     target_sources(nert PRIVATE src/opencl/reshape.cpp)
+    target_sources(nert PRIVATE src/opencl/transpose.cpp src/opencl/gather.cpp)
+    target_sources(nert PRIVATE src/opencl/slice.cpp src/opencl/concat.cpp)
+    target_sources(nert PRIVATE src/opencl/shape.cpp src/opencl/unsqueeze.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)

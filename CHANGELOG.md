@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NERT_HAS_CUDNN` only; non-zero output_padding and asymmetric pads
   rejected on CUDA). Every CPU op now has a CUDA row (`ConvTranspose`
   only under `NERT_HAS_CUDNN`) — tables complete.
+- OpenCL shared movement rows: `Transpose`, `Slice`, `Concat`,
+  `Shape`, `Unsqueeze`, `Gather` (hand-written OpenCL C, oracle
+  vs device green on the RTX 3060) — table 9→15; per-model portable
+  gaps recomputed in the task-models coverage matrix.
 
 ## [0.1.0] - Unreleased
 
