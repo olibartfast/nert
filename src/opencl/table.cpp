@@ -5,7 +5,8 @@
 // op + node. Rows: Relu/Add/Mul/Sub/Div/Sigmoid/Tanh/Softmax (first-party
 // OpenCL C, runtime-compiled) plus Reshape (validated buffer copy),
 // Transpose/Gather (indexed copies), Slice/Concat/Shape/Unsqueeze
-// (movement rows) and MaxPool/AveragePool/GlobalAveragePool (pools).
+// (movement rows), MaxPool/AveragePool/GlobalAveragePool (pools) and
+// Flatten/Gemm.
 
 #include "nert/device.hpp"
 
@@ -33,6 +34,8 @@ void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const st
 void MaxPool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void AveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void GlobalAveragePool(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Flatten(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Gemm(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindOpenCLKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
@@ -54,6 +57,8 @@ KernelFn FindOpenCLKernel(const std::string& op_type) {
         {"MaxPool", &MaxPool},
         {"AveragePool", &AveragePool},
         {"GlobalAveragePool", &GlobalAveragePool},
+        {"Flatten", &Flatten},
+        {"Gemm", &Gemm},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

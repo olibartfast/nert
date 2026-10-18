@@ -64,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   widen onto int64 lanes, and constant-parameter evaluation covers
   `Mod`, `Transpose` and single-axis N-D `Slice` (Grounding DINO's pad
   chain); regression test `PadWithEvaluatedParameterChain`.
+- OpenCL `Flatten`/`Gemm`: a validated flat copy and a first-party GEMM
+  kernel (transA/transB, alpha/beta, `[N]`/`[M,N]` bias) — table 18→20.
+  ResNet-18's portable gap is now just `Conv`; YOLO/OWLv2/RF-DETR drop
+  `Flatten`/`Gemm` as well.
 
 ## [0.1.0] - Unreleased
 

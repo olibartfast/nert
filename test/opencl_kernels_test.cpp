@@ -86,28 +86,28 @@ TEST(NertOpenCLKernels, AddBroadcastInt64Exact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
-// Gemm never lands on OpenCL: rejected at Run, naming node + op.
+// Conv has no OpenCL row: rejected at Run, naming node + op.
 TEST(NertOpenCLKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
     }
 
     nert::Graph graph;
-    graph.inputs = {{"a", {nert::DataType::Float32, {}}}, {"b", {nert::DataType::Float32, {}}}};
-    nert::Node gemm = MakeNode("mm_bad", "Gemm");
-    gemm.inputs = {"a", "b"};
-    gemm.outputs = {"y"};
-    graph.nodes = {gemm};
+    graph.inputs = {{"x", {nert::DataType::Float32, {}}}, {"w", {nert::DataType::Float32, {}}}};
+    nert::Node conv = MakeNode("conv_bad", "Conv");
+    conv.inputs = {"x", "w"};
+    conv.outputs = {"y"};
+    graph.nodes = {conv};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model ocl(graph, {{"a", {2, 3}}, {"b", {3, 2}}}, nert::OpenCLDevice());
+    nert::Model ocl(graph, {{"x", {1, 3, 8, 8}}, {"w", {2, 3, 3, 3}}}, nert::OpenCLDevice());
     try {
-        ocl.Run({{"a", std::vector<float>(6, 1.0F)}, {"b", std::vector<float>(6, 1.0F)}});
+        ocl.Run({{"x", std::vector<float>(192, 1.0F)}, {"w", std::vector<float>(54, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no OpenCL kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("mm_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("Gemm"), std::string::npos) << message;
+        EXPECT_NE(message.find("conv_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Conv"), std::string::npos) << message;
     }
 }
 
@@ -1262,4 +1262,300 @@ TEST(NertOpenCLKernels, SliceNegativeAxisStepExact) {
     ocl.allocator().release(dstp);
     ocl.allocator().release(dy);
     EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Flatten axis 0/1/-1 on [2,3,4]: order preserved, shape only changes.
+TEST(NertOpenCLKernels, FlattenAxesExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(24, 0.0F);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(i + 1);
+    }
+    struct Case {
+        bool has_axis;
+        int64_t axis;
+        std::vector<int64_t> out_dims;
+    };
+    const std::vector<Case> cases = {{false, 0, {2, 12}}, {true, 0, {1, 24}}, {true, -1, {24, 1}}};
+    for (const Case& c : cases) {
+        std::vector<float> cpuOut(x.size(), 0.0F);
+        nert::Node node = MakeNode("fl0", "Flatten");
+        if (c.has_axis) {
+            node.attributes.emplace_back("axis", c.axis);
+        }
+        node.inputs = {"x"};
+        node.outputs = {"y"};
+        nert::CpuDevice().kernels().find("Flatten")(node, {HostFloat(x, {2, 3, 4})}, {HostFloat(cpuOut, c.out_dims)});
+        EXPECT_EQ(cpuOut, x);
+
+        void* dx = Upload(ocl, x);
+        std::vector<float> gpuOut(x.size(), 0.0F);
+        void* dy = Upload(ocl, gpuOut);
+        nert::OpenCLDevice().kernels().find("Flatten")(node, {DeviceFloat(dx, {2, 3, 4})},
+                                                       {DeviceFloat(dy, c.out_dims)});
+        gpuOut = Download(ocl, dy, x.size());
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dy);
+        EXPECT_EQ(gpuOut, cpuOut);
+    }
+}
+
+// Flatten int64: [2,3,2] -> [2,6] with the values untouched.
+TEST(NertOpenCLKernels, FlattenInt64Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<int64_t> x(12, 0);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<int64_t>(i + 1);
+    }
+    std::vector<int64_t> cpuOut(x.size(), 0);
+    nert::Node node = MakeNode("fl_i64", "Flatten");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Flatten")(node, {HostInt64(x, {2, 3, 2})}, {HostInt64(cpuOut, {2, 6})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = UploadInt64(ocl, x);
+    std::vector<int64_t> gpuOut(x.size(), 0);
+    void* dy = UploadInt64(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Flatten")(node, {DeviceInt64(dx, {2, 3, 2})}, {DeviceInt64(dy, {2, 6})});
+    gpuOut = DownloadInt64(ocl, dy, x.size());
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Flatten bool bytes pass through unchanged.
+TEST(NertOpenCLKernels, FlattenBoolExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<std::uint8_t> x = {1, 0, 0, 1};
+    std::vector<std::uint8_t> cpuOut(4, 0);
+    nert::Node node = MakeNode("fl_b", "Flatten");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    auto host_view = [](std::vector<std::uint8_t>& data, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = data.data();
+        view.dtype = nert::DataType::Bool;
+        view.dims = std::move(dims);
+        return view;
+    };
+    nert::CpuDevice().kernels().find("Flatten")(node, {host_view(x, {2, 2})}, {host_view(cpuOut, {2, 2})});
+    EXPECT_EQ(cpuOut, x);
+
+    auto upload = [&](const std::vector<std::uint8_t>& host) {
+        void* buffer = ocl.allocator().allocate(static_cast<int64_t>(host.size()));
+        ocl.transfer().host_to_device(buffer, host.data(), static_cast<int64_t>(host.size()));
+        return buffer;
+    };
+    auto device_view = [](void* data, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = data;
+        view.dtype = nert::DataType::Bool;
+        view.dims = std::move(dims);
+        return view;
+    };
+    void* dx = upload(x);
+    std::vector<std::uint8_t> gpuOut(4, 0);
+    void* dy = upload(gpuOut);
+    nert::OpenCLDevice().kernels().find("Flatten")(node, {device_view(dx, {2, 2})}, {device_view(dy, {2, 2})});
+    ocl.transfer().device_to_host(gpuOut.data(), dy, static_cast<int64_t>(gpuOut.size()));
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Flatten rejects an axis outside [0, rank], naming node + op.
+TEST(NertOpenCLKernels, FlattenRejectsBadAxis) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(4, 1.0F);
+    std::vector<float> y(4, 0.0F);
+    nert::Node node = MakeNode("fl_bad", "Flatten");
+    node.attributes.emplace_back("axis", int64_t{3});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("Flatten")(node, {DeviceFloat(dx, {1, 4})}, {DeviceFloat(dy, {1, 4})});
+        FAIL() << "expected InferenceException for an out-of-range axis";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("fl_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Flatten"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
+// Gemm 2x2 exact: {1,2,3,4} * {5,6,7,8} = {19,22,43,50}.
+TEST(NertOpenCLKernels, GemmExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> b = {5.0F, 6.0F, 7.0F, 8.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("gm0", "Gemm");
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Gemm")(node, {HostFloat(a, {2, 2}), HostFloat(b, {2, 2})},
+                                             {HostFloat(cpuOut, {2, 2})});
+    ExpectNearOcl(cpuOut, (std::vector<float>{19.0F, 22.0F, 43.0F, 50.0F}));
+
+    void* da = Upload(ocl, a);
+    void* db = Upload(ocl, b);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Gemm")(node, {DeviceFloat(da, {2, 2}), DeviceFloat(db, {2, 2})},
+                                                {DeviceFloat(dy, {2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    ExpectNearOcl(gpuOut, cpuOut);
+}
+
+// Gemm transA and transB each reproduce the same product.
+TEST(NertOpenCLKernels, GemmTransposes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    struct Case {
+        int64_t transA;
+        int64_t transB;
+        std::vector<float> a;
+        std::vector<float> b;
+    };
+    // op(A) = [[1,2],[3,4]] and op(B) = [[5,6],[7,8]] in both cases.
+    const std::vector<Case> cases = {
+        {1, 0, {1.0F, 3.0F, 2.0F, 4.0F}, {5.0F, 6.0F, 7.0F, 8.0F}},
+        {0, 1, {1.0F, 2.0F, 3.0F, 4.0F}, {5.0F, 7.0F, 6.0F, 8.0F}},
+    };
+    for (const Case& c : cases) {
+        std::vector<float> a = c.a;
+        std::vector<float> b = c.b;
+        std::vector<float> cpuOut(4, 0.0F);
+        nert::Node node = MakeNode("gm_t", "Gemm");
+        node.attributes.emplace_back("transA", c.transA);
+        node.attributes.emplace_back("transB", c.transB);
+        node.inputs = {"a", "b"};
+        node.outputs = {"y"};
+        nert::CpuDevice().kernels().find("Gemm")(node, {HostFloat(a, {2, 2}), HostFloat(b, {2, 2})},
+                                                 {HostFloat(cpuOut, {2, 2})});
+
+        void* da = Upload(ocl, a);
+        void* db = Upload(ocl, b);
+        std::vector<float> gpuOut(4, 0.0F);
+        void* dy = Upload(ocl, gpuOut);
+        nert::OpenCLDevice().kernels().find("Gemm")(node, {DeviceFloat(da, {2, 2}), DeviceFloat(db, {2, 2})},
+                                                    {DeviceFloat(dy, {2, 2})});
+        gpuOut = Download(ocl, dy, 4);
+        ocl.allocator().release(da);
+        ocl.allocator().release(db);
+        ocl.allocator().release(dy);
+        ExpectNearOcl(gpuOut, cpuOut);
+    }
+}
+
+// Gemm alpha/beta with [N] and [M,N] bias against the oracle.
+TEST(NertOpenCLKernels, GemmAlphaBetaBias) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> a = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> b = {5.0F, 6.0F, 7.0F, 8.0F};
+    struct Case {
+        std::vector<float> bias;
+        std::vector<int64_t> bias_dims;
+        std::vector<float> expected;
+    };
+    const std::vector<Case> cases = {
+        {{1.0F, 1.0F}, {2}, {38.5F, 44.5F, 86.5F, 100.5F}},
+        {{1.0F, 2.0F, 3.0F, 4.0F}, {2, 2}, {38.5F, 45.0F, 87.5F, 102.0F}},
+    };
+    for (const Case& c : cases) {
+        std::vector<float> bias = c.bias;
+        std::vector<float> cpuOut(4, 0.0F);
+        nert::Node node = MakeNode("gm_ab", "Gemm");
+        node.attributes.emplace_back("alpha", 2.0F);
+        node.attributes.emplace_back("beta", 0.5F);
+        node.inputs = {"a", "b", "c"};
+        node.outputs = {"y"};
+        nert::CpuDevice().kernels().find("Gemm")(
+            node, {HostFloat(a, {2, 2}), HostFloat(b, {2, 2}), HostFloat(bias, c.bias_dims)},
+            {HostFloat(cpuOut, {2, 2})});
+        ExpectNearOcl(cpuOut, c.expected);
+
+        void* da = Upload(ocl, a);
+        void* db = Upload(ocl, b);
+        void* dc = Upload(ocl, bias);
+        std::vector<float> gpuOut(4, 0.0F);
+        void* dy = Upload(ocl, gpuOut);
+        nert::OpenCLDevice().kernels().find("Gemm")(
+            node, {DeviceFloat(da, {2, 2}), DeviceFloat(db, {2, 2}), DeviceFloat(dc, c.bias_dims)},
+            {DeviceFloat(dy, {2, 2})});
+        gpuOut = Download(ocl, dy, 4);
+        ocl.allocator().release(da);
+        ocl.allocator().release(db);
+        ocl.allocator().release(dc);
+        ocl.allocator().release(dy);
+        ExpectNearOcl(gpuOut, cpuOut);
+    }
+}
+
+// Gemm rejects a contraction mismatch, bad bias and wrong output shape.
+TEST(NertOpenCLKernels, GemmRejectsBadShapes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+
+    auto expect_throw = [&](const nert::Node& node, const std::vector<nert::TensorView>& inputs,
+                            const nert::TensorView& out) {
+        try {
+            nert::OpenCLDevice().kernels().find("Gemm")(node, inputs, {out});
+            FAIL() << "expected InferenceException for a malformed Gemm";
+        } catch (const nert::InferenceException& e) {
+            const std::string message = e.what();
+            EXPECT_NE(message.find("gm_bad"), std::string::npos) << message;
+            EXPECT_NE(message.find("Gemm"), std::string::npos) << message;
+        }
+    };
+
+    nert::Node mismatch = MakeNode("gm_bad", "Gemm");
+    mismatch.inputs = {"a", "b"};
+    mismatch.outputs = {"y"};
+    expect_throw(mismatch, {DeviceFloat(nullptr, {2, 3}), DeviceFloat(nullptr, {2, 3})}, DeviceFloat(nullptr, {2, 3}));
+
+    nert::Node badBias = MakeNode("gm_bad", "Gemm");
+    badBias.inputs = {"a", "b", "c"};
+    badBias.outputs = {"y"};
+    expect_throw(badBias, {DeviceFloat(nullptr, {2, 3}), DeviceFloat(nullptr, {3, 2}), DeviceFloat(nullptr, {2})},
+                 DeviceFloat(nullptr, {2, 2}));
+
+    nert::Node badOut = MakeNode("gm_bad", "Gemm");
+    badOut.inputs = {"a", "b"};
+    badOut.outputs = {"y"};
+    expect_throw(badOut, {DeviceFloat(nullptr, {2, 2}), DeviceFloat(nullptr, {2, 2})}, DeviceFloat(nullptr, {2, 3}));
 }
