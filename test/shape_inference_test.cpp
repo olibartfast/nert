@@ -2096,6 +2096,37 @@ TEST_F(EngineShapes, PadWithShapeDerivedPads) {
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{1, 3, 12}));
 }
 
+// Grounding DINO pattern: pads built through Mod, Reshape, a single-axis
+// Slice, Transpose, Reshape, Cast(INT32) and Concat resolve statically.
+TEST_F(EngineShapes, PadWithEvaluatedParameterChain) {
+    nert::Graph graph;
+    graph.inputs.push_back({"x", nert::TensorInfo{nert::DataType::Float32, {3, 8}}});
+    graph.outputs.push_back({"y", nert::TensorInfo{nert::DataType::Float32, {}}});
+    graph.initializers["two"] = make_int64_init({1}, {2});
+    graph.initializers["tail_base"] = make_int64_init({2}, {3, 2});
+    graph.initializers["flat_shape"] = make_int64_init({2}, {1, 2});
+    graph.initializers["starts"] = make_int64_init({1}, {0});
+    graph.initializers["ends"] = make_int64_init({1}, {1});
+    graph.initializers["axes"] = make_int64_init({1}, {0});
+    graph.initializers["steps"] = make_int64_init({1}, {1});
+    graph.initializers["minus_one"] = make_int64_init({1}, {-1});
+    graph.initializers["zeros2"] = make_int64_init({2}, {0, 0});
+    graph.nodes.push_back(make_graph_node("mod", "Mod", {"tail_base", "two"}, {"m"}));
+    graph.nodes.push_back(make_graph_node("reshape", "Reshape", {"m", "flat_shape"}, {"r"}));
+    graph.nodes.push_back(make_graph_node("slice", "Slice", {"r", "starts", "ends", "axes", "steps"}, {"s"}));
+    graph.nodes.push_back(make_graph_node("transpose", "Transpose", {"s"}, {"t"}));
+    graph.nodes.back().attributes.emplace_back("perm", std::vector<int64_t>{1, 0});
+    graph.nodes.push_back(make_graph_node("reshape2", "Reshape", {"t", "minus_one"}, {"flat"}));
+    graph.nodes.push_back(make_graph_node("cast", "Cast", {"flat"}, {"i32"}));
+    graph.nodes.back().attributes.emplace_back("to", int64_t{6});
+    graph.nodes.push_back(make_graph_node("concat", "Concat", {"zeros2", "i32"}, {"pads"}));
+    graph.nodes.back().attributes.emplace_back("axis", int64_t{0});
+    graph.nodes.push_back(make_graph_node("pad", "Pad", {"x", "pads", ""}, {"y"}));
+
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {3, 8}}});
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{4, 8}));
+}
+
 // An int64 ReduceSum over a Shape vector is evaluated statically and feeds Reshape.
 TEST_F(EngineShapes, Int64ReduceSumFeedsReshape) {
     nert::Graph graph;

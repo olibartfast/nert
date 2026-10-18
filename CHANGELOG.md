@@ -57,6 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coverage matrix's RAFT row was corrected: the local `ref.onnx` is a
   registration refiner, not torchvision RAFT, and no RAFT export is
   present locally.
+- Opset-18 conversion sweep: 13 local exports now load and are CPU/CUDA
+  op-complete — Grounding DINO (19,224 folded nodes), RF-DETR
+  keypoint/seg-nano-576/nano-1101, YOLO26s/26x/26n-depth/11s/v8n-pose/
+  26s-pose, and the FoundationPose scorer. Loader fixes: INT32 constants
+  widen onto int64 lanes, and constant-parameter evaluation covers
+  `Mod`, `Transpose` and single-axis N-D `Slice` (Grounding DINO's pad
+  chain); regression test `PadWithEvaluatedParameterChain`.
 
 ## [0.1.0] - Unreleased
 

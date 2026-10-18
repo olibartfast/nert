@@ -96,36 +96,50 @@ HIP-only gap beyond the OpenCL list is:
   `Transpose=133`, `Slice=72`, `Concat=38`, `Shape=32`,
   `Unsqueeze=23`, `Gather=4`.
 
-## Exports NERT cannot load (opset != 18)
+## Converted exports now loadable (opset-18 conversion, 2026-10-18)
 
-NERT requires ONNX-domain opset 18. 19 of 24 inventoried export files are
-not loadable today; their op-type coverage against the CPU table is
-complete once `Constant` is folded, so the blocker is the export/opset,
-not a missing CPU kernel.
+`onnx.version_converter.convert_version(model, 18)` plus
+`onnx.checker`; each row then loaded through NERT's own loader and
+shape inference. **CPU and CUDA op coverage is complete for every row**
+(0 missing types), but no reference gate has been run for these
+variants — they are OPS, not PASS. OpenCL/HIP gaps are ONNX op-type
+counts (Constant excluded).
+
+| Model | Source opset | NERT nodes | OpenCL gap | HIP gap |
+| --- | ---: | ---: | --- | --- |
+| Grounding DINO | 17 | 19,224 | 39 / 5,988 | 45 / 15,336 |
+| RF-DETR keypoint-preview | 17 | 2,355 | 27 / 869 | 33 / 1,486 |
+| RF-DETR seg-nano-576 | 17 | 1,216 | 27 / 402 | 33 / 675 |
+| RF-DETR nano-1101 | 17 | 1,002 | 25 / 335 | 31 / 567 |
+| FoundationPose scorer | 17 | 145 | 4 / 30 | 10 / 98 |
+| YOLO26s | 20 | 391 | 11 / 123 | 17 / 176 |
+| YOLO26x | 19 | 606 | 11 / 198 | 17 / 247 |
+| YOLO26n-depth | 20 | 328 | 8 / 113 | 11 / 139 |
+| YOLOv8n-pose | 20 | 267 | 3 / 83 | 7 / 110 |
+| YOLO11s | 12 | 321 | 4 / 102 | 8 / 132 |
+| YOLO26s-pose | 12 | 401 | 4 / 128 | 8 / 164 |
+
+The two RF-DETR keypoint-preview exports (1,392 and 3,542 ONNX nodes)
+fold to the same 2,355-node graph; the table lists it once. The
+FoundationPose `ref` and `scorer` components load; `ref2`/`refiner`/
+`rw`/`sw` remain blocked (below).
+
+## Exports NERT still cannot load
+
+Blockers are per-graph now, not the opset:
 
 | Export/file | Task | Opset | ONNX nodes | Blocker |
 | --- | --- | ---: | ---: | --- |
-| Grounding DINO | open-vocab detection | 17 | 31,821 | Convert to 18; CPU/CUDA gate pending; largest export. |
-| RF-DETR seg-small (deep-infer) | detection + segmentation | 17 | 1,879 | Convert to 18; duplicate of the NERT-side export. |
-| RF-DETR seg-nano-576 | detection + segmentation | 17 | 1,710 | Convert to 18. |
-| RF-DETR nano-1101 | detection | 17 | 1,434 | Convert to 18. |
-| RF-DETR keypoint-preview | keypoint | 17 | 1,392 / 3,542 | Two exports; convert to 18. |
-| RAFT components (`ref2`, `refiner`, `rw`, `scorer`, `sw`) | optical flow | 17 | 363 / 382 / 377 / 209 / 300 | Not present locally (inventoried from the Neuriplo zoo manifest); convert to 18 when provisioned. |
-| YOLO26s | detection | 20 | 391 | Convert to 18. |
-| YOLO26n-depth | depth | 20 | 348 | Convert to 18. |
-| YOLOv8n-pose | pose | 20 | 267 | Convert to 18. |
-| YOLO11s | detection | 12 | 321 | Convert to 18. |
-| YOLO26s-pose | pose | 12 | 401 / 418 | Two exports; convert to 18. |
-| YOLO26x | detection | 19 | 606 | Convert to 18. |
+| FoundationPose `ref2`, `refiner`, `rw`, `sw` | 6-D pose | 17→18 | 363 / 382 / 377 / 300 | Converted; shape inference needs dynamic `Slice` parameters (attention reshape). |
+| RF-DETR seg-small (deep-infer duplicate) | detection + segmentation | 17→18 | 1,879 | Converted; dynamic `Slice` parameters; the NERT-side export already loads. |
+| RAFT (torchvision RAFT-large) | optical flow | — | — | No local export. The local `ref.onnx` is a FoundationPose-style registration component, not RAFT. |
+| DETR family, ViT, ViTPose, Depth-Anything-V2, VideoMAE, ViViT, TimeSformer | various | — | — | No local export; CPU coverage recorded in the roadmap. |
 
-The torchvision RAFT-large export is absent locally (the local
-`ref.onnx` is a registration refiner, not RAFT), so no RAFT device gate
-is possible here. The DETR family (RT-DETR/D-FINE/DEIM/DEIMv2), ViT, ViTPose,
-Depth-Anything-V2, VideoMAE, ViViT, TimeSformer, and generic
-segmentation/pose families have CPU coverage recorded in the roadmap but
-no NERT-loadable opset-18 export in this tree, so they get no row here
-until an export exists. See the pending V-2/V-3 entries in
-[`validation.md`](validation.md).
+Grounding DINO needed two loader fixes: INT32 constants (folded onto
+int64 lanes, matching the Cast emulation) and constant-parameter
+evaluation through `Mod`, `Transpose`, and single-axis N-D `Slice`
+(its pad chain). Both landed 2026-10-18; the graph loads at 19,224
+folded nodes.
 
 ## Full-model gates
 
@@ -142,9 +156,10 @@ until an export exists. See the pending V-2/V-3 entries in
 
 ## Portable-backend priority (OpenCL)
 
-Shared by the four locally loadable models, sorted by model count then
-node touches. This ranks OpenCL; HIP additionally lacks the movement six and
-the pools, so its unlock sets are larger (see the HIP gaps above).
+Shared by the four primary loadable models above, sorted by model count
+then node touches. This ranks OpenCL; HIP additionally lacks the movement
+six and the pools, so its unlock sets are larger. The converted variants
+have their own gap columns in the table above.
 
 | Op type | Models using it | Node touches | Why it matters |
 | --- | ---: | ---: | --- |
@@ -184,10 +199,11 @@ and pools landed 2026-10-18).
 
 ## Non-kernel blockers
 
-1. **Opset policy.** NERT loads opset 18 only. 19 of 24 inventoried
-   exports need `onnx.version_converter.convert_version(model, 18)` and a
-   re-export/reference run before any kernel work can be claimed for
-   those families.
+1. **Opset policy.** NERT loads opset 18 only. The 2026-10-18 sweep
+   converted 17 candidates; 13 now load and are CPU/CUDA op-complete.
+   FoundationPose `ref2`/`refiner`/`rw`/`sw` and the deep-infer RF-DETR
+   duplicate still need dynamic `Slice` shape inference. RAFT and the
+   DETR/ViT families have no local export.
 2. **Consumer adapter.** Neuriplo's NERT backend selects
    `nert::CudaDevice()` behind `-DNEURIPLO_NERT_CUDA=ON` (adapter commit
    `014fe18`, 2026-10-18); the CUDA-leg full-model run is still pending,
@@ -198,8 +214,9 @@ and pools landed 2026-10-18).
 3. **Pending gates.** RF-DETR's CUDA gate now passes (2026-10-18).
    RAFT is blocked on a missing export, not on kernels.
    OWLv2/YOLO26n/ResNet gates pass.
-4. **Grounding DINO.** Opset 17, 31,821 nodes, CPU parity and CUDA gate
-   both pending; it is the largest open-vocab export.
+4. **Grounding DINO.** Converted and loading (19,224 folded nodes; all
+   CPU/CUDA op types covered). CPU parity and the CUDA gate still need
+   reference inputs; it is the largest open-vocab export.
 
 ## Environment notes
 
@@ -228,7 +245,8 @@ and pools landed 2026-10-18).
 - NERT model gates: `specs/2026-10-17-task-models/validation.md`,
   `specs/2026-10-17-n1g-yolo-gpu/validation.md`,
   `specs/2026-10-18-closure-cuda/validation.md`,
-  `specs/2026-10-18-model-gates/validation.md`.
+  `specs/2026-10-18-model-gates/validation.md`,
+  `specs/2026-10-18-opset18-conversions/validation.md`.
 - RAFT CPU parity: `specs/2026-10-10-raft-open-vocab/validation.md`.
 - Consumer adapter: `neuriplo/backends/nert/src/NertInfer.cpp`,
   `neuriplo/docs/backends.yaml`.

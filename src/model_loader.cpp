@@ -376,14 +376,15 @@ DataType initializer_dtype(int64_t onnx_type, const std::string& name)
     case kElemType_OnnxDouble: // narrowed to float32, see double_initializer_values
         return DataType::Float32;
     case kElemType_OnnxInt64:
+    case kElemType_OnnxInt32: // emulated on int64 lanes, see the Cast kernel
         return DataType::Int64;
     case kElemType_OnnxBool:
         return DataType::Bool;
     default:
         throw ModelLoadException("unsupported initializer data type " +
             quote(elem_type_name(onnx_type)) + " for tensor " + quote(name) +
-            " (engine accepts FLOAT weights, INT64 shape constants, and BOOL "
-            "masks)");
+            " (engine accepts FLOAT weights, INT64/INT32 integer constants, "
+            "and BOOL masks)");
     }
 }
 
@@ -453,6 +454,41 @@ std::vector<int64_t> int64_initializer_values(const TensorPatch& t,
     std::vector<int64_t> values(elems);
     if (elems > 0) {
         std::memcpy(values.data(), bytes.data(), bytes.size());
+    }
+    return values;
+}
+
+// INT32 constants are emulated on int64 lanes (see the Cast kernel doc):
+// widen the values so integer ops share one storage type.
+std::vector<int64_t> int32_initializer_values(const TensorPatch& t,
+    const std::string& model_dir, int64_t count)
+{
+    std::vector<int64_t> values;
+    if (!t.int32_data.empty()) {
+        values = t.int32_data;
+    } else {
+        const std::string bytes = load_tensor_data(t, model_dir);
+        if (bytes.empty() && count != 0) {
+            throw ModelLoadException("initializer tensor " + quote(t.name) +
+                " carries no data");
+        }
+        if (bytes.size() % sizeof(int32_t) != 0) {
+            throw ModelLoadException(
+                "initializer raw_data byte size is not a multiple of four for "
+                "tensor " +
+                quote(t.name));
+        }
+        const size_t elems = bytes.size() / sizeof(int32_t);
+        std::vector<int32_t> narrow(elems);
+        if (elems > 0) {
+            std::memcpy(narrow.data(), bytes.data(), bytes.size());
+        }
+        values.assign(narrow.begin(), narrow.end());
+    }
+    if (static_cast<int64_t>(values.size()) != count) {
+        throw ModelLoadException("initializer element count " +
+            std::to_string(values.size()) + " does not match shape for tensor " +
+            quote(t.name));
     }
     return values;
 }
@@ -533,6 +569,8 @@ Initializer materialize_initializer(const TensorPatch& t,
         init.values = float32_values(t, model_dir, count);
     } else if (dtype == DataType::Bool) {
         init.values = bool_initializer_values(t, model_dir, count);
+    } else if (dtype == DataType::Int64 && t.data_type == kElemType_OnnxInt32) {
+        init.values = int32_initializer_values(t, model_dir, count);
     } else {
         init.values = int64_initializer_values(t, model_dir, count);
     }
@@ -1486,10 +1524,11 @@ std::pair<std::string, Initializer> fold_constant_node(
     if (t.data_type != kElemType_OnnxFloat &&
         t.data_type != kElemType_OnnxDouble &&
         t.data_type != kElemType_OnnxInt64 &&
+        t.data_type != kElemType_OnnxInt32 &&
         t.data_type != kElemType_OnnxBool) {
         throw ModelLoadException("unsupported Constant value data type " +
             quote(elem_type_name(t.data_type)) + " on " + who +
-            " (engine folds FLOAT, DOUBLE, INT64, and BOOL Constants only)");
+            " (engine folds FLOAT, DOUBLE, INT32, INT64, and BOOL Constants only)");
     }
     t.name = raw.outputs[0];
     return {raw.outputs[0], materialize_initializer(t, model_dir)};
@@ -1590,6 +1629,10 @@ std::pair<std::string, TensorInfo> decode_value_info(const uint8_t* data,
         // value_info only: DOUBLE constants are narrowed to float32 at load,
         // so a DOUBLE intermediate is recorded as the float32 it becomes.
         dtype = DataType::Float32;
+    } else if (allow_integer && elem_type == kElemType_OnnxInt32) {
+        // INT32 is emulated on int64 lanes (see the Cast kernel doc), so an
+        // INT32 intermediate is recorded as the int64 it becomes.
+        dtype = DataType::Int64;
     } else {
         reject(std::string("carries unsupported element type ") +
             quote(elem_type_name(elem_type)) +

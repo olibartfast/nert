@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -583,6 +584,16 @@ std::optional<EvalTensor> eval_int64_binary(const StaticContext& ctx,
                 return std::nullopt;
             }
             out.i64[at] = a / b;
+        } else if (op == "Mod") {
+            if (b == 0) {
+                return std::nullopt;
+            }
+            int64_t r = a % b;
+            // fmod=0 is the ONNX floor-mod (sign of the divisor).
+            if (attr_int(node, "fmod", 0) == 0 && r != 0 && ((r < 0) != (b < 0))) {
+                r += b;
+            }
+            out.i64[at] = r;
         } else if (op == "Sub") {
             out.i64[at] = a - b;
         } else if (op == "Mul") {
@@ -612,6 +623,76 @@ std::optional<EvalTensor> eval_node(
         }
         value->dims = out_it->second.dims;
         return value;
+    }
+    if (op == "Transpose") {
+        // Constant transpose: reorder values by perm (default reversed).
+        if (node.inputs.size() != 1 || node.outputs.size() != 1) {
+            return std::nullopt;
+        }
+        auto value = eval_tensor(ctx, node.inputs[0], depth);
+        const auto out_it = ctx.inferred.find(node.outputs[0]);
+        if (!value.has_value() || out_it == ctx.inferred.end()) {
+            return std::nullopt;
+        }
+        const std::vector<int64_t>& in_dims = value->dims;
+        const std::vector<int64_t>& out_dims = out_it->second.dims;
+        const int64_t rank = static_cast<int64_t>(in_dims.size());
+        if (rank != static_cast<int64_t>(out_dims.size())) {
+            return std::nullopt;
+        }
+        std::vector<int64_t> perm = attr_ints(node, "perm");
+        if (perm.empty()) {
+            for (int64_t i = 0; i < rank; ++i) {
+                perm.push_back(rank - 1 - i);
+            }
+        }
+        if (static_cast<int64_t>(perm.size()) != rank) {
+            return std::nullopt;
+        }
+        std::vector<int64_t> in_strides(static_cast<size_t>(rank), 1);
+        for (int64_t i = rank - 2; i >= 0; --i) {
+            in_strides[static_cast<size_t>(i)] =
+                in_strides[static_cast<size_t>(i + 1)] * in_dims[static_cast<size_t>(i + 1)];
+        }
+        const int64_t count = eval_element_count(out_dims);
+        std::vector<int64_t> src(static_cast<size_t>(count));
+        std::vector<int64_t> coords(static_cast<size_t>(rank), 0);
+        for (int64_t i = 0; i < count; ++i) {
+            int64_t offset = 0;
+            for (int64_t d = 0; d < rank; ++d) {
+                offset += coords[static_cast<size_t>(d)] *
+                    in_strides[static_cast<size_t>(perm[static_cast<size_t>(d)])];
+            }
+            src[static_cast<size_t>(i)] = offset;
+            for (int64_t d = rank - 1; d >= 0; --d) {
+                if (++coords[static_cast<size_t>(d)] < out_dims[static_cast<size_t>(d)]) {
+                    break;
+                }
+                coords[static_cast<size_t>(d)] = 0;
+            }
+        }
+        EvalTensor out;
+        out.dtype = value->dtype;
+        out.dims = out_dims;
+        if (value->dtype == DataType::Bool) {
+            out.boolean.reserve(static_cast<size_t>(count));
+            for (const int64_t s : src) {
+                out.boolean.push_back(value->boolean[static_cast<size_t>(s)]);
+            }
+        } else if (value->dtype == DataType::Float32) {
+            out.f64.reserve(static_cast<size_t>(count));
+            for (const int64_t s : src) {
+                out.f64.push_back(value->f64[static_cast<size_t>(s)]);
+            }
+        } else if (value->dtype == DataType::Int64) {
+            out.i64.reserve(static_cast<size_t>(count));
+            for (const int64_t s : src) {
+                out.i64.push_back(value->i64[static_cast<size_t>(s)]);
+            }
+        } else {
+            return std::nullopt;
+        }
+        return out;
     }
     if (op == "Shape") {
         if (node.inputs.size() != 1) {
@@ -651,11 +732,37 @@ std::optional<EvalTensor> eval_node(
             : std::nullopt;
         const int64_t to = attr_int(node, "to", 0);
         if (!value.has_value() ||
-            (to != 7 /*INT64*/ && to != 1 /*FLOAT*/ && to != 9 /*BOOL*/)) {
+            (to != 7 /*INT64*/ && to != 6 /*INT32*/ && to != 1 /*FLOAT*/ && to != 9 /*BOOL*/)) {
             return std::nullopt;
         }
         EvalTensor out;
         out.dims = value->dims;
+        if (to == 6) {
+            // INT32 is emulated on int64 lanes (see the Cast kernel); clamp
+            // so a folded constant matches the runtime kernel's saturation.
+            out.dtype = DataType::Int64;
+            auto clamp32 = [](int64_t v) {
+                return std::max<int64_t>(std::numeric_limits<int32_t>::min(),
+                    std::min<int64_t>(std::numeric_limits<int32_t>::max(), v));
+            };
+            if (value->dtype == DataType::Int64) {
+                for (const int64_t v : value->i64) {
+                    out.i64.push_back(clamp32(v));
+                }
+            } else if (value->dtype == DataType::Float32) {
+                for (const double v : value->f64) {
+                    if (!std::isfinite(v)) {
+                        return std::nullopt;
+                    }
+                    out.i64.push_back(clamp32(static_cast<int64_t>(v)));
+                }
+            } else {
+                for (const char v : value->boolean) {
+                    out.i64.push_back(v != 0 ? 1 : 0);
+                }
+            }
+            return out;
+        }
         if (to == 9) {
             // Any nonzero element converts to true.
             if (value->dtype == DataType::Bool) {
@@ -704,8 +811,9 @@ std::optional<EvalTensor> eval_node(
         return out;
     }
     if (op == "Slice") {
-        // Rank-1 int64 data with constant starts/ends (and optional axes=0,
-        // any non-zero step): the slice of a shape vector.
+        // Int64 data sliced on one axis with constant starts/ends (and an
+        // optional single axis, any non-zero step). Shape vectors are the
+        // common case, but parameter chains also reshape to [N, 2] first.
         if (node.inputs.size() < 3) {
             return std::nullopt;
         }
@@ -713,14 +821,22 @@ std::optional<EvalTensor> eval_node(
         const auto starts = eval_tensor(ctx, node.inputs[1], depth);
         const auto ends = eval_tensor(ctx, node.inputs[2], depth);
         if (!data.has_value() || !starts.has_value() || !ends.has_value() ||
-            data->dtype != DataType::Int64 || data->dims.size() != 1 ||
+            data->dtype != DataType::Int64 || data->dims.empty() ||
             starts->i64.size() != 1 || ends->i64.size() != 1) {
             return std::nullopt;
         }
+        const int64_t rank = static_cast<int64_t>(data->dims.size());
+        int64_t axis = 0;
         if (node.inputs.size() > 3 && !node.inputs[3].empty()) {
             const auto axes = eval_tensor(ctx, node.inputs[3], depth);
-            if (!axes.has_value() || axes->i64.size() != 1 ||
-                (axes->i64[0] != 0 && axes->i64[0] != -1)) {
+            if (!axes.has_value() || axes->i64.size() != 1) {
+                return std::nullopt;
+            }
+            axis = axes->i64[0];
+            if (axis < 0) {
+                axis += rank;
+            }
+            if (axis < 0 || axis >= rank) {
                 return std::nullopt;
             }
         }
@@ -733,15 +849,29 @@ std::optional<EvalTensor> eval_node(
             }
             step = steps->i64[0];
         }
-        const auto [begin, count] =
-            slice_range(starts->i64[0], ends->i64[0], step, data->dims[0]);
+        const int64_t dim = data->dims[static_cast<size_t>(axis)];
+        const auto [begin, count] = slice_range(starts->i64[0], ends->i64[0], step, dim);
+        int64_t outer = 1;
+        for (int64_t i = 0; i < axis; ++i) {
+            outer *= data->dims[static_cast<size_t>(i)];
+        }
+        int64_t inner = 1;
+        for (int64_t i = axis + 1; i < rank; ++i) {
+            inner *= data->dims[static_cast<size_t>(i)];
+        }
         EvalTensor out;
         out.dtype = DataType::Int64;
-        for (int64_t k = 0; k < count; ++k) {
-            out.i64.push_back(
-                data->i64[static_cast<size_t>(begin + k * step)]);
+        out.dims = data->dims;
+        out.dims[static_cast<size_t>(axis)] = count;
+        out.i64.reserve(static_cast<size_t>(outer * count * inner));
+        for (int64_t o = 0; o < outer; ++o) {
+            for (int64_t k = 0; k < count; ++k) {
+                const int64_t base = (o * dim + begin + k * step) * inner;
+                for (int64_t i = 0; i < inner; ++i) {
+                    out.i64.push_back(data->i64[static_cast<size_t>(base + i)]);
+                }
+            }
         }
-        out.dims = {count};
         return out;
     }
     if (op == "Gather") {
@@ -821,7 +951,7 @@ std::optional<EvalTensor> eval_node(
         }
         return out;
     }
-    if (op == "Add" || op == "Sub" || op == "Mul" || op == "Div") {
+    if (op == "Add" || op == "Sub" || op == "Mul" || op == "Div" || op == "Mod") {
         return eval_int64_binary(ctx, node, depth, op);
     }
     if (op == "Equal") {
