@@ -87,6 +87,16 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | 34 | task Phase 1 ResNet-18 gate | `../nert-w-task1` / `wip/nert-task1` | OFF 8/8 + CUDA gate top-1 107=107 + GAP rows + format | merged | done 2026-10-17: GAP mini-slice (4th wiring point: loader allowlist); gate dev noted 2.2e-03 |
 | 35 | task Phase 2 RF-DETR | `../nert-w-task2` / `wip/nert-task2` | docs only, no code | merged | done 2026-10-17: inventory + CPU parity (model-identical), R1..R6b slices filed |
 | 36 | N1b cuDNN Conv | `../nert-w-n1b` / `wip/nert-n1b` + nert-gpu:26.08 | OFF 8/8; host-ON 11/11 (conv SKIP); ct-ON 11/11 + format | merged | done 2026-10-16: legacy cuDNN path + plan cache + parity |
+| 37 | Bench Slice 2 multi-device driver | main (`wip` folded) | CUDA 11/1 SKIP + OCL 8/4 + HIP 8/4; OFF 12/12; format | merged 2026-10-18 | one fixture list, `device` column; missing device/row SKIP |
+| 38 | Bench Slice 3 shared helpers | `../nert-w-bench3` | OCL 2/2 + HIP 2/2 + OFF 12/12 + format; net -40 lines | merged 2026-10-18 | `test/device_test_helpers.hpp`, no matrix change |
+| 39 | N1e-A cached Conv state | `../nert-w-n1e-a` | container ctest 23/23; Conv 5.87 -> 0.98 ms; maxdiff unchanged | merged 2026-10-18 | one handle + cached descriptors/plan per geometry |
+| 40 | N1e-B frontend Conv row | `../nert-w-n1e-a` | frontend v1.31.0: ctest 23/23, Conv 0.96 ms, bit-identical; fallback leg green | merged 2026-10-18 | opt-in `NERT_CUDNN_FRONTEND_DIR`; used by slice C fusion later |
+| 41 | N1d-M5 OpenCL Reshape | `../nert-w-n1d-m5` | OpenCL gtest 19/19 + OFF 12/12 + format | merged 2026-10-18 | host-validated `clEnqueueCopyBuffer` movement |
+| 42 | N1c-M5 HIP Reshape | `../nert-w-n1c-m5` | HIP gtest 19/19 + OFF 12/12 + format | merged 2026-10-18 | hipified from CUDA, names only |
+| 43 | cuDNN Frontend spike | main + packet | bit-identical on ResNet/YOLO shapes; 20-39x per-call (setup cached) | verdict adopt 2026-10-18 | `v1.31.0` pinned; N1e follow-up packet filed |
+| 44 | R6 + Tier-5 CUDA (31 kernels) | main (parallel planner) | OFF 12/12 + CUDA 23/23 + format | merged 2026-10-18 | closes RF-DETR R6a/R6b + Tier-5 CUDA gaps (GridSample/Einsum then excluded) |
+| 45 | OWLv2 bring-up + CUDA gate | `../nert-w-owlv2` | OFF 12/12 + CUDA 23/23; OWLv2 CUDA 7 s: logits exact, boxes 1.9e-04, 0 over | merged 2026-10-18 | int32 Cast, Einsum CPU ellipsis + CUDA Einsum, bool movement, empty ConstantOfShape |
+| 46 | Bench Slice 4/5a | main | table audit + Reshape fixture (CUDA/OCL/HIP PASS) + OFF 12/12 + format | merged 2026-10-18 | R6/Tier-5 fixtures queued as Slice 5b |
 | — | N1 CUDA layer | packet after Q-1 decision | — | — | queued |
 
 ## N1 backend decision (2026-10-16, maintainer)
