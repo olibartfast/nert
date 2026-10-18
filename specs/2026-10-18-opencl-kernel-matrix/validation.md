@@ -32,6 +32,8 @@ reference gate. Tolerance: `ExpectNearOcl` unless exact.
 | V-M5 | ResNet-18 full-model OpenCL gate (224x224, 1000 classes) vs ORT | pass | 2026-10-19 | top-1 107 = ORT; logits maxdiff 3.695e-06, mean 7.944e-07, 54 ms; OpenCL vs CPU max 2.168e-03. |
 | V-M6 | Expand: 7 cases (rows/columns/scalar/identity copy/int64/bool/negatives) | pass 7/7 | 2026-10-19 | Cache-key collision between dtype entry points found and fixed (`ExpandF/I/B`). |
 | V-M7 | Where: mask/broadcast/int64 + 3 negatives | pass 4/4 | 2026-10-19 | Lane kernel needed its launch locals renamed (TensorView shadowing). |
+| V-M8 | OWLv2 row batch: Cast, ConstantOfShape, Equal/Greater/LessOrEqual/And, IsNaN/Erf/Elu, ReduceL2/ArgMax, two Einsum equations | pass 9/9 tests | 2026-10-19 | Table 25→37; einsum supports `...pd,...qd->...pq` and `bchw,bnc->bnhw` only, with a named error otherwise. |
+| V-M9 | OWLv2 full OpenCL gate vs ORT: logits exact, top-1 3600/3600, pred_boxes max 5.093e-04, 0 over tolerance | pass | 2026-10-19 | 952-node model, 4 s; runner uses the same zero-pixel/ids fixture as the CPU/CUDA gate. |
 | V-D6 | Diff audit | pass | 2026-10-19 | Kernel/test files + executor + shared registration + coverage/CHANGELOG. |
 
 ## Deviations

@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LayerNormalization` (axis/epsilon, scale/bias, float accumulation) —
   table 21→23. YOLO26n drops to 11 types, OWLv2 to 14, RF-DETR to 23;
   RAFT-large's OpenCL gap is 10 types/122 nodes.
+- OpenCL OWLv2 batch: Cast, ConstantOfShape, Equal, Greater,
+  LessOrEqual, And, IsNaN, Erf, Elu, ReduceL2, ArgMax and the two target
+  Einsum equations — table 25→37. **OWLv2 is op-complete and passes the
+  full OpenCL gate** (logits exact, top-1 3600/3600, boxes max
+  5.093e-04, 0 over tolerance, 4 s). YOLO26n drops to 6 types/21 nodes,
+  RF-DETR to 14/84, RAFT to 7/116.
 - RAFT-large: real torchvision opset-18 export provisioned (1,836 ONNX
   nodes) and the full CPU+CUDA gate passes against ORT — flow maxdiff
   1.317e-04 (CPU) / 1.344e-04 (CUDA), tolerance 5.324e-03, on a real
