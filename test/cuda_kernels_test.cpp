@@ -177,33 +177,36 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
 
 // An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
 // rejection, matching the pinned CPU behavior; see N1 validation notes).
-// Probe op is InstanceNormalization: CPU-covered with shape inference, and
-// no CUDA row exists, so this probe never needs moving again.
+// Probe op is ConvTranspose: CPU-covered with shape inference, and no CUDA
+// row exists except in cuDNN builds — so the probe runs there only when the
+// row is absent, and skips when cuDNN provides it. (InstanceNormalization
+// held this probe until CUDA closure landed every row; ConvTranspose is the
+// last device-conditional row. If it ever gains a first-party row, move the
+// probe to whatever op is still rowless, or revisit.)
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
     }
+    if (nert::CudaDevice().kernels().find("ConvTranspose") != nullptr) {
+        GTEST_SKIP() << "ConvTranspose row present (cuDNN build)";
+    }
 
     nert::Graph graph;
-    graph.inputs = {{"a", {nert::DataType::Float32, {}}},
-                    {"b", {nert::DataType::Float32, {}}},
-                    {"c", {nert::DataType::Float32, {}}}};
-    nert::Node bad = MakeNode("in_bad", "InstanceNormalization");
-    bad.inputs = {"a", "b", "c"};
+    graph.inputs = {{"x", {nert::DataType::Float32, {}}}, {"w", {nert::DataType::Float32, {}}}};
+    nert::Node bad = MakeNode("ct_bad", "ConvTranspose");
+    bad.inputs = {"x", "w"};
     bad.outputs = {"y"};
     graph.nodes = {bad};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model cuda(graph, {{"a", {2, 3}}, {"b", {3}}, {"c", {3}}}, nert::CudaDevice());
+    nert::Model cuda(graph, {{"x", {1, 1, 2, 2}}, {"w", {1, 1, 2, 2}}}, nert::CudaDevice());
     try {
-        cuda.Run({{"a", std::vector<float>(6, 1.0F)},
-                  {"b", std::vector<float>(3, 1.0F)},
-                  {"c", std::vector<float>(3, 1.0F)}});
+        cuda.Run({{"x", std::vector<float>(4, 1.0F)}, {"w", std::vector<float>(4, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no CUDA kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("in_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("InstanceNormalization"), std::string::npos) << message;
+        EXPECT_NE(message.find("ct_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("ConvTranspose"), std::string::npos) << message;
     }
 }
 

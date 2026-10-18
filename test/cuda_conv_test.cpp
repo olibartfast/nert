@@ -207,3 +207,116 @@ TEST(NertCudaConv, ModelConvMatchesCpu) {
     nert::Model cuda(graph, dims, nert::CudaDevice());
     ExpectNear(cuda.Run(inputs).outputs.at("y"), expected);
 }
+
+bool HasCudaConvTranspose() {
+    int count = 0;
+    if (cudaGetDeviceCount(&count) != cudaSuccess || count < 1) {
+        return false;
+    }
+#ifdef NERT_HAS_CUDNN
+    return nert::CudaDevice().kernels().find("ConvTranspose") != nullptr;
+#else
+    return false;
+#endif
+}
+
+// 2x2 stride-2 no bias, W = I-ish {1,0,0,1}: hand-computed scatter.
+TEST(NertCudaConv, ConvTransposeStride2NoBias) {
+    if (!HasCudaConvTranspose()) {
+        GTEST_SKIP() << "no CUDA ConvTranspose (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> w = {1.0F, 0.0F, 0.0F, 1.0F};
+    nert::Node node = MakeNode("ct0", "ConvTranspose");
+    node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    const std::vector<float> expected = {1.0F, 0.0F, 2.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F,
+                                         3.0F, 0.0F, 4.0F, 0.0F, 0.0F, 3.0F, 0.0F, 4.0F};
+    std::vector<float> cpuOut(16, 0.0F);
+    nert::CpuDevice().kernels().find("ConvTranspose")(node, {HostFloat(x, {1, 1, 2, 2}), HostFloat(w, {1, 1, 2, 2})},
+                                                      {HostFloat(cpuOut, {1, 1, 4, 4})});
+    ExpectNear(cpuOut, expected);
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    std::vector<float> gpuOut(16, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ConvTranspose")(
+        node, {DeviceFloat(dx, {1, 1, 2, 2}), DeviceFloat(dw, {1, 1, 2, 2})}, {DeviceFloat(dy, {1, 1, 4, 4})});
+    gpuOut = Download(cuda, dy, 16);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, expected);
+}
+
+// 3x3 stride-1 pad-1 with bias vs the oracle.
+TEST(NertCudaConv, ConvTransposePaddedWithBias) {
+    if (!HasCudaConvTranspose()) {
+        GTEST_SKIP() << "no CUDA ConvTranspose (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> w = {1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F};
+    std::vector<float> bias = {10.0F};
+    nert::Node node = MakeNode("ct1", "ConvTranspose");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 1, 1});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::CpuDevice().kernels().find("ConvTranspose")(
+        node, {HostFloat(x, {1, 1, 2, 2}), HostFloat(w, {1, 1, 3, 3}), HostFloat(bias, {1})},
+        {HostFloat(cpuOut, {1, 1, 2, 2})});
+    // Corner (0,0): x00*w11+x01*w10+x10*w01+x11*w00 + 10 = 1+2+3+4+10.
+    ExpectNear(cpuOut, (std::vector<float>{20.0F, 20.0F, 20.0F, 20.0F}));
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* db = Upload(cuda, bias);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ConvTranspose")(
+        node, {DeviceFloat(dx, {1, 1, 2, 2}), DeviceFloat(dw, {1, 1, 3, 3}), DeviceFloat(db, {1})},
+        {DeviceFloat(dy, {1, 1, 2, 2})});
+    gpuOut = Download(cuda, dy, 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, cpuOut);
+}
+
+// ConvTranspose rejects non-zero output_padding on CUDA, naming node + op.
+TEST(NertCudaConv, ConvTransposeRejectsOutputPadding) {
+    if (!HasCudaConvTranspose()) {
+        GTEST_SKIP() << "no CUDA ConvTranspose (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(4, 1.0F);
+    std::vector<float> w(4, 1.0F);
+    std::vector<float> y(9, 0.0F);
+    nert::Node node = MakeNode("ct_bad", "ConvTranspose");
+    node.attributes.emplace_back("output_padding", std::vector<int64_t>{1, 0});
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("ConvTranspose")(
+            node, {DeviceFloat(dx, {1, 1, 2, 2}), DeviceFloat(dw, {1, 1, 2, 2})}, {DeviceFloat(dy, {1, 1, 3, 3})});
+        FAIL() << "expected InferenceException for non-zero output_padding";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("ct_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("ConvTranspose"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(dy);
+}

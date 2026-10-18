@@ -148,7 +148,7 @@ if(NERT_ENABLE_CUDA)
                                 src/cuda/gather.cu src/cuda/gather_elements.cu src/cuda/mat_mul.cu
                                 src/cuda/cast.cu src/cuda/equal.cu src/cuda/where.cu src/cuda/shape.cu
                                 src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/reduce_max.cu src/cuda/reduce_sum.cu
-                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/layer_normalization.cu src/cuda/sin.cu src/cuda/cos.cu src/cuda/exp.cu src/cuda/elu.cu src/cuda/log.cu src/cuda/floor.cu src/cuda/is_nan.cu src/cuda/abs.cu src/cuda/neg.cu src/cuda/pow.cu src/cuda/greater.cu src/cuda/less.cu src/cuda/greater_or_equal.cu src/cuda/less_or_equal.cu src/cuda/and.cu src/cuda/or.cu src/cuda/not.cu src/cuda/max.cu src/cuda/min.cu src/cuda/clip.cu src/cuda/identity.cu src/cuda/squeeze.cu src/cuda/tile.cu src/cuda/range.cu src/cuda/eye_like.cu src/cuda/pad.cu src/cuda/reduce_mean.cu src/cuda/reduce_l2.cu src/cuda/arg_max.cu src/cuda/cum_sum.cu src/cuda/scatter_nd.cu src/cuda/einsum.cu src/cuda/table.cu)
+                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/layer_normalization.cu src/cuda/sin.cu src/cuda/cos.cu src/cuda/exp.cu src/cuda/elu.cu src/cuda/log.cu src/cuda/floor.cu src/cuda/is_nan.cu src/cuda/abs.cu src/cuda/neg.cu src/cuda/pow.cu src/cuda/greater.cu src/cuda/less.cu src/cuda/greater_or_equal.cu src/cuda/less_or_equal.cu src/cuda/and.cu src/cuda/or.cu src/cuda/not.cu src/cuda/max.cu src/cuda/min.cu src/cuda/clip.cu src/cuda/identity.cu src/cuda/squeeze.cu src/cuda/tile.cu src/cuda/range.cu src/cuda/eye_like.cu src/cuda/pad.cu src/cuda/reduce_mean.cu src/cuda/reduce_l2.cu src/cuda/arg_max.cu src/cuda/cum_sum.cu src/cuda/scatter_nd.cu src/cuda/grid_sample.cu src/cuda/instance_normalization.cu src/cuda/einsum.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
@@ -159,7 +159,7 @@ if(NERT_ENABLE_CUDA)
     find_library(CUDNN_LIBRARY NAMES cudnn PATHS /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/cuda/lib64
                                                "$ENV{CUDNN_ROOT}" "$ENV{CUDNN_ROOT}/lib64")
     if(CUDNN_INCLUDE_DIR AND CUDNN_LIBRARY)
-        target_sources(nert PRIVATE src/cuda/conv.cu)
+        target_sources(nert PRIVATE src/cuda/conv.cu src/cuda/conv_transpose.cu)
         target_compile_definitions(nert PRIVATE NERT_HAS_CUDNN)
         target_include_directories(nert PRIVATE ${CUDNN_INCLUDE_DIR})
         target_link_libraries(nert PRIVATE ${CUDNN_LIBRARY})

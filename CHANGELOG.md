@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ReduceMean`/`ReduceL2`/`ArgMax`/`CumSum`/`ScatterND` — closing the
   R6a/R6b RF-DETR gaps and the Tier-5 open-vocab CUDA-missing set
   (GridSample and Einsum excluded) at the bench tolerance.
+- CUDA closure: `GridSample` (first-party bilinear/nearest,
+  zeros/border/reflection, align 0/1), `InstanceNormalization`
+  (first-party per-(n,c) rows), `ConvTranspose` (cuDNN backward-data,
+  `NERT_HAS_CUDNN` only; non-zero output_padding and asymmetric pads
+  rejected on CUDA). Every CPU op now has a CUDA row (`ConvTranspose`
+  only under `NERT_HAS_CUDNN`) — tables complete.
 
 ## [0.1.0] - Unreleased
 

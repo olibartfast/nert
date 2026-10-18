@@ -259,3 +259,110 @@ TEST(NertCudaNorm, RejectsYShapeMismatch) {
     cuda.allocator().release(ds);
     cuda.allocator().release(dy);
 }
+
+// InstanceNormalization over [1,2,2,2] with scale {2,0.5}, B {1,-1}: hand-computed.
+TEST(NertCudaNorm, InstanceNormExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    // ch0 {0,1,2,3}: mean 1.5, var 1.25; ch1 {4,5,6,7}: mean 5.5, var 1.25.
+    std::vector<float> x = {0.0F, 1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F};
+    std::vector<float> scale = {2.0F, 0.5F};
+    std::vector<float> bias = {1.0F, -1.0F};
+    nert::Node node = MakeNode("in0", "InstanceNormalization");
+    const double invStd = 1.0 / std::sqrt(1.25 + 1e-5);
+    std::vector<float> expected(8, 0.0F);
+    for (int i = 0; i < 4; ++i) {
+        expected[i] = static_cast<float>((x[i] - 1.5) * invStd * 2.0 + 1.0);
+        expected[4 + i] = static_cast<float>((x[4 + i] - 5.5) * invStd * 0.5 - 1.0);
+    }
+    std::vector<float> cpuOut(8, 0.0F);
+    nert::CpuDevice().kernels().find("InstanceNormalization")(
+        node, {HostFloat(x, {1, 2, 2, 2}), HostFloat(scale, {2}), HostFloat(bias, {2})},
+        {HostFloat(cpuOut, {1, 2, 2, 2})});
+    ExpectNear(cpuOut, expected);
+
+    void* dx = Upload(cuda, x);
+    void* ds = Upload(cuda, scale);
+    void* db = Upload(cuda, bias);
+    std::vector<float> gpuOut(8, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("InstanceNormalization")(
+        node, {DeviceFloat(dx, {1, 2, 2, 2}), DeviceFloat(ds, {2}), DeviceFloat(db, {2})},
+        {DeviceFloat(dy, {1, 2, 2, 2})});
+    gpuOut = Download(cuda, dy, 8);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, expected);
+}
+
+// InstanceNormalization rank-2 input: single spatial element -> zeros (+B).
+TEST(NertCudaNorm, InstanceNormRank2Exact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {5.0F, -3.0F};
+    std::vector<float> scale = {1.0F, 2.0F};
+    std::vector<float> bias = {0.5F, -0.5F};
+    nert::Node node = MakeNode("in1", "InstanceNormalization");
+    // Single spatial element: mean == value, variance 0 -> normalized 0.
+    const std::vector<float> expected = {0.5F, -0.5F};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::CpuDevice().kernels().find("InstanceNormalization")(
+        node, {HostFloat(x, {1, 2}), HostFloat(scale, {2}), HostFloat(bias, {2})}, {HostFloat(cpuOut, {1, 2})});
+    ExpectNear(cpuOut, expected);
+
+    void* dx = Upload(cuda, x);
+    void* ds = Upload(cuda, scale);
+    void* db = Upload(cuda, bias);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("InstanceNormalization")(
+        node, {DeviceFloat(dx, {1, 2}), DeviceFloat(ds, {2}), DeviceFloat(db, {2})}, {DeviceFloat(dy, {1, 2})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, expected);
+}
+
+// InstanceNormalization rejects a bad scale size, naming node + op.
+TEST(NertCudaNorm, InstanceNormRejectsBadScale) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(8, 1.0F);
+    std::vector<float> scale(3, 1.0F);
+    std::vector<float> bias(2, 0.0F);
+    std::vector<float> y(8, 0.0F);
+    nert::Node node = MakeNode("in_bad", "InstanceNormalization");
+    node.inputs = {"x", "scale", "b"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* ds = Upload(cuda, scale);
+    void* db = Upload(cuda, bias);
+    void* dy = Upload(cuda, y);
+    try {
+        nert::CudaDevice().kernels().find("InstanceNormalization")(
+            node, {DeviceFloat(dx, {1, 2, 2, 2}), DeviceFloat(ds, {3}), DeviceFloat(db, {2})},
+            {DeviceFloat(dy, {1, 2, 2, 2})});
+        FAIL() << "expected InferenceException for a bad scale size";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("in_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("InstanceNormalization"), std::string::npos) << message;
+    }
+    cuda.allocator().release(dx);
+    cuda.allocator().release(ds);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+}

@@ -202,6 +202,14 @@ if(NERT_ENABLE_CUDA)
         GTest::gtest
         GTest::gtest_main)
     add_test(NAME nert_cuda_move COMMAND nert_cuda_move_test)
+    add_executable(nert_cuda_sample_test cuda_sample_test.cpp)
+    target_compile_features(nert_cuda_sample_test PRIVATE cxx_std_17)
+    target_compile_options(nert_cuda_sample_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_cuda_sample_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_cuda_sample COMMAND nert_cuda_sample_test)
     # cuDNN presence (N1b Conv row) is visible to the CUDA tests so they can
     # assert precisely instead of guessing.
     if(CUDNN_INCLUDE_DIR AND CUDNN_LIBRARY)

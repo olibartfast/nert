@@ -7,8 +7,8 @@
 // Reshape/Unsqueeze/Flatten/Expand/Concat/Split/Slice/Transpose/Gather/GatherElements/MatMul/Cast/Equal/Where/
 // Shape/ConstantOfShape/Mod/ReduceMax/ReduceSum/TopK/Resize/Sqrt/Erf/LayerNormalization/Sin/Cos/Exp/Elu/Log/Floor/
 // IsNaN/Abs/Neg/Pow/Greater/Less/GreaterOrEqual/LessOrEqual/And/Or/Not/Max/Min/Clip/Tile/Identity/Squeeze/Range/
-// EyeLike/Pad/ReduceMean/ReduceL2/ArgMax/CumSum/ScatterND (first-party, except MatMul via cuBLAS like Gemm), Conv
-// (cuDNN, NERT_HAS_CUDNN builds only).
+// EyeLike/Pad/ReduceMean/ReduceL2/ArgMax/CumSum/ScatterND/GridSample (first-party, except MatMul via cuBLAS like Gemm),
+// Conv (cuDNN, NERT_HAS_CUDNN builds only).
 
 #include "nert/device.hpp"
 
@@ -64,6 +64,9 @@ void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std
 void ArgMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void CumSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void GridSample(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void InstanceNormalization(const Node& node, const std::vector<TensorView>& inputs,
+                           const std::vector<TensorView>& outputs);
 void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Reshape(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -86,13 +89,14 @@ void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const st
 void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #ifdef NERT_HAS_CUDNN
 #ifdef NERT_HAS_CUDNN_FRONTEND
 void ConvFrontend(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #else
 void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
-void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #endif
+void ConvTranspose(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 #endif
 
 KernelFn FindCudaKernel(const std::string& op_type) {
@@ -142,6 +146,8 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"ArgMax", &ArgMax},
         {"CumSum", &CumSum},
         {"ScatterND", &ScatterND},
+        {"GridSample", &GridSample},
+        {"InstanceNormalization", &InstanceNormalization},
         {"Einsum", &Einsum},
         {"Softmax", &Softmax},
         {"Reshape", &Reshape},
@@ -170,6 +176,9 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"Conv", &ConvFrontend},
 #else
         {"Conv", &Conv},
+#endif
+#ifdef NERT_HAS_CUDNN
+        {"ConvTranspose", &ConvTranspose},
 #endif
 #endif
     };
