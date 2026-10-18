@@ -68,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kernel (transA/transB, alpha/beta, `[N]`/`[M,N]` bias) — table 18→20.
   ResNet-18's portable gap is now just `Conv`; YOLO/OWLv2/RF-DETR drop
   `Flatten`/`Gemm` as well.
+- OpenCL `Conv`: first-party N-D cross-correlation (rank 3–5, groups,
+  strides, dilations, explicit/SAME pads, bias) — table 20→21.
+  ResNet-18 is op-complete on OpenCL (0 missing types); YOLO26n's gap
+  drops to 12 types, OWLv2 to 16, RF-DETR to 25.
 
 ## [0.1.0] - Unreleased
 

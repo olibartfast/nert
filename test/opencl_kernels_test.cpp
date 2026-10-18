@@ -86,28 +86,28 @@ TEST(NertOpenCLKernels, AddBroadcastInt64Exact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
-// Conv has no OpenCL row: rejected at Run, naming node + op.
+// Sin has no OpenCL row: rejected at Run, naming node + op.
 TEST(NertOpenCLKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
     }
 
     nert::Graph graph;
-    graph.inputs = {{"x", {nert::DataType::Float32, {}}}, {"w", {nert::DataType::Float32, {}}}};
-    nert::Node conv = MakeNode("conv_bad", "Conv");
-    conv.inputs = {"x", "w"};
-    conv.outputs = {"y"};
-    graph.nodes = {conv};
+    graph.inputs = {{"x", {nert::DataType::Float32, {}}}};
+    nert::Node sin = MakeNode("sin_bad", "Sin");
+    sin.inputs = {"x"};
+    sin.outputs = {"y"};
+    graph.nodes = {sin};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model ocl(graph, {{"x", {1, 3, 8, 8}}, {"w", {2, 3, 3, 3}}}, nert::OpenCLDevice());
+    nert::Model ocl(graph, {{"x", {4}}}, nert::OpenCLDevice());
     try {
-        ocl.Run({{"x", std::vector<float>(192, 1.0F)}, {"w", std::vector<float>(54, 1.0F)}});
+        ocl.Run({{"x", std::vector<float>(4, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no OpenCL kernel";
     } catch (const nert::InferenceException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("conv_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("Conv"), std::string::npos) << message;
+        EXPECT_NE(message.find("sin_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("Sin"), std::string::npos) << message;
     }
 }
 
@@ -1558,4 +1558,172 @@ TEST(NertOpenCLKernels, GemmRejectsBadShapes) {
     badOut.inputs = {"a", "b"};
     badOut.outputs = {"y"};
     expect_throw(badOut, {DeviceFloat(nullptr, {2, 2}), DeviceFloat(nullptr, {2, 2})}, DeviceFloat(nullptr, {2, 3}));
+}
+
+// Conv 2-D 3x3 * 2x2 identity-ish kernel: hand-computed windows.
+TEST(NertOpenCLKernels, Conv2dExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F};
+    std::vector<float> w = {1.0F, 0.0F, 0.0F, 1.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("cv0", "Conv");
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Conv")(node, {HostFloat(x, {1, 1, 3, 3}), HostFloat(w, {1, 1, 2, 2})},
+                                             {HostFloat(cpuOut, {1, 1, 2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 8.0F, 12.0F, 14.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* dw = Upload(ocl, w);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Conv")(node, {DeviceFloat(dx, {1, 1, 3, 3}), DeviceFloat(dw, {1, 1, 2, 2})},
+                                                {DeviceFloat(dy, {1, 1, 2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dw);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Conv depthwise (group=2) scales each channel by its own 1x1 filter.
+TEST(NertOpenCLKernels, ConvGroupsExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 10.0F, 20.0F, 30.0F, 40.0F};
+    std::vector<float> w = {1.0F, 2.0F};
+    std::vector<float> cpuOut(8, 0.0F);
+    nert::Node node = MakeNode("cv_g", "Conv");
+    node.attributes.emplace_back("group", int64_t{2});
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Conv")(node, {HostFloat(x, {1, 2, 2, 2}), HostFloat(w, {2, 1, 1, 1})},
+                                             {HostFloat(cpuOut, {1, 2, 2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F, 20.0F, 40.0F, 60.0F, 80.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* dw = Upload(ocl, w);
+    std::vector<float> gpuOut(8, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Conv")(node, {DeviceFloat(dx, {1, 2, 2, 2}), DeviceFloat(dw, {2, 1, 1, 1})},
+                                                {DeviceFloat(dy, {1, 2, 2, 2})});
+    gpuOut = Download(ocl, dy, 8);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dw);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Conv stride 2 + pads 1 + bias: window placement matches the oracle.
+TEST(NertOpenCLKernels, ConvStridePadBias) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(16, 0.0F);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(i + 1);
+    }
+    std::vector<float> w = {1.0F, 1.0F, 1.0F, 1.0F};
+    std::vector<float> bias = {0.5F};
+    std::vector<float> cpuOut(9, 0.0F);
+    nert::Node node = MakeNode("cv_sp", "Conv");
+    node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 1, 1});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Conv")(
+        node, {HostFloat(x, {1, 1, 4, 4}), HostFloat(w, {1, 1, 2, 2}), HostFloat(bias, {1})},
+        {HostFloat(cpuOut, {1, 1, 3, 3})});
+
+    void* dx = Upload(ocl, x);
+    void* dw = Upload(ocl, w);
+    void* db = Upload(ocl, bias);
+    std::vector<float> gpuOut(9, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Conv")(
+        node, {DeviceFloat(dx, {1, 1, 4, 4}), DeviceFloat(dw, {1, 1, 2, 2}), DeviceFloat(db, {1})},
+        {DeviceFloat(dy, {1, 1, 3, 3})});
+    gpuOut = Download(ocl, dy, 9);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dw);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    ExpectNearOcl(gpuOut, cpuOut);
+}
+
+// Conv 1-D lifts to three axes: {1,2,3,4} * {1,1} -> {3,5,7}.
+TEST(NertOpenCLKernels, Conv1dExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    std::vector<float> w = {1.0F, 1.0F};
+    std::vector<float> cpuOut(3, 0.0F);
+    nert::Node node = MakeNode("cv1", "Conv");
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Conv")(node, {HostFloat(x, {1, 1, 4}), HostFloat(w, {1, 1, 2})},
+                                             {HostFloat(cpuOut, {1, 1, 3})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{3.0F, 5.0F, 7.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* dw = Upload(ocl, w);
+    std::vector<float> gpuOut(3, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Conv")(node, {DeviceFloat(dx, {1, 1, 4}), DeviceFloat(dw, {1, 1, 2})},
+                                                {DeviceFloat(dy, {1, 1, 3})});
+    gpuOut = Download(ocl, dy, 3);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dw);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Conv rejects a weight-channel mismatch, bad bias and wrong output shape.
+TEST(NertOpenCLKernels, ConvRejectsBadShapes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+
+    auto expect_throw = [&](const nert::Node& node, const std::vector<nert::TensorView>& inputs,
+                            const nert::TensorView& out) {
+        try {
+            nert::OpenCLDevice().kernels().find("Conv")(node, inputs, {out});
+            FAIL() << "expected InferenceException for a malformed Conv";
+        } catch (const nert::InferenceException& e) {
+            const std::string message = e.what();
+            EXPECT_NE(message.find("cv_bad"), std::string::npos) << message;
+            EXPECT_NE(message.find("Conv"), std::string::npos) << message;
+        }
+    };
+
+    nert::Node channelMismatch = MakeNode("cv_bad", "Conv");
+    channelMismatch.inputs = {"x", "w"};
+    channelMismatch.outputs = {"y"};
+    expect_throw(channelMismatch, {DeviceFloat(nullptr, {1, 2, 4, 4}), DeviceFloat(nullptr, {1, 1, 3, 3})},
+                 DeviceFloat(nullptr, {1, 1, 2, 2}));
+
+    nert::Node badBias = MakeNode("cv_bad", "Conv");
+    badBias.inputs = {"x", "w", "b"};
+    badBias.outputs = {"y"};
+    expect_throw(badBias,
+                 {DeviceFloat(nullptr, {1, 1, 4, 4}), DeviceFloat(nullptr, {1, 1, 3, 3}), DeviceFloat(nullptr, {2})},
+                 DeviceFloat(nullptr, {1, 1, 2, 2}));
+
+    nert::Node badOut = MakeNode("cv_bad", "Conv");
+    badOut.inputs = {"x", "w"};
+    badOut.outputs = {"y"};
+    expect_throw(badOut, {DeviceFloat(nullptr, {1, 1, 4, 4}), DeviceFloat(nullptr, {1, 1, 3, 3})},
+                 DeviceFloat(nullptr, {1, 1, 3, 3}));
 }

@@ -30,7 +30,7 @@ TEST(NertOpenCLDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(ocl).transfer());
 }
 
-// Table rows resolve; Conv is still missing so the executor rejects the
+// Table rows resolve; Sin is still missing so the executor rejects the
 // node naming op + node.
 TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     if (!HasOpenCLDevice()) {
@@ -48,7 +48,8 @@ TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     EXPECT_NE(ocl.kernels().find("Reshape"), nullptr);
     EXPECT_NE(ocl.kernels().find("Flatten"), nullptr);
     EXPECT_NE(ocl.kernels().find("Gemm"), nullptr);
-    EXPECT_EQ(ocl.kernels().find("Conv"), nullptr);
+    EXPECT_NE(ocl.kernels().find("Conv"), nullptr);
+    EXPECT_EQ(ocl.kernels().find("Sin"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.
