@@ -1,8 +1,9 @@
 # Coverage matrix — task models × devices
 
-Date: 2026-10-18. First measured pass against the working tree, including
-the uncommitted CUDA-closure slice; OpenCL movement rows
-(Transpose/Slice/Concat/Shape/Unsqueeze/Gather) folded in same-day.
+Date: 2026-10-18. Measured pass against the working tree. The CUDA
+closure slice, the OpenCL movement rows (Transpose/Slice/Concat/Shape/
+Unsqueeze/Gather) and the OpenCL pools (MaxPool/AveragePool/
+GlobalAveragePool) all landed the same day and are folded in here.
 This is the living matrix required by [`requirements.md`](requirements.md)
 (in-scope coverage tracking) and [`plan.md`](plan.md) Phase 4. Update it
 whenever a full-model gate runs or a device kernel row lands; do not let
@@ -37,7 +38,7 @@ is folded `Constant` nodes.
 | CPU (oracle) | 72 | Reference set; every inventoried model's op types are covered after constant folding. |
 | CUDA | 72 | Identical set to CPU. `Conv` and `ConvTranspose` are cuDNN-gated; a CUDA build without cuDNN lacks those two rows. |
 | OpenCL | 18 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`, `Transpose`, `Slice`, `Concat`, `Shape`, `Unsqueeze`, `Gather`, `MaxPool`, `AveragePool`, `GlobalAveragePool`. |
-| HIP | 9 | Same set as OpenCL. |
+| HIP | 9 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`. Lags OpenCL by the movement six and the three pools. |
 
 The CUDA table being op-complete is the key result: **there are no
 missing CUDA op types to add for any current model.** New CUDA kernel
@@ -46,18 +47,18 @@ can. The portable layers are where kernel coverage is missing.
 
 ## Models NERT can load (opset 18)
 
-| Model | Task | NERT nodes (ONNX) | CPU | CUDA | OpenCL / HIP | Notes |
-| --- | --- | ---: | --- | --- | --- | --- |
-| ResNet-18 | classification | 49 (49) | PASS | PASS | GAP(3) / 22 | CUDA gate V-1; CI fixture. |
-| YOLO26n | detection | 421 (485) | PASS | PASS | GAP(14) / 145 | CUDA gate R-6; 6/6 confident rows. |
-| OWLv2-base-patch16 | open-vocab detection | 952 (1219) | PASS | PASS | GAP(18) / 331 | CPU and CUDA parity V-3/V-3b. |
-| RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | OPS | GAP(27) / 399 | CUDA op coverage complete; full gate pending. |
-| RAFT (ref component) | optical flow | 156 (156) | PASS | OPS | GAP(6) / 38 | Full RAFT CPU parity pass; CUDA gate pending after InstanceNormalization landed. |
+| Model | Task | NERT nodes (ONNX) | CPU | CUDA | OpenCL | HIP | Notes |
+| --- | --- | ---: | --- | --- | --- | --- | --- |
+| ResNet-18 | classification | 49 (49) | PASS | PASS | GAP(3) / 22 | GAP(5) / 24 | CUDA gate V-1; CI fixture. |
+| YOLO26n | detection | 421 (485) | PASS | PASS | GAP(14) / 145 | GAP(21) / 197 | CUDA gate R-6; 6/6 confident rows. |
+| OWLv2-base-patch16 | open-vocab detection | 952 (1219) | PASS | PASS | GAP(18) / 331 | GAP(24) / 453 | CPU and CUDA parity V-3/V-3b. |
+| RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | OPS | GAP(27) / 399 | GAP(33) / 701 | CUDA op coverage complete; full gate pending. |
+| RAFT (ref component) | optical flow | 156 (156) | PASS | OPS | GAP(6) / 38 | GAP(12) / 85 | Full RAFT CPU parity pass; CUDA gate pending after InstanceNormalization landed. |
 
-### Missing OpenCL/HIP rows by model
+### Missing OpenCL rows by model
 
-Counts are NERT post-fold node touches. The same list applies to OpenCL
-and HIP because their tables currently carry the same nine op types.
+Counts are NERT post-fold node touches. HIP is a subset of this table
+plus the OpenCL-only movement/pool rows; its exact gaps follow.
 
 - **ResNet-18 — 3 types, 22 nodes:** `Conv=20`, `Flatten=1`,
   `Gemm=1`.
@@ -78,6 +79,25 @@ and HIP because their tables currently carry the same nine op types.
   `GatherElements=1`, `Less=1`, `ReduceMax=1`, `Resize=1`, `TopK=1`.
 - **RAFT ref — 6 types, 38 nodes:** `Conv=15`, `MatMul=12`,
   `LayerNormalization=4`, `Squeeze=3`, `Gemm=2`, `ReduceMean=2`.
+
+### Missing HIP rows by model
+
+HIP carries only the original nine rows, so every OpenCL gap applies
+and the movement six plus the pools are also missing. The extra
+HIP-only gap beyond the OpenCL list is:
+
+- **ResNet-18 — 5 types, 24 nodes:** OpenCL gap plus
+  `GlobalAveragePool=1`, `MaxPool=1`.
+- **YOLO26n — 21 types, 197 nodes:** OpenCL gap plus `Concat=28`,
+  `Unsqueeze=11`, `Transpose=6`, `MaxPool=3`, `Slice=2`, `Gather=1`,
+  `Shape=1`.
+- **OWLv2 — 24 types, 453 nodes:** OpenCL gap plus `Transpose=97`,
+  `Gather=11`, `Concat=5`, `Shape=5`, `Slice=3`, `Unsqueeze=1`.
+- **RF-DETR seg-small — 33 types, 701 nodes:** OpenCL gap plus
+  `Transpose=133`, `Slice=72`, `Concat=38`, `Shape=32`,
+  `Unsqueeze=23`, `Gather=4`.
+- **RAFT ref — 12 types, 85 nodes:** OpenCL gap plus `Transpose=16`,
+  `Concat=12`, `Slice=8`, `Gather=6`, `Shape=3`, `Unsqueeze=2`.
 
 ## Exports NERT cannot load (opset != 18)
 
@@ -121,10 +141,11 @@ until an export exists. See the pending V-2/V-3 entries in
 | Other YOLO families | Recorded (model zoo) | Not run | Local exports are opset 12/19/20; conversion first. |
 | DETR family | Recorded (roadmap Phase 2) | Not run | Opset-18 export/harness still the gate. |
 
-## Portable-backend priority (OpenCL/HIP)
+## Portable-backend priority (OpenCL)
 
 Shared by the five loadable models, sorted by model count then node
-touches:
+touches. This ranks OpenCL; HIP additionally lacks the movement six and
+the pools, so its unlock sets are larger (see the HIP gaps above).
 
 | Op type | Models using it | Node touches | Why it matters |
 | --- | ---: | ---: | --- |
@@ -150,13 +171,13 @@ Remaining op types are used by one or two models: `Erf` (2/21),
 
 Model-centric milestones:
 
-| Model unlock | Op types still needed |
-| --- | ---: |
-| ResNet-18 | 3 |
-| RAFT ref | 6 |
-| YOLO26n | 14 |
-| OWLv2 | 18 |
-| RF-DETR seg-small | 27 |
+| Model unlock | OpenCL | HIP |
+| --- | ---: | ---: |
+| ResNet-18 | 3 | 5 |
+| RAFT ref | 6 | 12 |
+| YOLO26n | 14 | 21 |
+| OWLv2 | 18 | 24 |
+| RF-DETR seg-small | 27 | 33 |
 
 `Conv` is required by all five, so no full model can run on OpenCL/HIP
 until it lands. The useful order is therefore: Flatten/Gemm rows, then
@@ -169,18 +190,33 @@ and pools landed 2026-10-18).
    exports need `onnx.version_converter.convert_version(model, 18)` and a
    re-export/reference run before any kernel work can be claimed for
    those families.
-2. **Consumer adapter.** Neuriplo's NERT backend is CPU-only:
-   `backends/nert/src/NertInfer.cpp:81-82` throws `"NERT runs on CPU only
-   in this phase"` when `use_gpu` is true, and
-   `neuriplo/docs/backends.yaml` marks NERT `gpu: false`. No Neuriplo
-   task family can dispatch to a NERT GPU device until that adapter
-   selects `CudaDevice`/`OpenCLDevice`/`HipDevice` and the GPU CI leg
-   exists. NERT kernel coverage alone does not change the consumer
-   matrix.
+2. **Consumer adapter.** Neuriplo's NERT backend selects
+   `nert::CudaDevice()` behind `-DNEURIPLO_NERT_CUDA=ON` (adapter commit
+   `014fe18`, 2026-10-18); the CUDA-leg full-model run is still pending,
+   and there is no `OpenCLDevice`/`HipDevice` selection or GPU CI leg.
+   `neuriplo/docs/backends.yaml` now records NERT as `gpu: true`
+   (build-time opt-in). NERT kernel coverage alone does not change the
+   consumer matrix.
 3. **Pending gates.** RF-DETR and RAFT have complete CUDA op coverage but
    no full-model CUDA gate. OWLv2/YOLO26n/ResNet gates pass.
 4. **Grounding DINO.** Opset 17, 31,821 nodes, CPU parity and CUDA gate
    both pending; it is the largest open-vocab export.
+
+## Environment notes
+
+- **cuDNN gates.** Build with `CUDNN_ROOT=/tmp/opencode/cudnn` and run
+  with
+  `LD_LIBRARY_PATH=$HOME/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64`.
+  A bare `ctest` in `build-cudnn` aborts with
+  `Cannot load symbol cublasLtGetVersion` on this host; the CUDA-13 pip
+  runtime supplies the matching `cublasLt`.
+- **Zero-extent tensors.** RF-DETR's transformer concatenates a
+  zero-length slice. `Concat` accepts zero-length operands on CPU, CUDA
+  and OpenCL (a zero extent contributes nothing); a zero-only output
+  returns without a launch.
+- **OpenCL fp64.** `GlobalAveragePool` accumulates in double and
+  requires `cl_khr_fp64`; a device without double-precision support
+  fails with a named error before the kernel builds.
 
 ## Sources
 

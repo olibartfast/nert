@@ -393,3 +393,37 @@ TEST(NertCudaConcat, SliceBoolRange) {
     cuda.allocator().release(dy);
     EXPECT_EQ(gpuOut, cpuOut);
 }
+
+// Concat with an empty operand: {2,0,4} + {2,3,4} along axis 1 -> {2,3,4}.
+// RF-DETR's transformer concatenates a zero-length slice; a zero extent is
+// legal and contributes nothing.
+TEST(NertCudaConcat, ConcatEmptyOperandExact) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> empty;
+    std::vector<float> b(24, 0.0F);
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        b[i] = static_cast<float>(i + 1);
+    }
+    std::vector<float> cpuOut(24, 0.0F);
+    nert::Node node = MakeNode("cc_empty", "Concat");
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Concat")(node, {HostFloat(empty, {2, 0, 4}), HostFloat(b, {2, 3, 4})},
+                                               {HostFloat(cpuOut, {2, 3, 4})});
+    EXPECT_EQ(cpuOut, b);
+
+    void* db = Upload(cuda, b);
+    std::vector<float> gpuOut(24, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Concat")(node, {DeviceFloat(nullptr, {2, 0, 4}), DeviceFloat(db, {2, 3, 4})},
+                                                {DeviceFloat(dy, {2, 3, 4})});
+    gpuOut = Download(cuda, dy, 24);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}

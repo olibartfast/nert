@@ -2,7 +2,8 @@
 //
 // Mirrors the CPU oracle (via the verified CUDA row): rank>=2 input,
 // output [N, C, 1, ..., 1], each (n, c) output is the mean of its
-// spatial plane accumulated in double with one float32 rounding. One
+// spatial plane accumulated in double with one float32 rounding (the
+// device must report double-precision support, cl_khr_fp64). One
 // work-item per (n, c) row. The OpenCL C source compiles once per
 // process via the shared runtime.
 
@@ -86,6 +87,17 @@ void GlobalAveragePool(const Node& node, const std::vector<TensorView>& inputs,
     }
     if (rows == 0) {
         return;
+    }
+    // The kernel accumulates in double; OpenCL fp64 is optional, so fail
+    // with the device capability named instead of a build error.
+    cl_device_id device = nullptr;
+    CheckCl(clGetContextInfo(opencl_runtime::Context(), CL_CONTEXT_DEVICES, sizeof(device), &device, nullptr),
+            "clGetContextInfo", context);
+    cl_device_fp_config fp64 = 0;
+    CheckCl(clGetDeviceInfo(device, CL_DEVICE_DOUBLE_FP_CONFIG, sizeof(fp64), &fp64, nullptr), "clGetDeviceInfo",
+            context);
+    if (fp64 == 0) {
+        throw InferenceException(context + ": device has no double-precision support (cl_khr_fp64 is required)");
     }
     cl_mem xm = reinterpret_cast<cl_mem>(const_cast<void*>(x.data));
     cl_mem ym = reinterpret_cast<cl_mem>(out.data);

@@ -28,6 +28,20 @@ void CheckCl(cl_int status, const char* what, const std::string& context) {
     }
 }
 
+// Releases the out-of-range flag buffer on every exit path, including a
+// throw from a kernel launch or read.
+struct ClMemOwner {
+    cl_mem mem = nullptr;
+    ClMemOwner() = default;
+    ClMemOwner(const ClMemOwner&) = delete;
+    ClMemOwner& operator=(const ClMemOwner&) = delete;
+    ~ClMemOwner() {
+        if (mem != nullptr) {
+            (void)clReleaseMemObject(mem);
+        }
+    }
+};
+
 int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& context) {
     int64_t count = 1;
     for (int64_t dim : dims) {
@@ -204,9 +218,11 @@ void Gather(const Node& node, const std::vector<TensorView>& inputs, const std::
         inner *= in.dims[static_cast<std::size_t>(i)];
     }
 
+    ClMemOwner oobOwner;
     cl_int oobError = CL_SUCCESS;
-    cl_mem oob = clCreateBuffer(opencl_runtime::Context(), CL_MEM_READ_WRITE, sizeof(cl_int), nullptr, &oobError);
+    oobOwner.mem = clCreateBuffer(opencl_runtime::Context(), CL_MEM_READ_WRITE, sizeof(cl_int), nullptr, &oobError);
     CheckCl(oobError, "clCreateBuffer", context);
+    cl_mem oob = oobOwner.mem;
     cl_int zero = 0;
     CheckCl(clEnqueueWriteBuffer(opencl_runtime::Queue(), oob, CL_TRUE, 0, sizeof(zero), &zero, 0, nullptr, nullptr),
             "clEnqueueWriteBuffer", context);
@@ -228,7 +244,6 @@ void Gather(const Node& node, const std::vector<TensorView>& inputs, const std::
     CheckCl(
         clEnqueueReadBuffer(opencl_runtime::Queue(), oob, CL_TRUE, 0, sizeof(flagged), &flagged, 0, nullptr, nullptr),
         "clEnqueueReadBuffer", context);
-    CheckCl(clReleaseMemObject(oob), "clReleaseMemObject", context);
     if (flagged != 0) {
         throw InferenceException(context + ": Gather index is out of range");
     }

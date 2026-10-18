@@ -1,6 +1,6 @@
 // Concat on OpenCL: join the inputs along one axis.
 //
-// Mirrors the CPU oracle: float32/int64 sharing one dtype, axis attr
+// Mirrors the CPU oracle: float32/int64/bool sharing one dtype, axis attr
 // default 1 with negative wrap, shared rank, agreement off the concat
 // axis. Each (input, outer-row) block is one clEnqueueCopyBuffer
 // device-to-device, exactly the oracle's memcpy structure (ConcatCopy
@@ -30,8 +30,8 @@ void CheckCl(cl_int status, const char* what, const std::string& context) {
 int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& context) {
     int64_t count = 1;
     for (int64_t dim : dims) {
-        if (dim <= 0) {
-            throw InferenceException(context + ": non-positive dimension");
+        if (dim < 0) {
+            throw InferenceException(context + ": negative dimension");
         }
         count *= dim;
     }
@@ -81,8 +81,8 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
         throw InferenceException(context + ": expected at least one input and one output");
     }
     const TensorView& first = inputs[0];
-    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64) {
-        throw InferenceException(context + ": tensors must be float32 or int64");
+    if (first.dtype != DataType::Float32 && first.dtype != DataType::Int64 && first.dtype != DataType::Bool) {
+        throw InferenceException(context + ": tensors must be float32, int64, or bool");
     }
     const TensorView& out = outputs[0];
     if (out.dtype != first.dtype) {
@@ -147,7 +147,9 @@ void Concat(const Node& node, const std::vector<TensorView>& inputs, const std::
         inner *= expected[static_cast<std::size_t>(i)];
     }
     const int64_t out_extent = expected[static_cast<std::size_t>(axis)];
-    const std::size_t element = first.dtype == DataType::Float32 ? sizeof(float) : sizeof(int64_t);
+    const std::size_t element = first.dtype == DataType::Float32 ? sizeof(float)
+                                : first.dtype == DataType::Int64 ? sizeof(int64_t)
+                                                                 : sizeof(std::uint8_t);
     ConcatCopy(inputs, reinterpret_cast<cl_mem>(out.data), axis, outer, inner, out_extent, element, context);
 }
 

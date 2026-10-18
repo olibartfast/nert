@@ -30,6 +30,7 @@ cmake -S . -B build-ocl -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_OPENCL=ON && cm
 |----|---------------|--------|------|-------|
 | V-A | `nert_opencl_kernels_test` Transpose×3 + Gather×2 | pass 5/5 new | 2026-10-18 | RTX 3060 NVIDIA platform; atomic OOB-flag path green |
 | V-B | Slice + Concat ×4 | pass 4/4 new | 2026-10-18 | Test-axes slip fixed (oracle right); CudaDevice typo caught on re-read |
+| V-B2 | Slice negative-axis/step + Concat empty operand + Concat bool | pass 3/3 new | 2026-10-18 | Review follow-up: claimed variants now covered; Concat also gained the bool row (CPU/CUDA parity) |
 | V-C | Shape + Unsqueeze ×4 | pass 4/4 new | 2026-10-18 | H2D/D2D transfer rows, no compute kernels |
 | V-D1 | OFF leg full `ctest` | pass 12/12 | 2026-10-18 | Fixture fallback |
 | V-D2 | CUDA-ON leg full `ctest` | pass 24/24 | 2026-10-18 | Unchanged by this slice |

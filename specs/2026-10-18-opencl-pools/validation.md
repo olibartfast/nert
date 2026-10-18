@@ -26,9 +26,9 @@ cmake -S . -B build-ocl -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_OPENCL=ON && cm
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
-| V-P1 | MaxPool k2/s2 + dilated/padded + negative | pass 3/3 new | 2026-10-18 | RTX 3060; -inf OOB, ceil, dilation green |
-| V-P2 | AveragePool k2/s2 + count_include_pad 0/1 + negative | pass 3/3 new | 2026-10-18 | Test-dim slip + 24-vs-16B Download slip fixed (both oracle-right) |
-| V-P3 | GAP rank-4 + negative | pass 2/2 new | 2026-10-18 | Double accum bit-matches oracle |
+| V-P1 | MaxPool k2/s2 + dilated/padded + ceil_mode + negatives | pass 4/4 new | 2026-10-18 | RTX 3060; -inf OOB, ceil, dilation green; bad-pads negative added on review |
+| V-P2 | AveragePool k2/s2 + count_include_pad 0/1 + ceil-past-input divisor + negative | pass 4/4 new | 2026-10-18 | Test-dim slip + 24-vs-16B Download slip fixed (both oracle-right); ceil+pad divisor added on review |
+| V-P3 | GAP rank-4 + rank-3 + negative | pass 3/3 new | 2026-10-18 | Double accum bit-matches oracle; rank-3 + fp64-requirement guard added on review |
 | V-D1 | OFF leg full `ctest` | pass 12/12 | 2026-10-18 | Fixture fallback |
 | V-D2 | CUDA-ON leg full `ctest` | pass 24/24 | 2026-10-18 | Unchanged by this slice |
 | V-D3 | OpenCL-ON leg full `ctest` | pass 14/14 | 2026-10-18 | Table 15→18 rows |

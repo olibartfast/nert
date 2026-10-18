@@ -1521,6 +1521,29 @@ TEST(NertKernels, ConcatNegativeAxisInt64) {
     EXPECT_EQ(out, (std::vector<int64_t>{1, 3, 4, 2, 5, 6}));
 }
 
+// Concat with an empty operand: {2,0,4} + {2,3,4} along axis 1 -> {2,3,4}.
+// A zero-length slice concatenated with a non-empty input is legal ONNX and
+// appears in RF-DETR's transformer; the empty operand contributes nothing.
+TEST(NertKernels, ConcatEmptyOperand) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Concat");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> a;
+    std::vector<float> b(24, 0.0f);
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        b[i] = static_cast<float>(i + 1);
+    }
+    std::vector<float> out(24, 0.0f);
+    nert::Node node = MakeNode("concat_empty", "Concat");
+    node.attributes.emplace_back("axis", int64_t{1});
+    std::vector<nert::TensorView> inputs = {FloatView(a, {2, 0, 4}), FloatView(b, {2, 3, 4})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 3, 4})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, b);
+}
+
 // Split divides [2,4] into unequal [2,1] and [2,3] parts along axis 1.
 TEST(NertKernels, SplitUnequalSizes) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Split");

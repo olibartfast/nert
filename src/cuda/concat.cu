@@ -26,8 +26,8 @@ void CheckCuda(cudaError_t status, const char* what, const std::string& context)
 int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& context) {
     int64_t count = 1;
     for (int64_t dim : dims) {
-        if (dim <= 0) {
-            throw InferenceException(context + ": non-positive dimension");
+        if (dim < 0) {
+            throw InferenceException(context + ": negative dimension");
         }
         count *= dim;
     }

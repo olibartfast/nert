@@ -1010,3 +1010,256 @@ TEST(NertOpenCLKernels, GlobalAveragePoolRejectsBadShape) {
     ocl.allocator().release(dx);
     ocl.allocator().release(dy);
 }
+
+// Concat with an empty operand: {2,0,4} + {2,3,4} along axis 1 -> {2,3,4}.
+// RF-DETR's transformer concatenates a zero-length slice; a zero extent is
+// legal and contributes nothing.
+TEST(NertOpenCLKernels, ConcatEmptyOperandExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> empty;
+    std::vector<float> b(24, 0.0F);
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        b[i] = static_cast<float>(i + 1);
+    }
+    std::vector<float> cpuOut(24, 0.0F);
+    nert::Node node = MakeNode("cc_empty", "Concat");
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Concat")(node, {HostFloat(empty, {2, 0, 4}), HostFloat(b, {2, 3, 4})},
+                                               {HostFloat(cpuOut, {2, 3, 4})});
+    EXPECT_EQ(cpuOut, b);
+
+    void* db = Upload(ocl, b);
+    std::vector<float> gpuOut(24, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Concat")(node, {DeviceFloat(nullptr, {2, 0, 4}), DeviceFloat(db, {2, 3, 4})},
+                                                  {DeviceFloat(dy, {2, 3, 4})});
+    gpuOut = Download(ocl, dy, 24);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Concat bool rows: {2,2} + {2,1} along axis 1 -> {2,3}, bytes unchanged.
+TEST(NertOpenCLKernels, ConcatBoolRows) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<std::uint8_t> a = {1, 0, 1, 0};
+    std::vector<std::uint8_t> b = {0, 1};
+    std::vector<std::uint8_t> cpuOut(6, 0);
+    nert::Node node = MakeNode("cc_b", "Concat");
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.inputs = {"a", "b"};
+    node.outputs = {"y"};
+    auto host_view = [](std::vector<std::uint8_t>& data, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = data.data();
+        view.dtype = nert::DataType::Bool;
+        view.dims = std::move(dims);
+        return view;
+    };
+    nert::CpuDevice().kernels().find("Concat")(node, {host_view(a, {2, 2}), host_view(b, {2, 1})},
+                                               {host_view(cpuOut, {2, 3})});
+    EXPECT_EQ(cpuOut, (std::vector<std::uint8_t>{1, 0, 0, 1, 0, 1}));
+
+    auto upload = [&](const std::vector<std::uint8_t>& host) {
+        void* buffer = ocl.allocator().allocate(static_cast<int64_t>(host.size()));
+        ocl.transfer().host_to_device(buffer, host.data(), static_cast<int64_t>(host.size()));
+        return buffer;
+    };
+    auto device_view = [](void* data, std::vector<int64_t> dims) {
+        nert::TensorView view;
+        view.data = data;
+        view.dtype = nert::DataType::Bool;
+        view.dims = std::move(dims);
+        return view;
+    };
+    void* da = upload(a);
+    void* db = upload(b);
+    std::vector<std::uint8_t> gpuOut(6, 0);
+    void* dy = upload(gpuOut);
+    nert::OpenCLDevice().kernels().find("Concat")(node, {device_view(da, {2, 2}), device_view(db, {2, 1})},
+                                                  {device_view(dy, {2, 3})});
+    ocl.transfer().device_to_host(gpuOut.data(), dy, static_cast<int64_t>(gpuOut.size()));
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// MaxPool ceil_mode over 3x3 k2/s2 -> 2x2; the final window is clipped, so
+// the out-of-range samples stay -inf and drop out of the max.
+TEST(NertOpenCLKernels, MaxPoolCeilModeExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F, 9.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("mp_ceil", "MaxPool");
+    node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("ceil_mode", int64_t{1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("MaxPool")(node, {HostFloat(x, {1, 1, 3, 3})}, {HostFloat(cpuOut, {1, 1, 2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{5.0F, 6.0F, 8.0F, 9.0F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("MaxPool")(node, {DeviceFloat(dx, {1, 1, 3, 3})},
+                                                   {DeviceFloat(dy, {1, 1, 2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// AveragePool ceil_mode + pads: the include-pad divisor counts padded
+// positions inside the window but clips at the padded input edge.
+TEST(NertOpenCLKernels, AveragePoolCeilPadDivisor) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    auto run = [&](int64_t includePad, const std::vector<float>& expected) {
+        std::vector<float> cpuOut(4, 0.0F);
+        nert::Node node = MakeNode("ap_ceil", "AveragePool");
+        node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+        node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+        node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 0, 0});
+        node.attributes.emplace_back("ceil_mode", int64_t{1});
+        node.attributes.emplace_back("count_include_pad", includePad);
+        node.inputs = {"x"};
+        node.outputs = {"y"};
+        nert::CpuDevice().kernels().find("AveragePool")(node, {HostFloat(x, {1, 1, 2, 2})},
+                                                        {HostFloat(cpuOut, {1, 1, 2, 2})});
+        ExpectNearOcl(cpuOut, expected);
+
+        void* dx = Upload(ocl, x);
+        std::vector<float> gpuOut(4, 0.0F);
+        void* dy = Upload(ocl, gpuOut);
+        nert::OpenCLDevice().kernels().find("AveragePool")(node, {DeviceFloat(dx, {1, 1, 2, 2})},
+                                                           {DeviceFloat(dy, {1, 1, 2, 2})});
+        gpuOut = Download(ocl, dy, 4);
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dy);
+        ExpectNearOcl(gpuOut, cpuOut);
+    };
+    run(1, std::vector<float>{0.25F, 1.0F, 1.5F, 4.0F});
+    run(0, std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F});
+}
+
+// MaxPool rejects a pads list that is not two entries per spatial axis.
+TEST(NertOpenCLKernels, MaxPoolRejectsBadPads) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(16, 1.0F);
+    std::vector<float> y(9, 0.0F);
+    nert::Node node = MakeNode("mp_pads", "MaxPool");
+    node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 0});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("MaxPool")(node, {DeviceFloat(dx, {1, 1, 4, 4})},
+                                                       {DeviceFloat(dy, {1, 1, 3, 3})});
+        FAIL() << "expected InferenceException for a malformed pads list";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("mp_pads"), std::string::npos) << message;
+        EXPECT_NE(message.find("MaxPool"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
+// GlobalAveragePool rank-3: [2,3,4] -> [2,3,1], one mean per (n,c) plane.
+TEST(NertOpenCLKernels, GlobalAveragePoolRank3Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(24, 0.0F);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(i + 1);
+    }
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::Node node = MakeNode("gap3", "GlobalAveragePool");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("GlobalAveragePool")(node, {HostFloat(x, {2, 3, 4})},
+                                                          {HostFloat(cpuOut, {2, 3, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{2.5F, 6.5F, 10.5F, 14.5F, 18.5F, 22.5F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("GlobalAveragePool")(node, {DeviceFloat(dx, {2, 3, 4})},
+                                                             {DeviceFloat(dy, {2, 3, 1})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Slice negative axis + negative step: {1..6} -> indices 5,3,1 -> {6,4,2}.
+TEST(NertOpenCLKernels, SliceNegativeAxisStepExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> starts = {5};
+    std::vector<int64_t> ends = {0};
+    std::vector<int64_t> axes = {-1};
+    std::vector<int64_t> steps = {-2};
+    std::vector<float> cpuOut(3, 0.0F);
+    nert::Node node = MakeNode("sl_neg", "Slice");
+    node.inputs = {"x", "starts", "ends", "axes", "steps"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Slice")(
+        node,
+        {HostFloat(x, {6}), HostInt64(starts, {1}), HostInt64(ends, {1}), HostInt64(axes, {1}), HostInt64(steps, {1})},
+        {HostFloat(cpuOut, {3})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 4.0F, 2.0F}));
+
+    void* dx = Upload(ocl, x);
+    void* dst = UploadInt64(ocl, starts);
+    void* den = UploadInt64(ocl, ends);
+    void* dax = UploadInt64(ocl, axes);
+    void* dstp = UploadInt64(ocl, steps);
+    std::vector<float> gpuOut(3, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Slice")(node,
+                                                 {DeviceFloat(dx, {6}), DeviceInt64(dst, {1}), DeviceInt64(den, {1}),
+                                                  DeviceInt64(dax, {1}), DeviceInt64(dstp, {1})},
+                                                 {DeviceFloat(dy, {3})});
+    gpuOut = Download(ocl, dy, 3);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dst);
+    ocl.allocator().release(den);
+    ocl.allocator().release(dax);
+    ocl.allocator().release(dstp);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}

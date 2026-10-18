@@ -26,6 +26,12 @@ cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_CUDA=ON && cma
 CUDNN_ROOT=/tmp/opencode/cudnn cmake -S . -B build-cudnn -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_CUDA=ON && cmake --build build-cudnn --parallel "$(nproc)" && LD_LIBRARY_PATH=/home/oli/.local/lib/python3.12/site-packages/nvidia/cudnn/lib ctest --test-dir build-cudnn --output-on-failure
 ```
 
+Host prerequisite: a bare `ctest` in `build-cudnn` aborts on this host
+with `Cannot load symbol cublasLtGetVersion` unless `LD_LIBRARY_PATH`
+points at a CUDA-12-matched pip cuDNN (above) or at
+`$HOME/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64`.
+The latter is the CUDA-13 runtime + 9.25 farm; both were verified 24/24.
+
 ## Evidence
 
 | ID | Command/Check | Result | Date | Notes |
