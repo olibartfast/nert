@@ -80,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nodes) and the full CUDA gate passes against ORT — flow maxdiff
   1.344e-04 (tolerance 5.324e-03) on a real image pair. The earlier
   `ref.onnx` was a FoundationPose refiner, not RAFT.
+- OpenCL full-model execution: handle-based devices now back each planned
+  arena offset with its own buffer (`cl_mem` handles cannot be offset);
+  two-output regression test. **ResNet-18 is the first full model to pass
+  on OpenCL** — top-1 107 = ORT, logits maxdiff 3.695e-06 in 54 ms.
 
 ## [0.1.0] - Unreleased
 

@@ -28,7 +28,9 @@ reference gate. Tolerance: `ExpectNearOcl` unless exact.
 | V-D3 | OpenCL-ON leg | pass 16/16 | 2026-10-19 | 14 prior + MatMul + LayerNorm. |
 | V-D4 | cuDNN farm leg | pass 24/24 | 2026-10-19 | `LD_LIBRARY_PATH` as recorded in coverage. |
 | V-D5 | `scripts/format.sh --check` | pass | 2026-10-19 | `--fix` on integration edits. |
-| V-D6 | Diff audit | pass | 2026-10-19 | Kernel/test files + shared registration + coverage/CHANGELOG. |
+| V-M4 | OpenCL executor arena: per-offset buffers for handle-based devices + two-output model regression | pass 5/5 device tests | 2026-10-19 | Before: `arena_ + offset` on a `cl_mem` segfaulted in the driver at the first non-zero-offset tensor. |
+| V-M5 | ResNet-18 full-model OpenCL gate (224x224, 1000 classes) vs ORT | pass | 2026-10-19 | top-1 107 = ORT; logits maxdiff 3.695e-06, mean 7.944e-07, 54 ms; OpenCL vs CPU max 2.168e-03. |
+| V-D6 | Diff audit | pass | 2026-10-19 | Kernel/test files + executor + shared registration + coverage/CHANGELOG. |
 
 ## Deviations
 
@@ -39,6 +41,10 @@ reference gate. Tolerance: `ExpectNearOcl` unless exact.
   correct scale/bias slots) and wrote the LayerNorm test.
 - `MatMul` and `LayerNormalization` accumulate in float32 while the CPU
   oracle uses double; comparisons use the 1e-3 scaled tolerance.
+- The first full OpenCL model exposed a real executor bug: arena views were
+  built as `base + offset`, which is only valid for pointer devices. OpenCL
+  now allocates one buffer per planned offset; the two-output regression test
+  covers the path.
 - The MatMul build emits a GCC `-Wmaybe-uninitialized` note from
   `std::variant` internals in the test; it is not in shared headers,
   the build is not `-Werror`, and the test passes.

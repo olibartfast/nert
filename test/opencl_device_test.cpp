@@ -7,7 +7,9 @@
 
 #include "device_test_helpers.hpp"
 #include "nert/device.hpp"
+#include "nert/executor.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <vector>
@@ -25,6 +27,7 @@ TEST(NertOpenCLDevice, NamesItself) {
     }
     EXPECT_STREQ(nert::OpenCLDevice().name(), "opencl");
     EXPECT_FALSE(nert::OpenCLDevice().is_host());
+    EXPECT_FALSE(nert::OpenCLDevice().supports_arena_offsets());
     const nert::Device& ocl = nert::OpenCLDevice();
     (void)static_cast<nert::Allocator&>(const_cast<nert::Device&>(ocl).allocator());
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(ocl).transfer());
@@ -80,4 +83,35 @@ TEST(NertOpenCLDevice, TransferRoundTrip) {
     ocl.transfer().device_to_host(back.data(), device, static_cast<int64_t>(bytes));
     ocl.allocator().release(device);
     EXPECT_EQ(back, host);
+}
+
+// A two-output model exercises the handle-based arena path: the second
+// output lives at a non-zero offset, which pointer arithmetic cannot express
+// on a cl_mem. The executor must back each planned offset with a buffer.
+TEST(NertOpenCLDevice, ModelRunsTwoOutputGraph) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Graph graph;
+    graph.inputs = {{"x", {nert::DataType::Float32, {}}}};
+    graph.outputs = {{"y_relu", {nert::DataType::Float32, {}}}, {"y_sig", {nert::DataType::Float32, {}}}};
+    nert::Node relu;
+    relu.name = "relu";
+    relu.op_type = "Relu";
+    relu.inputs = {"x"};
+    relu.outputs = {"y_relu"};
+    nert::Node sigmoid;
+    sigmoid.name = "sigmoid";
+    sigmoid.op_type = "Sigmoid";
+    sigmoid.inputs = {"x"};
+    sigmoid.outputs = {"y_sig"};
+    graph.nodes = {relu, sigmoid};
+
+    nert::Model model(graph, {{"x", {4}}}, nert::OpenCLDevice());
+    const std::vector<float> x = {-1.0F, 2.0F, -3.0F, 4.0F};
+    const nert::InferenceResult result = model.Run({{"x", x}});
+    EXPECT_EQ(result.outputs.at("y_relu"), (std::vector<float>{0.0F, 2.0F, 0.0F, 4.0F}));
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        EXPECT_NEAR(result.outputs.at("y_sig")[i], 1.0F / (1.0F + std::exp(-x[i])), 1e-6F) << "i=" << i;
+    }
 }

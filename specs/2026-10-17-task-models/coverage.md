@@ -49,7 +49,7 @@ can. The portable layers are where kernel coverage is missing.
 
 | Model | Task | NERT nodes (ONNX) | CPU | CUDA | OpenCL | HIP | Notes |
 | --- | --- | ---: | --- | --- | --- | --- | --- |
-| ResNet-18 | classification | 49 (49) | PASS | PASS | OPS | GAP(5) / 24 | CUDA gate V-1; CI fixture. OpenCL op coverage complete; portable gate pending. |
+| ResNet-18 | classification | 49 (49) | PASS | PASS | PASS | GAP(5) / 24 | CUDA gate V-1; OpenCL gate 2026-10-19: top-1 107 = ORT, logits maxdiff 3.695e-06. |
 | YOLO26n | detection | 421 (485) | PASS | PASS | GAP(11) / 38 | GAP(21) / 197 | CUDA gate R-6; 6/6 confident rows. |
 | OWLv2-base-patch16 | open-vocab detection | 952 (1219) | PASS | PASS | GAP(14) / 73 | GAP(24) / 453 | CPU and CUDA parity V-3/V-3b. |
 | RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | PASS | GAP(23) / 167 | GAP(33) / 701 | CUDA gate 2026-10-18: boxes 9.9e-04, labels 3.1e-04, top-1 100%, mask IoU 0.9995. |
@@ -138,10 +138,9 @@ Blockers are per-graph now, not the opset:
 | --- | --- | ---: | ---: | --- |
 | FoundationPose `ref2`, `refiner`, `rw`, `sw` | 6-D pose | 17→18 | 363 / 382 / 377 / 300 | Converted; shape inference needs dynamic `Slice` parameters (attention reshape). |
 | RF-DETR seg-small (deep-infer duplicate) | detection + segmentation | 17→18 | 1,879 | Converted; dynamic `Slice` parameters; the NERT-side export already loads. |
-| RAFT (torchvision RAFT-large) | optical flow | — | — | No local export. The local `ref.onnx` is a FoundationPose-style registration component, not RAFT. |
 | DETR family, ViT, ViTPose, Depth-Anything-V2, VideoMAE, ViViT, TimeSformer | various | — | — | No local export; CPU coverage recorded in the roadmap. |
 
-Grounding DINO needed two loader fixes: INT32 constants (folded onto
+RAFT is now provisioned as a real torchvision export and is in the models table above. Grounding DINO needed two loader fixes: INT32 constants (folded onto
 int64 lanes, matching the Cast emulation) and constant-parameter
 evaluation through `Mod`, `Transpose`, and single-axis N-D `Slice`
 (its pad chain). Both landed 2026-10-18; the graph loads at 19,224
@@ -149,15 +148,16 @@ folded nodes.
 
 ## Full-model gates
 
-| Model | CPU parity | CUDA full gate | Evidence / blocker |
-| --- | --- | --- | --- |
-| ResNet-18 | PASS | PASS | V-1 (top-1 identical; max diff 2.167e-03, classification-identical). |
-| YOLO26n | PASS | PASS | R-6 (6/6 confident rows, min IoU 0.9998039; detection-identical). |
-| OWLv2 | PASS | PASS | V-3/V-3b (logits exact; boxes 1.9e-04; 0 rows over tolerance). |
-| RF-DETR seg-small | PASS | PASS | 2026-10-18 gate: boxes 9.938e-04, labels 3.080e-04, top-1 100%, binarized mask IoU min 0.999528; detection-identical (packet `specs/2026-10-18-model-gates/`). |
-| RAFT | Recorded (Neuriplo manifest) | Blocked | Real opset-18 export absent locally; the local `ref.onnx` is a registration refiner, not RAFT. |
-| Grounding DINO | Pending | Pending | Opset-18 conversion and reference run needed. |
-| Other YOLO families | Recorded (model zoo) | Not run | Local exports are opset 12/19/20; conversion first. |
+| Model | CPU | CUDA | OpenCL | HIP | Evidence / blocker |
+| --- | --- | --- | --- | --- | --- |
+| ResNet-18 | PASS | PASS | PASS | GAP(5/24) | V-1; OpenCL gate 2026-10-19: top-1 107 = ORT, logits maxdiff 3.695e-06 (mean 7.944e-07), 54 ms. |
+| YOLO26n | PASS | PASS | GAP(11/38) | GAP(21/197) | R-6 (6/6 confident rows, min IoU 0.9998039; detection-identical). |
+| OWLv2 | PASS | PASS | GAP(14/73) | GAP(24/453) | V-3/V-3b (logits exact; boxes 1.9e-04; 0 rows over tolerance). |
+| RF-DETR seg-small | PASS | PASS | GAP(23/167) | GAP(33/701) | CUDA gate boxes 9.938e-04, labels 3.080e-04, top-1 100%, mask IoU 0.999528. |
+| RAFT-large | OPS (CPU run pending) | PASS | GAP(10/122) | GAP(19/501) | CUDA gate 2026-10-19: flow maxdiff 1.344e-04 (tol 5.324e-03) on a real `bus.jpg` pair; real torchvision export. |
+| Grounding DINO | OPS | OPS | GAP(35/5,235) | GAP(45/15,336) | Loads (19,224 folded nodes), CPU/CUDA op-complete; reference gate pending. |
+| Converted YOLO/RF-DETR variants | OPS | OPS | per converted table | per converted table | Load + shape inference only; no reference gate yet. |
+| DETR/ViT/ViTPose/Depth-Anything/VideoMAE/ViViT/TimeSformer | BLOCKED | BLOCKED | BLOCKED | BLOCKED | No local export (searched 2026-10-18). |
 | DETR family | Recorded (roadmap Phase 2) | Not run | Opset-18 export/harness still the gate. |
 
 ## Portable-backend priority (OpenCL)

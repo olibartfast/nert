@@ -96,11 +96,19 @@ class Model {
     // were uploaded.
     void ReleaseResidents();
 
+    // Releases every per-offset arena buffer; safe to call when none were
+    // allocated (handle-based devices only).
+    void ReleaseArenaSlots();
+
     const Graph& graph_; // borrowed; must outlive the model
     Device* device_;     // the device chosen once for this graph
     InferredShapes shapes_;
     MemoryPlan plan_;
     void* arena_ = nullptr; // one allocation, shared by every arena tensor
+    // Handle-based devices (OpenCL) cannot offset a base allocation, so each
+    // distinct planned offset gets its own buffer sized to the largest tensor
+    // placed there. Empty on pointer-offset devices.
+    std::map<int64_t, void*> arena_slots_;
     // Device buffers holding the initializers, uploaded once in the
     // constructor on non-host devices; empty on host devices (which read
     // initializer storage in place) and for empty initializers.

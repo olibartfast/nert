@@ -12,6 +12,7 @@
 
 #include "nert/executor.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -83,11 +84,31 @@ Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& devic
     : graph_(graph), device_(const_cast<Device*>(&device)), shapes_(InferShapes(graph, input_dims)),
       plan_(PlanMemory(graph, shapes_)) {
     try {
-        if (plan_.arena_size > 0) {
+        if (plan_.arena_size > 0 && device_->supports_arena_offsets()) {
             arena_ = device_->allocator().allocate(plan_.arena_size);
             if (arena_ == nullptr) {
                 throw InferenceException("executor: could not allocate the " + std::to_string(plan_.arena_size) +
                                          "-byte arena");
+            }
+        } else if (plan_.arena_size > 0) {
+            // Handle-based devices cannot add a byte offset to a base
+            // allocation. Back every distinct planned offset with one buffer
+            // sized to the largest tensor placed there; the planner's liveness
+            // guarantees tensors sharing an offset do not overlap in time.
+            std::map<int64_t, int64_t> slot_sizes;
+            for (const auto& entry : plan_.buffers) {
+                if (entry.second.size > 0) {
+                    int64_t& size = slot_sizes[entry.second.offset];
+                    size = std::max(size, entry.second.size);
+                }
+            }
+            for (const auto& entry : slot_sizes) {
+                void* buffer = device_->allocator().allocate(entry.second);
+                if (buffer == nullptr) {
+                    throw InferenceException("executor: could not allocate the " + std::to_string(entry.second) +
+                                             "-byte arena slot at offset " + std::to_string(entry.first));
+                }
+                arena_slots_.emplace(entry.first, buffer);
             }
         }
         UploadResidents();
@@ -95,6 +116,7 @@ Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& devic
         // The destructor never runs for a failed construction, so release
         // the partial state here before the exception escapes.
         ReleaseResidents();
+        ReleaseArenaSlots();
         if (arena_ != nullptr) {
             device_->allocator().release(arena_);
             arena_ = nullptr;
@@ -105,6 +127,7 @@ Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& devic
 
 Model::~Model() {
     ReleaseResidents();
+    ReleaseArenaSlots();
     if (arena_ != nullptr) {
         device_->allocator().release(arena_);
     }
@@ -290,6 +313,13 @@ void Model::ReleaseResidents() {
     resident_.clear();
 }
 
+void Model::ReleaseArenaSlots() {
+    for (const auto& entry : arena_slots_) {
+        device_->allocator().release(entry.second);
+    }
+    arena_slots_.clear();
+}
+
 void Model::Execute(std::map<std::string, TensorView>& views,
                     std::map<std::string, std::vector<uint8_t>>& host_outputs) {
     for (const auto& entry : graph_.initializers) {
@@ -371,7 +401,18 @@ void Model::Execute(std::map<std::string, TensorView>& views,
             }
             const TensorInfo& info = ShapeOf(shapes_, name);
             TensorView view;
-            view.data = static_cast<char*>(arena_) + buffer->second.offset;
+            if (device_->supports_arena_offsets()) {
+                view.data = static_cast<char*>(arena_) + buffer->second.offset;
+            } else if (buffer->second.size == 0) {
+                view.data = nullptr;
+            } else {
+                const auto slot = arena_slots_.find(buffer->second.offset);
+                if (slot == arena_slots_.end()) {
+                    throw InferenceException("executor: no arena slot for output '" + name + "' of node '" + node.name +
+                                             "'");
+                }
+                view.data = slot->second;
+            }
             view.dtype = info.dtype;
             view.dims = info.dims;
             views[name] = view;

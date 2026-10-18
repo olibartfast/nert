@@ -69,6 +69,11 @@ public:
     // CPU device and host-memory test devices use the default; the CUDA
     // device overrides it to false so the executor stages transfers.
     virtual bool is_host() const { return true; }
+    // True when an arena allocation is a real address and adding a byte
+    // offset yields a valid kernel view (CPU/CUDA). Handle-based devices
+    // (OpenCL) return false; the executor then backs every planned offset
+    // with its own allocation instead of doing pointer arithmetic.
+    virtual bool supports_arena_offsets() const { return true; }
 };
 
 // The process-lifetime CPU device, the reference implementation of the seam.

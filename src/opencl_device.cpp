@@ -93,6 +93,7 @@ class OpenCLDeviceImpl final : public Device {
     Transfer& transfer() override { return transfer_; }
     const KernelTable& kernels() const override { return kernels_; }
     bool is_host() const override { return false; }
+    bool supports_arena_offsets() const override { return false; }
 
   private:
     OpenCLAllocator allocator_;
