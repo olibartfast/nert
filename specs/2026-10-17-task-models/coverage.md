@@ -36,7 +36,7 @@ is folded `Constant` nodes.
 | Layer | Op rows | Notes |
 | --- | ---: | --- |
 | CPU (oracle) | 72 | Reference set; every inventoried model's op types are covered after constant folding. |
-| CUDA | 72 | Identical set to CPU. `Conv` and `ConvTranspose` are cuDNN-gated; a CUDA build without cuDNN lacks those two rows. |
+| CUDA | 72 | Identical set to CPU. `Conv` and `ConvTranspose` are cuDNN-gated; a CUDA build without cuDNN lacks those two rows. Strict float32: cuBLAS runs `CUBLAS_PEDANTIC_MATH` and cuDNN `CUDNN_FMA_MATH`, so TF32 is off on Ampere+. |
 | OpenCL | 18 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`, `Transpose`, `Slice`, `Concat`, `Shape`, `Unsqueeze`, `Gather`, `MaxPool`, `AveragePool`, `GlobalAveragePool`. |
 | HIP | 9 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`. Lags OpenCL by the movement six and the three pools. |
 
@@ -52,8 +52,9 @@ can. The portable layers are where kernel coverage is missing.
 | ResNet-18 | classification | 49 (49) | PASS | PASS | GAP(3) / 22 | GAP(5) / 24 | CUDA gate V-1; CI fixture. |
 | YOLO26n | detection | 421 (485) | PASS | PASS | GAP(14) / 145 | GAP(21) / 197 | CUDA gate R-6; 6/6 confident rows. |
 | OWLv2-base-patch16 | open-vocab detection | 952 (1219) | PASS | PASS | GAP(18) / 331 | GAP(24) / 453 | CPU and CUDA parity V-3/V-3b. |
-| RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | OPS | GAP(27) / 399 | GAP(33) / 701 | CUDA op coverage complete; full gate pending. |
-| RAFT (ref component) | optical flow | 156 (156) | PASS | OPS | GAP(6) / 38 | GAP(12) / 85 | Full RAFT CPU parity pass; CUDA gate pending after InstanceNormalization landed. |
+| RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | PASS | GAP(27) / 399 | GAP(33) / 701 | CUDA gate 2026-10-18: boxes 9.9e-04, labels 3.1e-04, top-1 100%, mask IoU 0.9995. |
+
+RAFT (torchvision RAFT-large) is not in this table: no opset-18 export is present locally. Its CPU parity is recorded through Neuriplo's manifest harness (V-3 in the RAFT packet). The earlier 156-node row came from `/tmp/opencode/ref.onnx`, which is a pose-registration refiner (inputs `A`/`B` 6×160×160, outputs `trans`/`rot`), not RAFT; that misattribution is corrected here. Device gaps for the real RAFT graph are unknown until the export is provisioned.
 
 ### Missing OpenCL rows by model
 
@@ -77,8 +78,6 @@ plus the OpenCL-only movement/pool rows; its exact gaps follow.
   `Cos=4`, `Equal=4`, `Gemm=4`, `GridSample=4`, `Sin=4`, `Exp=3`,
   `Not=3`, `Tile=3`, `Greater=2`, `And=1`, `Einsum=1`,
   `GatherElements=1`, `Less=1`, `ReduceMax=1`, `Resize=1`, `TopK=1`.
-- **RAFT ref — 6 types, 38 nodes:** `Conv=15`, `MatMul=12`,
-  `LayerNormalization=4`, `Squeeze=3`, `Gemm=2`, `ReduceMean=2`.
 
 ### Missing HIP rows by model
 
@@ -96,8 +95,6 @@ HIP-only gap beyond the OpenCL list is:
 - **RF-DETR seg-small — 33 types, 701 nodes:** OpenCL gap plus
   `Transpose=133`, `Slice=72`, `Concat=38`, `Shape=32`,
   `Unsqueeze=23`, `Gather=4`.
-- **RAFT ref — 12 types, 85 nodes:** OpenCL gap plus `Transpose=16`,
-  `Concat=12`, `Slice=8`, `Gather=6`, `Shape=3`, `Unsqueeze=2`.
 
 ## Exports NERT cannot load (opset != 18)
 
@@ -113,7 +110,7 @@ not a missing CPU kernel.
 | RF-DETR seg-nano-576 | detection + segmentation | 17 | 1,710 | Convert to 18. |
 | RF-DETR nano-1101 | detection | 17 | 1,434 | Convert to 18. |
 | RF-DETR keypoint-preview | keypoint | 17 | 1,392 / 3,542 | Two exports; convert to 18. |
-| RAFT components (`ref2`, `refiner`, `rw`, `scorer`, `sw`) | optical flow | 17 | 363 / 382 / 377 / 209 / 300 | Convert to 18; `ref.onnx` already loads. |
+| RAFT components (`ref2`, `refiner`, `rw`, `scorer`, `sw`) | optical flow | 17 | 363 / 382 / 377 / 209 / 300 | Not present locally (inventoried from the Neuriplo zoo manifest); convert to 18 when provisioned. |
 | YOLO26s | detection | 20 | 391 | Convert to 18. |
 | YOLO26n-depth | depth | 20 | 348 | Convert to 18. |
 | YOLOv8n-pose | pose | 20 | 267 | Convert to 18. |
@@ -121,7 +118,9 @@ not a missing CPU kernel.
 | YOLO26s-pose | pose | 12 | 401 / 418 | Two exports; convert to 18. |
 | YOLO26x | detection | 19 | 606 | Convert to 18. |
 
-The DETR family (RT-DETR/D-FINE/DEIM/DEIMv2), ViT, ViTPose,
+The torchvision RAFT-large export is absent locally (the local
+`ref.onnx` is a registration refiner, not RAFT), so no RAFT device gate
+is possible here. The DETR family (RT-DETR/D-FINE/DEIM/DEIMv2), ViT, ViTPose,
 Depth-Anything-V2, VideoMAE, ViViT, TimeSformer, and generic
 segmentation/pose families have CPU coverage recorded in the roadmap but
 no NERT-loadable opset-18 export in this tree, so they get no row here
@@ -135,29 +134,29 @@ until an export exists. See the pending V-2/V-3 entries in
 | ResNet-18 | PASS | PASS | V-1 (top-1 identical; max diff 2.167e-03, classification-identical). |
 | YOLO26n | PASS | PASS | R-6 (6/6 confident rows, min IoU 0.9998039; detection-identical). |
 | OWLv2 | PASS | PASS | V-3/V-3b (logits exact; boxes 1.9e-04; 0 rows over tolerance). |
-| RF-DETR seg-small | PASS | OPS | Kernels complete; full CUDA gate not recorded. |
-| RAFT | PASS | OPS | InstanceNormalization row landed; full CUDA gate not recorded. |
+| RF-DETR seg-small | PASS | PASS | 2026-10-18 gate: boxes 9.938e-04, labels 3.080e-04, top-1 100%, binarized mask IoU min 0.999528; detection-identical (packet `specs/2026-10-18-model-gates/`). |
+| RAFT | Recorded (Neuriplo manifest) | Blocked | Real opset-18 export absent locally; the local `ref.onnx` is a registration refiner, not RAFT. |
 | Grounding DINO | Pending | Pending | Opset-18 conversion and reference run needed. |
 | Other YOLO families | Recorded (model zoo) | Not run | Local exports are opset 12/19/20; conversion first. |
 | DETR family | Recorded (roadmap Phase 2) | Not run | Opset-18 export/harness still the gate. |
 
 ## Portable-backend priority (OpenCL)
 
-Shared by the five loadable models, sorted by model count then node
-touches. This ranks OpenCL; HIP additionally lacks the movement six and
+Shared by the four locally loadable models, sorted by model count then
+node touches. This ranks OpenCL; HIP additionally lacks the movement six and
 the pools, so its unlock sets are larger (see the HIP gaps above).
 
 | Op type | Models using it | Node touches | Why it matters |
 | --- | ---: | ---: | --- |
-| `Conv` | 5 | 152 | Blocks every loadable model; hardest portable kernel. |
-| `MatMul` | 4 | 376 | Transformer detection, OWLv2, RAFT. |
-| `LayerNormalization` | 3 | 113 | Both transformer detectors and RAFT. |
+| `Conv` | 4 | 137 | Blocks every loadable model; hardest portable kernel. |
+| `MatMul` | 3 | 364 | Transformer detectors and OWLv2. |
+| `LayerNormalization` | 2 | 109 | Both transformer detectors. |
 | `Cast` | 3 | 49 | Dtype crosses. |
 | `Where` | 3 | 36 | Masks. |
 | `Expand` | 3 | 19 | Broadcast. |
 | `ConstantOfShape` | 3 | 12 | Shape-generated constants. |
 | `Equal` | 3 | 10 | Masks. |
-| `Gemm` | 3 | 7 | ResNet classifier, RF-DETR, RAFT. |
+| `Gemm` | 2 | 5 | ResNet classifier, RF-DETR. |
 | `Flatten` | 3 | 4 | ResNet/YOLO/OWLv2. |
 
 Remaining op types are used by one or two models: `Erf` (2/21),
@@ -165,7 +164,7 @@ Remaining op types are used by one or two models: `Erf` (2/21),
 `Greater` (2/3), `Resize` (2/3), `TopK` (2/3), `Einsum` (2/2),
 `ReduceMax` (2/2), `Sqrt` (1/48), `IsNaN` (1/12), `ReduceSum` (1/5),
 `Cos` (1/4), `GridSample` (1/4), `Sin` (1/4), `Exp` (1/3), `Not` (1/3),
-`ReduceL2` (1/3), `Squeeze` (1/3), `Tile` (1/3), `ReduceMean` (1/2),
+`ReduceL2` (1/3), `Tile` (1/3),
 `ArgMax` (1/1), `Elu` (1/1), `Less` (1/1),
 `LessOrEqual` (1/1), `Mod` (1/1).
 
@@ -174,12 +173,11 @@ Model-centric milestones:
 | Model unlock | OpenCL | HIP |
 | --- | ---: | ---: |
 | ResNet-18 | 3 | 5 |
-| RAFT ref | 6 | 12 |
 | YOLO26n | 14 | 21 |
 | OWLv2 | 18 | 24 |
 | RF-DETR seg-small | 27 | 33 |
 
-`Conv` is required by all five, so no full model can run on OpenCL/HIP
+`Conv` is required by all four, so no full model can run on OpenCL/HIP
 until it lands. The useful order is therefore: Flatten/Gemm rows, then
 `Conv`, then the transformer-specific rows (the shared movement six
 and pools landed 2026-10-18).
@@ -197,8 +195,9 @@ and pools landed 2026-10-18).
    `neuriplo/docs/backends.yaml` now records NERT as `gpu: true`
    (build-time opt-in). NERT kernel coverage alone does not change the
    consumer matrix.
-3. **Pending gates.** RF-DETR and RAFT have complete CUDA op coverage but
-   no full-model CUDA gate. OWLv2/YOLO26n/ResNet gates pass.
+3. **Pending gates.** RF-DETR's CUDA gate now passes (2026-10-18).
+   RAFT is blocked on a missing export, not on kernels.
+   OWLv2/YOLO26n/ResNet gates pass.
 4. **Grounding DINO.** Opset 17, 31,821 nodes, CPU parity and CUDA gate
    both pending; it is the largest open-vocab export.
 
@@ -217,6 +216,10 @@ and pools landed 2026-10-18).
 - **OpenCL fp64.** `GlobalAveragePool` accumulates in double and
   requires `cl_khr_fp64`; a device without double-precision support
   fails with a named error before the kernel builds.
+- **TF32.** CUDA math modes now truly forbid TF32 (`CUBLAS_PEDANTIC_MATH`,
+  `CUDNN_FMA_MATH`). `NVIDIA_TF32_OVERRIDE=0` is no longer needed; before
+  the fix, TF32 noise flipped RF-DETR's near-tie TopK order and changed
+  the outputs by O(0.5).
 
 ## Sources
 
@@ -224,7 +227,8 @@ and pools landed 2026-10-18).
   `src/hip/table.cpp`, `src/kernels/cpu_kernels.cpp`.
 - NERT model gates: `specs/2026-10-17-task-models/validation.md`,
   `specs/2026-10-17-n1g-yolo-gpu/validation.md`,
-  `specs/2026-10-18-closure-cuda/validation.md`.
+  `specs/2026-10-18-closure-cuda/validation.md`,
+  `specs/2026-10-18-model-gates/validation.md`.
 - RAFT CPU parity: `specs/2026-10-10-raft-open-vocab/validation.md`.
 - Consumer adapter: `neuriplo/backends/nert/src/NertInfer.cpp`,
   `neuriplo/docs/backends.yaml`.

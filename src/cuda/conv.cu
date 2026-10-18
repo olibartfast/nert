@@ -7,7 +7,8 @@
 // cudnnAddTensor-style bias done first-party) instead of the v9
 // operation-graph API. Same library kernels underneath, far smaller API
 // surface to get exactly right, identical numerics goal. TF32 is forbidden
-// (CUDNN_DEFAULT_MATH) so results match the float32 CPU oracle within
+// (CUDNN_FMA_MATH; DEFAULT_MATH still allows TF32 on Ampere+) so results
+// match the float32 CPU oracle within
 // tolerance. Rank 3 lifts to 4D (H=1 shares the buffer: the flat layout is
 // identical); rank 5 runs as native 3D (NCDHW).
 //
@@ -371,7 +372,7 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
                                                        stride.data(), dilation.data(), CUDNN_CROSS_CORRELATION,
                                                        CUDNN_DATA_FLOAT),
                        "cudnnSetConvolutionNdDescriptor", context);
-            CheckCudnn(cudnnSetConvolutionMathType(plan->conv_desc, CUDNN_DEFAULT_MATH), "cudnnSetConvolutionMathType",
+            CheckCudnn(cudnnSetConvolutionMathType(plan->conv_desc, CUDNN_FMA_MATH), "cudnnSetConvolutionMathType",
                        context);
             CheckCudnn(cudnnSetConvolutionGroupCount(plan->conv_desc, IntOrThrow(group, "group", context)),
                        "cudnnSetConvolutionGroupCount", context);

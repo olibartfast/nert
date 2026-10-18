@@ -4,7 +4,8 @@
 // path (descriptors + v7 heuristics + first-party bias add). The transpose
 // Y(N,M,Ho,Wo) = ConvTranspose(X(N,C,H,W), W(C,M/group,kH,kW)) is exactly
 // the convolution input-gradient with dy=X, filter=W, dx=Y. TF32 is
-// forbidden (CUDNN_DEFAULT_MATH) so results match the float32 CPU oracle
+// forbidden (CUDNN_FMA_MATH; DEFAULT_MATH still allows TF32 on Ampere+)
+// so results match the float32 CPU oracle
 // within tolerance. Rank-4 only, explicit pads or VALID (the loader
 // rejects the rest, like the oracle).
 //
@@ -289,7 +290,7 @@ void ConvTranspose(const Node& node, const std::vector<TensorView>& inputs, cons
             CheckCudnn(cudnnSetConvolutionNdDescriptor(plan->conv_desc, 2, pad.data(), stride.data(), dilation.data(),
                                                        CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT),
                        "cudnnSetConvolutionNdDescriptor", context);
-            CheckCudnn(cudnnSetConvolutionMathType(plan->conv_desc, CUDNN_DEFAULT_MATH), "cudnnSetConvolutionMathType",
+            CheckCudnn(cudnnSetConvolutionMathType(plan->conv_desc, CUDNN_FMA_MATH), "cudnnSetConvolutionMathType",
                        context);
             CheckCudnn(cudnnSetConvolutionGroupCount(plan->conv_desc, IntOrThrow(group, "group", context)),
                        "cudnnSetConvolutionGroupCount", context);

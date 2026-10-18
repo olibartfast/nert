@@ -3,7 +3,8 @@
 // Row-major NERT layouts reach column-major cuBLAS as C^T = op(B)^T *
 // op(A)^T: the B operand is passed first with leading dim b.dims[1], the A
 // operand second with leading dim a.dims[1], and m/n are swapped. TF32 is
-// forbidden (CUBLAS_DEFAULT_MATH) so results match the float32 CPU oracle
+// forbidden (CUBLAS_PEDANTIC_MATH; DEFAULT_MATH still allows TF32 on
+// Ampere+) so results match the float32 CPU oracle
 // within tolerance rather than tensor-float. The optional rank-2 bias rides
 // the beta term; a rank-1 [N] bias is added by a small first-party kernel.
 // The output is zeroed first so a beta of 0 never reads garbage.
@@ -137,8 +138,9 @@ void Gemm(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 
     cublasHandle_t handle = nullptr;
     CheckCublas(cublasCreate(&handle), "cublasCreate", context);
-    // Forbid TF32/tensor cores: the CPU oracle is strict float32.
-    CheckCublas(cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH), "cublasSetMathMode", context);
+    // Pedantic math forbids TF32/tensor cores; DEFAULT_MATH still permits
+    // TF32 on Ampere+, which the strict-float32 oracle cannot tolerate.
+    CheckCublas(cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH), "cublasSetMathMode", context);
 
     float* y = static_cast<float*>(out.data);
     CheckCuda(cudaMemset(y, 0, static_cast<std::size_t>(m * n) * sizeof(float)), "cudaMemset", context);

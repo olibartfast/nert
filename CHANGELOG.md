@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenCL pools: `MaxPool`, `AveragePool`, `GlobalAveragePool`
   (verified CUDA-row ports; ResNet-18 portable gap down to
   `Conv`/`Flatten`/`Gemm`) — table 15→18.
+- RF-DETR seg-small CUDA gate: boxes 9.9e-04, labels 3.1e-04, top-1
+  100%, binarized mask IoU min 0.9995 — detection-identical. The gate
+  exposed two blockers, both fixed: `Concat` accepts zero-extent
+  operands on every device, and the CUDA math modes now truly disable
+  TF32 (`CUBLAS_PEDANTIC_MATH`/`CUDNN_FMA_MATH`; `DEFAULT_MATH` still
+  allows it) after TF32 noise flipped near-tie TopK ordering. The
+  coverage matrix's RAFT row was corrected: the local `ref.onnx` is a
+  registration refiner, not torchvision RAFT, and no RAFT export is
+  present locally.
 
 ## [0.1.0] - Unreleased
 

@@ -3,7 +3,7 @@
 // Mirrors the CPU oracle: float32 only, 1-D promotion (A [K] -> [1,K],
 // B [K] -> [K,1]), NumPy-broadcast batch shapes, per-batch contraction
 // check. Each broadcast batch is one cublasSgemm with the Gemm row-major
-// swap trick (CUBLAS_DEFAULT_MATH: strict float32 like the oracle).
+// swap trick (CUBLAS_PEDANTIC_MATH: strict float32 like the oracle).
 
 #include "nert/device.hpp"
 
@@ -171,8 +171,9 @@ void MatMul(const Node& node, const std::vector<TensorView>& inputs, const std::
 
     cublasHandle_t handle = nullptr;
     CheckCublas(cublasCreate(&handle), "cublasCreate", context);
-    // Forbid TF32/tensor cores: the CPU oracle is strict float32.
-    CheckCublas(cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH), "cublasSetMathMode", context);
+    // Pedantic math forbids TF32/tensor cores; DEFAULT_MATH still permits
+    // TF32 on Ampere+, which the strict-float32 oracle cannot tolerate.
+    CheckCublas(cublasSetMathMode(handle, CUBLAS_PEDANTIC_MATH), "cublasSetMathMode", context);
 
     const float alpha = 1.0F;
     const float beta = 0.0F;
