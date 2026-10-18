@@ -34,6 +34,10 @@ struct Case {
     nert::Node node;
     std::vector<std::vector<int64_t>> inDims;
     std::vector<std::vector<float>> inData;
+    // Parallel to inData: a non-empty entry makes that input int64
+    // (e.g. Reshape's shape operand); empty keeps the float input.
+    std::vector<std::vector<int64_t>> int64Dims;
+    std::vector<std::vector<int64_t>> int64Data;
     std::vector<int64_t> outDims;
 };
 
@@ -151,19 +155,25 @@ void RunDeviceCase(const DeviceSlot& slot, const Case& c, const std::vector<floa
     std::vector<void*> devicePtrs;
     std::vector<nert::TensorView> deviceIns;
     for (std::size_t i = 0; i < c.inData.size(); ++i) {
-        const int64_t bytes = static_cast<int64_t>(c.inData[i].size() * sizeof(float));
+        const bool as_int64 = i < c.int64Data.size() && !c.int64Data[i].empty();
+        const int64_t bytes = as_int64 ? static_cast<int64_t>(c.int64Data[i].size() * sizeof(int64_t))
+                                       : static_cast<int64_t>(c.inData[i].size() * sizeof(float));
         void* deviceBuffer = device.allocator().allocate(bytes);
         if (deviceBuffer == nullptr) {
             std::cout << "FAIL: device allocate failed for " << c.op << " " << c.label << '\n';
             ++failed;
             return;
         }
-        device.transfer().host_to_device(deviceBuffer, c.inData[i].data(), bytes);
+        if (as_int64) {
+            device.transfer().host_to_device(deviceBuffer, c.int64Data[i].data(), bytes);
+        } else {
+            device.transfer().host_to_device(deviceBuffer, c.inData[i].data(), bytes);
+        }
         devicePtrs.push_back(deviceBuffer);
         nert::TensorView v;
         v.data = deviceBuffer;
-        v.dtype = nert::DataType::Float32;
-        v.dims = c.inDims[i];
+        v.dtype = as_int64 ? nert::DataType::Int64 : nert::DataType::Float32;
+        v.dims = as_int64 ? c.int64Dims[i] : c.inDims[i];
         deviceIns.push_back(v);
     }
     std::vector<float> zeros(static_cast<std::size_t>(Count(c.outDims)), 0.0F);
@@ -296,6 +306,18 @@ int main() {
     }
     {
         Case c;
+        c.op = "Reshape";
+        c.label = Shape({2, 3, 4}) + " -> " + Shape({6, 4});
+        c.node = MakeNode("bench_reshape", "Reshape");
+        c.inDims = {{2, 3, 4}, {}};
+        c.inData = {Fill(rng, 24, -1.0F, 1.0F), {}};
+        c.int64Dims = {{}, {2}};
+        c.int64Data = {{}, {6, 4}};
+        c.outDims = {6, 4};
+        cases.push_back(std::move(c));
+    }
+    {
+        Case c;
         c.op = "Conv";
         c.label = Shape({8, 16, 64, 64}) + " k3+bias";
         c.node = MakeNode("bench_conv", "Conv");
@@ -326,10 +348,12 @@ int main() {
         }
         std::vector<nert::TensorView> cpuIns;
         for (std::size_t i = 0; i < c.inData.size(); ++i) {
+            const bool as_int64 = i < c.int64Data.size() && !c.int64Data[i].empty();
             nert::TensorView v;
-            v.data = const_cast<float*>(c.inData[i].data());
-            v.dtype = nert::DataType::Float32;
-            v.dims = c.inDims[i];
+            v.data = as_int64 ? static_cast<void*>(const_cast<int64_t*>(c.int64Data[i].data()))
+                              : static_cast<void*>(const_cast<float*>(c.inData[i].data()));
+            v.dtype = as_int64 ? nert::DataType::Int64 : nert::DataType::Float32;
+            v.dims = as_int64 ? c.int64Dims[i] : c.inDims[i];
             cpuIns.push_back(v);
         }
         std::vector<float> ref(static_cast<std::size_t>(Count(c.outDims)), 0.0F);

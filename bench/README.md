@@ -55,6 +55,7 @@ Reference numbers (RTX 3060, 2026-10-17/18, one line per device leg):
 | CUDA | MaxPool | [8,64,112,112] k3 s2 | 379.40 | 2.04 | 185.7x | 0 |
 | CUDA | AveragePool | [8,64,112,112] k3 s2 | 137.04 | 1.47 | 93.2x | 0 |
 | CUDA | Softmax | [256,4096] | 56.22 | 18.06 | 3.1x | 0 |
+| CUDA | Conv | [8,16,64,64] k3+bias | SKIP (no cuDNN on host leg) | | | |
 | OpenCL | Relu | 4M | 94.28 | 3.76 | 25.1x | 0 |
 | OpenCL | Sigmoid | 4M | 63.53 | 3.78 | 16.8x | 1.79e-07 |
 | OpenCL | Tanh | 4M | 244.65 | 3.77 | 64.9x | 1.19e-07 |
@@ -71,9 +72,14 @@ Reference numbers (RTX 3060, 2026-10-17/18, one line per device leg):
 | HIP | Sub | 4M bcast | 188.75 | 9.65 | 19.6x | 0 |
 | HIP | Div | 4M | 105.87 | 9.56 | 11.1x | 0 |
 | HIP | Softmax | [256,4096] | 54.96 | 17.32 | 3.2x | 0 |
+| CUDA | Reshape | [2,3,4] -> [6,4] | 0.00 | 0.03 | 0.1x | 0 |
+| OpenCL | Reshape | [2,3,4] -> [6,4] | 0.00 | 0.09 | 0.0x | 0 |
+| HIP | Reshape | [2,3,4] -> [6,4] | 0.00 | 0.02 | 0.1x | 0 |
 
 Rows without a device kernel `SKIP` on that leg: CUDA has no cuDNN in
 the host container (Conv), OpenCL/HIP have no Gemm/pools/Conv yet.
+The Reshape fixture carries an int64 shape operand (the driver supports
+mixed int64 inputs); its CPU side is a memcpy, so ratios are noise.
 Softmax is only ~3x on CUDA/HIP: one thread per row with double
 accumulation on both sides, honestly reported, not tuned.
 
