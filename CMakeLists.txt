@@ -205,6 +205,8 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/conv.cpp)
     target_sources(nert PRIVATE src/opencl/mat_mul.cpp)
     target_sources(nert PRIVATE src/opencl/layer_normalization.cpp)
+    target_sources(nert PRIVATE src/opencl/expand.cpp)
+    target_sources(nert PRIVATE src/opencl/where.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)

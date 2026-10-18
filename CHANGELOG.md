@@ -85,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arena offset with its own buffer (`cl_mem` handles cannot be offset);
   two-output regression test. **ResNet-18 is the first full model to pass
   on OpenCL** — top-1 107 = ORT, logits maxdiff 3.695e-06 in 54 ms.
+- OpenCL `Expand` (runtime target shape, identity copy + broadcast) and
+  `Where` (bool condition, f32/i64 values, broadcast) — table 23→25.
+  YOLO26n drops to 9 types/28 nodes, OWLv2 to 12/42, RF-DETR to 21/153;
+  RAFT-large to 9/119.
 
 ## [0.1.0] - Unreleased
 

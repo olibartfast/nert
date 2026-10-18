@@ -254,6 +254,22 @@ if(NERT_ENABLE_OPENCL)
         GTest::gtest
         GTest::gtest_main)
     add_test(NAME nert_opencl_layer_norm COMMAND nert_opencl_layer_norm_test)
+    add_executable(nert_opencl_expand_test opencl_expand_test.cpp)
+    target_compile_features(nert_opencl_expand_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_expand_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_expand_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_expand COMMAND nert_opencl_expand_test)
+    add_executable(nert_opencl_where_test opencl_where_test.cpp)
+    target_compile_features(nert_opencl_where_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_where_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_where_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_where COMMAND nert_opencl_where_test)
 endif()
 
 # HIP device scaffold test (N1c-M1 on NVIDIA). Built only when the HIP device

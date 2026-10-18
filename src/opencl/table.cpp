@@ -6,7 +6,7 @@
 // OpenCL C, runtime-compiled) plus Reshape (validated buffer copy),
 // Transpose/Gather (indexed copies), Slice/Concat/Shape/Unsqueeze
 // (movement rows), MaxPool/AveragePool/GlobalAveragePool (pools),
-// Flatten/Gemm, Conv, MatMul and LayerNormalization.
+// Flatten/Gemm, Conv, MatMul/LayerNormalization, and Expand/Where.
 
 #include "nert/device.hpp"
 
@@ -40,6 +40,8 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
 void MatMul(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void LayerNormalization(const Node& node, const std::vector<TensorView>& inputs,
                         const std::vector<TensorView>& outputs);
+void Expand(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Where(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindOpenCLKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
@@ -66,6 +68,8 @@ KernelFn FindOpenCLKernel(const std::string& op_type) {
         {"Conv", &Conv},
         {"MatMul", &MatMul},
         {"LayerNormalization", &LayerNormalization},
+        {"Expand", &Expand},
+        {"Where", &Where},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

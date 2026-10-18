@@ -30,6 +30,8 @@ reference gate. Tolerance: `ExpectNearOcl` unless exact.
 | V-D5 | `scripts/format.sh --check` | pass | 2026-10-19 | `--fix` on integration edits. |
 | V-M4 | OpenCL executor arena: per-offset buffers for handle-based devices + two-output model regression | pass 5/5 device tests | 2026-10-19 | Before: `arena_ + offset` on a `cl_mem` segfaulted in the driver at the first non-zero-offset tensor. |
 | V-M5 | ResNet-18 full-model OpenCL gate (224x224, 1000 classes) vs ORT | pass | 2026-10-19 | top-1 107 = ORT; logits maxdiff 3.695e-06, mean 7.944e-07, 54 ms; OpenCL vs CPU max 2.168e-03. |
+| V-M6 | Expand: 7 cases (rows/columns/scalar/identity copy/int64/bool/negatives) | pass 7/7 | 2026-10-19 | Cache-key collision between dtype entry points found and fixed (`ExpandF/I/B`). |
+| V-M7 | Where: mask/broadcast/int64 + 3 negatives | pass 4/4 | 2026-10-19 | Lane kernel needed its launch locals renamed (TensorView shadowing). |
 | V-D6 | Diff audit | pass | 2026-10-19 | Kernel/test files + executor + shared registration + coverage/CHANGELOG. |
 
 ## Deviations
