@@ -88,7 +88,8 @@ N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DE
 Dev environment: `.devcontainer` (26.08 stack); host stays toolkit-minimal.
 
 Queued: portable-backend parity toward YOLO order (HIP pools next), N1e
-slice C bias fusion + executor activation fusion, Vulkan
+slice C bias fusion + executor activation fusion, bench Slice 5 (fixtures
+for the R6/Tier-5 set + Reshape on every table), Vulkan
 shader-toolchain, AMD runner (rocBLAS/MIOpen + HIP-amd build).
 
 Landed 2026-10-18: N1d-M5 OpenCL Reshape, N1c-M5 HIP Reshape, N1e slice A
