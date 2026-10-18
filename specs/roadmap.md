@@ -92,10 +92,10 @@ Landed (2026-10-16/17, RTX 3060): N1a scaffold + pilot (Gemm/Relu/Add),
 N1b cuDNN Conv, N1e-1 elementwise (Mul/Sub/Div) + N1e-2 pools + N1e-3
 activations, N1f runtime-bench dedup, N1g-1..5b YOLO set + GPU GATE
 (YOLO26n fully dispatched, 6/6 rows), N1d-M1..M4 OpenCL (device + 8 ops),
-N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DETR norm corridor on CUDA (Sqrt/Erf/ReduceSum/LayerNormalization, 126 gap nodes, oracle-matched), R6 + Tier-5 rows on CUDA (31 kernels: unary/logic/compare/fold/move/reduce/scatter families, oracle-matched; GridSample + Einsum excluded).
+N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DETR norm corridor on CUDA (Sqrt/Erf/ReduceSum/LayerNormalization, 126 gap nodes, oracle-matched), R6 + Tier-5 rows on CUDA (31 kernels, oracle-matched), closure rows GridSample/InstanceNormalization/ConvTranspose (cuDNN-gated) — every CPU op on CUDA (ConvTranspose cuDNN-only).
 Dev environment: `.devcontainer` (26.08 stack); host stays toolkit-minimal.
 
-Queued: portable-backend parity toward YOLO order (HIP pools next), N1e
+Queued: OpenCL Flatten/Gemm next (movement six + pools landed 2026-10-18), then OpenCL Conv; HIP pools next, N1e
 slice C bias fusion + executor activation fusion, bench Slice 5 (fixtures
 for the R6/Tier-5 set + Reshape on every table), Vulkan
 shader-toolchain, AMD runner (rocBLAS/MIOpen + HIP-amd build).

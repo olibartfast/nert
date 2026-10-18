@@ -809,3 +809,204 @@ TEST(NertOpenCLKernels, UnsqueezeRejectsDupAxes) {
     ocl.allocator().release(dy);
 }
 
+// MaxPool k2/s2 over 1..16 (4x4): hand-computed window maxima.
+TEST(NertOpenCLKernels, MaxPoolStride2Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F,  3.0F,  4.0F,  5.0F,  6.0F,  7.0F,  8.0F,
+                            9.0F, 10.0F, 11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("mp0", "MaxPool");
+    node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("MaxPool")(node, {HostFloat(x, {1, 1, 4, 4})}, {HostFloat(cpuOut, {1, 1, 2, 2})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 8.0F, 14.0F, 16.0F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("MaxPool")(node, {DeviceFloat(dx, {1, 1, 4, 4})},
+                                                   {DeviceFloat(dy, {1, 1, 2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// MaxPool k2/s1/pad1/dilation2 vs oracle (exercises pads + dilation).
+TEST(NertOpenCLKernels, MaxPoolDilatedPaddedMatchesOracle) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {3.0F, 1.0F, 4.0F, 1.0F, 5.0F, 9.0F, 2.0F, 6.0F, 5.0F};
+    std::vector<float> cpuOut(9, 0.0F);
+    nert::Node node = MakeNode("mp1", "MaxPool");
+    node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("dilations", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 1, 1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("MaxPool")(node, {HostFloat(x, {1, 1, 3, 3})}, {HostFloat(cpuOut, {1, 1, 3, 3})});
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(9, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("MaxPool")(node, {DeviceFloat(dx, {1, 1, 3, 3})},
+                                                   {DeviceFloat(dy, {1, 1, 3, 3})});
+    gpuOut = Download(ocl, dy, 9);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// MaxPool rejects a missing kernel_shape, naming node + op.
+TEST(NertOpenCLKernels, MaxPoolRejectsMissingKernel) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(16, 1.0F);
+    std::vector<float> y(4, 0.0F);
+    nert::Node node = MakeNode("mp_bad", "MaxPool");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("MaxPool")(node, {DeviceFloat(dx, {1, 1, 4, 4})},
+                                                       {DeviceFloat(dy, {1, 1, 2, 2})});
+        FAIL() << "expected InferenceException for a missing kernel_shape";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("mp_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("MaxPool"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
+// AveragePool k2/s2 over 1..16 (4x4): hand-computed window means.
+TEST(NertOpenCLKernels, AveragePoolStride2Exact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F,  3.0F,  4.0F,  5.0F,  6.0F,  7.0F,  8.0F,
+                            9.0F, 10.0F, 11.0F, 12.0F, 13.0F, 14.0F, 15.0F, 16.0F};
+    std::vector<float> cpuOut(4, 0.0F);
+    nert::Node node = MakeNode("ap0", "AveragePool");
+    node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+    node.attributes.emplace_back("strides", std::vector<int64_t>{2, 2});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("AveragePool")(node, {HostFloat(x, {1, 1, 4, 4})},
+                                                    {HostFloat(cpuOut, {1, 1, 2, 2})});
+    ExpectNearOcl(cpuOut, (std::vector<float>{3.5F, 5.5F, 11.5F, 13.5F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(4, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("AveragePool")(node, {DeviceFloat(dx, {1, 1, 4, 4})},
+                                                       {DeviceFloat(dy, {1, 1, 2, 2})});
+    gpuOut = Download(ocl, dy, 4);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    ExpectNearOcl(gpuOut, cpuOut);
+}
+
+// AveragePool count_include_pad with pads vs oracle (divisor rule).
+TEST(NertOpenCLKernels, AveragePoolCountPadMatchesOracle) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F};
+    auto run = [&](int64_t inc) {
+        std::vector<float> cpuOut(4, 0.0F);
+        nert::Node node = MakeNode("ap1", "AveragePool");
+        node.attributes.emplace_back("kernel_shape", std::vector<int64_t>{2, 2});
+        node.attributes.emplace_back("strides", std::vector<int64_t>{1, 1});
+        node.attributes.emplace_back("pads", std::vector<int64_t>{1, 1, 0, 0});
+        node.attributes.emplace_back("count_include_pad", inc);
+        node.inputs = {"x"};
+        node.outputs = {"y"};
+        nert::CpuDevice().kernels().find("AveragePool")(node, {HostFloat(x, {1, 1, 2, 2})},
+                                                        {HostFloat(cpuOut, {1, 1, 2, 2})});
+
+        void* dx = Upload(ocl, x);
+        std::vector<float> gpuOut(4, 0.0F);
+        void* dy = Upload(ocl, gpuOut);
+        nert::OpenCLDevice().kernels().find("AveragePool")(node, {DeviceFloat(dx, {1, 1, 2, 2})},
+                                                           {DeviceFloat(dy, {1, 1, 2, 2})});
+        gpuOut = Download(ocl, dy, 4);
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dy);
+        ExpectNearOcl(gpuOut, cpuOut);
+    };
+    run(0);
+    run(1);
+}
+
+// GlobalAveragePool over [1,2,2,2] of 1..8: channel means {2.5, 6.5}.
+TEST(NertOpenCLKernels, GlobalAveragePoolExact) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("gap0", "GlobalAveragePool");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("GlobalAveragePool")(node, {HostFloat(x, {1, 2, 2, 2})},
+                                                          {HostFloat(cpuOut, {1, 2, 1, 1})});
+    ExpectNearOcl(cpuOut, (std::vector<float>{2.5F, 6.5F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("GlobalAveragePool")(node, {DeviceFloat(dx, {1, 2, 2, 2})},
+                                                             {DeviceFloat(dy, {1, 2, 1, 1})});
+    gpuOut = Download(ocl, dy, 2);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    ExpectNearOcl(gpuOut, cpuOut);
+}
+
+// GlobalAveragePool rejects a bad output shape, naming node + op.
+TEST(NertOpenCLKernels, GlobalAveragePoolRejectsBadShape) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x(8, 1.0F);
+    std::vector<float> y(2, 0.0F);
+    nert::Node node = MakeNode("gap_bad", "GlobalAveragePool");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, y);
+    try {
+        nert::OpenCLDevice().kernels().find("GlobalAveragePool")(node, {DeviceFloat(dx, {1, 2, 2, 2})},
+                                                                 {DeviceFloat(dy, {2})});
+        FAIL() << "expected InferenceException for a bad output shape";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("gap_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("GlobalAveragePool"), std::string::npos) << message;
+    }
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}

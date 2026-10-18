@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Shape`, `Unsqueeze`, `Gather` (hand-written OpenCL C, oracle
   vs device green on the RTX 3060) — table 9→15; per-model portable
   gaps recomputed in the task-models coverage matrix.
+- OpenCL pools: `MaxPool`, `AveragePool`, `GlobalAveragePool`
+  (verified CUDA-row ports; ResNet-18 portable gap down to
+  `Conv`/`Flatten`/`Gemm`) — table 15→18.
 
 ## [0.1.0] - Unreleased
 

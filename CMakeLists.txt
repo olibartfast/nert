@@ -200,6 +200,7 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/transpose.cpp src/opencl/gather.cpp)
     target_sources(nert PRIVATE src/opencl/slice.cpp src/opencl/concat.cpp)
     target_sources(nert PRIVATE src/opencl/shape.cpp src/opencl/unsqueeze.cpp)
+    target_sources(nert PRIVATE src/opencl/max_pool.cpp src/opencl/average_pool.cpp src/opencl/global_average_pool.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)
