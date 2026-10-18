@@ -87,9 +87,13 @@ activations, N1f runtime-bench dedup, N1g-1..5b YOLO set + GPU GATE
 N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DETR norm corridor on CUDA (Sqrt/Erf/ReduceSum/LayerNormalization, 126 gap nodes, oracle-matched), R6 + Tier-5 rows on CUDA (31 kernels: unary/logic/compare/fold/move/reduce/scatter families, oracle-matched; GridSample + Einsum excluded).
 Dev environment: `.devcontainer` (26.08 stack); host stays toolkit-minimal.
 
-Queued: portable-backend parity toward YOLO order (HIP activations next,
-OpenCL reshape next), N1e pre/post fusion (packet pending), Vulkan
+Queued: portable-backend parity toward YOLO order (HIP pools next), N1e
+slice C bias fusion + executor activation fusion, Vulkan
 shader-toolchain, AMD runner (rocBLAS/MIOpen + HIP-amd build).
+
+Landed 2026-10-18: N1d-M5 OpenCL Reshape, N1c-M5 HIP Reshape, N1e slice A
+cached cuDNN Conv state (5.9x per-call), slice B opt-in cuDNN Frontend
+Conv row.
 
 Measurement note (2026-10-16, `specs/2026-10-16-kernel-bench-harness/`,
 branch `feature/bench-playground-layout`): the opt-in `bench/` harness now
