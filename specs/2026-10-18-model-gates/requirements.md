@@ -35,5 +35,5 @@ seg-small and RAFT had complete CUDA op coverage but no full-model gate.
 
 ## Open questions
 
-- RAFT CPU cross-check on the new export is running; the CUDA gate is
-  already against ORT on the same graph.
+- RAFT CPU and CUDA gates both pass against ORT on the new export
+  (1.317e-04 and 1.344e-04).

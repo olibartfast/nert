@@ -77,8 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table 21→23. YOLO26n drops to 11 types, OWLv2 to 14, RF-DETR to 23;
   RAFT-large's OpenCL gap is 10 types/122 nodes.
 - RAFT-large: real torchvision opset-18 export provisioned (1,836 ONNX
-  nodes) and the full CUDA gate passes against ORT — flow maxdiff
-  1.344e-04 (tolerance 5.324e-03) on a real image pair. The earlier
+  nodes) and the full CPU+CUDA gate passes against ORT — flow maxdiff
+  1.317e-04 (CPU) / 1.344e-04 (CUDA), tolerance 5.324e-03, on a real
+  image pair. The earlier
   `ref.onnx` was a FoundationPose refiner, not RAFT.
 - OpenCL full-model execution: handle-based devices now back each planned
   arena offset with its own buffer (`cl_mem` handles cannot be offset);

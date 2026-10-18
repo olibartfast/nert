@@ -53,7 +53,7 @@ can. The portable layers are where kernel coverage is missing.
 | YOLO26n | detection | 421 (485) | PASS | PASS | GAP(11) / 38 | GAP(21) / 197 | CUDA gate R-6; 6/6 confident rows. |
 | OWLv2-base-patch16 | open-vocab detection | 952 (1219) | PASS | PASS | GAP(14) / 73 | GAP(24) / 453 | CPU and CUDA parity V-3/V-3b. |
 | RF-DETR seg-small | detection + segmentation | 1255 (1785) | PASS | PASS | GAP(23) / 167 | GAP(33) / 701 | CUDA gate 2026-10-18: boxes 9.9e-04, labels 3.1e-04, top-1 100%, mask IoU 0.9995. |
-| RAFT-large (torchvision) | optical flow | 1299 (1836) | OPS | PASS | GAP(10) / 122 | GAP(19) / 501 | Real opset-18 export 2026-10-19; CUDA gate max 1.344e-04 vs ORT (tol 5.324e-03); CPU run pending. |
+| RAFT-large (torchvision) | optical flow | 1299 (1836) | PASS | PASS | GAP(10) / 122 | GAP(19) / 501 | Real opset-18 export 2026-10-19; CPU max 1.317e-04, CUDA max 1.344e-04 vs ORT (tol 5.324e-03). |
 
 RAFT-large was re-provisioned as a real torchvision export (opset 18, 1,836 ONNX nodes, 1,299 after folding) on 2026-10-19. The earlier 156-node row came from `/tmp/opencode/ref.onnx`, a FoundationPose-style registration refiner (inputs `A`/`B` 6×160×160, outputs `trans`/`rot`), not RAFT; that misattribution is corrected here. CPU parity is recorded through Neuriplo's manifest harness; the CUDA full-model gate uses the new export.
 
@@ -154,7 +154,7 @@ folded nodes.
 | YOLO26n | PASS | PASS | GAP(11/38) | GAP(21/197) | R-6 (6/6 confident rows, min IoU 0.9998039; detection-identical). |
 | OWLv2 | PASS | PASS | GAP(14/73) | GAP(24/453) | V-3/V-3b (logits exact; boxes 1.9e-04; 0 rows over tolerance). |
 | RF-DETR seg-small | PASS | PASS | GAP(23/167) | GAP(33/701) | CUDA gate boxes 9.938e-04, labels 3.080e-04, top-1 100%, mask IoU 0.999528. |
-| RAFT-large | OPS (CPU run pending) | PASS | GAP(10/122) | GAP(19/501) | CUDA gate 2026-10-19: flow maxdiff 1.344e-04 (tol 5.324e-03) on a real `bus.jpg` pair; real torchvision export. |
+| RAFT-large | PASS | PASS | GAP(10/122) | GAP(19/501) | Full gate 2026-10-19 on a real `bus.jpg` pair: CPU maxdiff 1.317e-04 (1,074 s), CUDA 1.344e-04; tolerance 5.324e-03. |
 | Grounding DINO | OPS | OPS | GAP(35/5,235) | GAP(45/15,336) | Loads (19,224 folded nodes), CPU/CUDA op-complete; reference gate pending. |
 | Converted YOLO/RF-DETR variants | OPS | OPS | per converted table | per converted table | Load + shape inference only; no reference gate yet. |
 | DETR/ViT/ViTPose/Depth-Anything/VideoMAE/ViViT/TimeSformer | BLOCKED | BLOCKED | BLOCKED | BLOCKED | No local export (searched 2026-10-18). |
