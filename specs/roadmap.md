@@ -1,119 +1,168 @@
 # NERT Roadmap
 
-> Status: living roadmap, created 2026-10-10 on extraction from Neuriplo
-> (`olibartfast/nert@81b6b1f`). History lives in neuriplo packets
-> `2026-09-17-native-engine-cpu-spine`, `2026-10-01-yolo26-native`, and
-> `2026-10-10-native-tasks-op-coverage` (tiers 1–3 done 2026-10-10).
+> Status: living roadmap. Created on 2026-10-10 when NERT moved out of
+> Neuriplo (`olibartfast/nert@81b6b1f`). Detailed history remains in the
+> Neuriplo packets `2026-09-17-native-engine-cpu-spine`,
+> `2026-10-01-yolo26-native`, and `2026-10-10-native-tasks-op-coverage`.
 
-## Status Key
+## How to Read the Status
 
-- **Complete** — landed with evidence.
-- **Next** — the active packet.
-- **Planned** — ordered, not yet specified.
-- **Blocked** — needs an identified decision.
+- **Complete** — implemented and backed by recorded evidence.
+- **In progress** — active work with a current specification.
+- **Planned** — ordered, but not yet specified.
+- **Blocked** — waiting on a decision, export, or external toolchain.
 
 ## Phase 0 — CPU Reference Spine (Complete)
 
-Parser, IR, shape inference, arena planner, executor, device seam, and the
-ResNet-18 op set (`Conv`, `Gemm`, `MatMul`, `Add`, `Relu`, `MaxPool`,
-`ReduceMean`, `Reshape`). Proven by ResNet-18 parity (max abs diff
-3.14713e-05, budget 1e-4). History: neuriplo
+The first phase delivered the interpreter itself: ONNX parsing, the graph IR,
+static shape inference, arena planning, the executor, the device seam, and the
+ResNet-18 operator set (`Conv`, `Gemm`, `MatMul`, `Add`, `Relu`, `MaxPool`,
+`ReduceMean`, and `Reshape`). ResNet-18 parity against ONNX Runtime recorded a
+maximum absolute difference of `3.14713e-05` against a `1e-4` budget.
+
+History: Neuriplo specification packet
 `specs/2026-09-17-native-engine-cpu-spine/`.
 
-## Phase 1 — YOLO / Detection Coverage (Complete)
+## Phase 1 — YOLO and Detection Coverage (Complete)
 
-23 new ops incl. `Mul/Div/Sub/Sigmoid/Cast/Softmax/ReduceMax/Mod/Equal/Where/
-Concat/Split/Unsqueeze/Expand/Transpose/Slice/Gather/GatherElements/Resize/
-Flatten/Shape/ConstantOfShape/TopK`, constant folding, int64/bool
-intermediates, confident-row parity on a real image (6 rows, min IoU
-0.999999). History: neuriplo `specs/2026-10-01-yolo26-native/`.
+Twenty-three operators were added for YOLO detection, including `Mul`, `Div`,
+`Sub`, `Sigmoid`, `Cast`, `Softmax`, `ReduceMax`, `Mod`, `Equal`, `Where`,
+`Concat`, `Split`, `Unsqueeze`, `Expand`, `Transpose`, `Slice`, `Gather`,
+`GatherElements`, `Resize`, `Flatten`, `Shape`, `ConstantOfShape`, and `TopK`.
+The phase also introduced constant folding, int64 and bool intermediates, and
+confident-row parity on a real image: six rows matched with a minimum IoU of
+`0.999999`.
 
-## Phase 2 — YOLO Completion + Transformer Encoders (Complete)
+History: Neuriplo specification packet
+`specs/2026-10-01-yolo26-native/`.
 
-Tier 1 (`ConvTranspose/Pow/Tile/AveragePool/Identity/Floor` + folding,
-DOUBLE narrowing, duplicate value-info, Resize sizes) and Tier 2
-(`Erf/LayerNormalization/Sqrt/Squeeze/Tanh/IsNaN` + [D-8]–[D-13]) with
-model-zoo parity over YOLO families and ViT/ViTPose/Depth-Anything-V2/
-VideoMAE/ViViT/TimeSformer, plus Tier 3 DETR-family groundwork
-(`GridSample/ReduceSum/Range/Clip/Log/Pad/Abs/Neg/Exp/Cos/Sin/Einsum/And/Not/
-Greater/Less`, int64+bool I/O [D-14], double accumulation [D-15], DETR
-comparison [D-16], RT-DETR/D-FINE/DEIM/DEIMv2 end to end). Evidence: neuriplo
-`specs/2026-10-10-native-tasks-op-coverage/validation.md`.
+## Phase 2 — YOLO Completion and Transformer Encoders (Complete)
 
-## Phase 3 — RAFT + Open Vocabulary (In progress)
+This phase completed the YOLO families and added the transformer encoder
+operators. Tier 1 covered `ConvTranspose`, `Pow`, `Tile`, `AveragePool`,
+`Identity`, and `Floor`, along with folding and dtype narrowing fixes. Tier 2
+added `Erf`, `LayerNormalization`, `Sqrt`, `Squeeze`, `Tanh`, and `IsNaN` and
+proved parity for ViT, ViTPose, Depth-Anything-V2, VideoMAE, ViViT, and
+TimeSformer.
 
-Active packet: `specs/2026-10-10-raft-open-vocab/`.
+Tier 3 supplied the DETR groundwork: `GridSample`, `ReduceSum`, `Range`,
+`Clip`, `Log`, `Pad`, `Abs`, `Neg`, `Exp`, `Cos`, `Sin`, `Einsum`, `And`,
+`Not`, `Greater`, and `Less`, plus int64 and bool graph I/O, double
+accumulation for reductions, DETR comparison rules, and end-to-end runs for
+RT-DETR, D-FINE, DEIM, and DEIMv2.
 
-- Tier 4: `InstanceNormalization` + RAFT end to end ([Q-3] static-per-load).
-  **Complete (Phase A, 2026-10-10)** — kernel, shape rule, loader entry,
-  hand-computed tests; RAFT parity `max_scaled_diff=6.10e-05` (atol 1e-3).
-- Tier 5: `ArgMax/Elu/LessOrEqual/ReduceL2/CumSum/EyeLike/GreaterOrEqual/
-  Max/Min/Or/ScatterND` + OWLv2 / Grounding DINO end to end. **Kernels
-  complete 2026-10-16** (all 11: shape rule, loader entry, hand-computed +
-  negative tests, format clean, 8/8 non-fixture suites green); OWLv2 /
-  Grounding DINO parity + regression manifests are the open integration
-  gate (Neuriplo-side runs).
-- Exit: every gated export loads and matches ONNX Runtime per the packet's
-  [V-3] (atol 1e-3 scaled, detection/DETR rows confident-only); ResNet
-  fixture ctest stays green; no existing test weakened.
-- OWLv2 bring-up + parity (2026-10-18): real-model dispatch found and
-  closed int32 `Cast`, Einsum ellipsis (CPU), bool movement
-  (`Flatten`/`Gather`/`Concat`/`Slice`/`Transpose`/`Unsqueeze`), empty
-  `ConstantOfShape`, and CUDA `Einsum`. CPU vs ORT: logits bit-identical
-  (top-1 3600/3600), boxes maxdiff 1.3e-04. Full 1219-node CPU dispatch
-  3037 s Release; CUDA dispatch 7 s with logits bit-identical and boxes
-  maxdiff 1.9e-04 (0 rows over tolerance). Evidence: task-models
-  `validation.md` V-3/V-3b.
+Evidence: Neuriplo specification
+`specs/2026-10-10-native-tasks-op-coverage/validation.md`. The related
+decision records are `D-8` through `D-16`, including `D-13` for the
+Resize-size policy, `D-14` for int64 and bool I/O, and `D-15` for double
+accumulation.
 
-## Phase 4 — Hardening + Policy (Complete 2026-10-16)
+## Phase 3 — RAFT and Open Vocabulary (In Progress)
 
-[Q-1] decided: require opset-18 exports + conversion note (README).
-[Q-3] decided: static per load ([D-8], evidenced by RAFT parity).
-[Q-4] decided: ResNet-18 fixture only in CI; zoo parity in Neuriplo.
-Packet: `specs/2026-10-16-phase4-hardening/`. No new ops; no `src/`/
-`test/` behavior change.
+Active specification: `specs/2026-10-10-raft-open-vocab/`.
 
-## Phase 5 — Namespace Rename (Complete 2026-10-16)
+- **RAFT (Tier 4).** The `InstanceNormalization` kernel, shape rule, loader
+  entry, and tests are complete. RAFT parity recorded
+  `max_scaled_diff=6.10e-05` against an `atol` of `1e-3`. The real
+  torchvision RAFT-large export is not present in this repository; the parity
+  number came from Neuriplo's manifest harness.
+- **Open-vocabulary operators (Tier 5).** All eleven kernels are implemented:
+  `ArgMax`, `Elu`, `LessOrEqual`, `ReduceL2`, `CumSum`, `EyeLike`,
+  `GreaterOrEqual`, `Max`, `Min`, `Or`, and `ScatterND`. OWLv2 is complete on
+  CPU and CUDA. Grounding DINO now has a converted, loadable export but still
+  needs a full reference gate.
+- **OWLv2 bring-up.** Real-model dispatch exposed and closed several gaps:
+  int32 `Cast` emulation on int64 lanes, Einsum ellipsis handling, bool
+  movement (`Flatten`, `Gather`, `Concat`, `Slice`, `Transpose`, `Unsqueeze`),
+  empty `ConstantOfShape`, and CUDA `Einsum`. CPU results match ONNX Runtime:
+  logits are bit-identical (top-1 `3600/3600`) and box differences peak at
+  `1.3e-04`. CUDA completes the full 1219-node dispatch in about seven seconds
+  with bit-identical logits and box differences peaking at `1.9e-04`; no row
+  exceeds the tolerance. Evidence: validation `V-3` and `V-3b` in the
+  task-model specification.
 
-[Q-5] decided: `include/nert/` + namespace `nert` + `snake_case` filenames
-in one breaking 0.2.0 commit (`wip/nert-phase5`), with the matching Neuriplo
-adapter change (includes + namespace) still to land consumer-side.
-Packet: `specs/2026-10-16-phase5-rename/`. No behavior change.
+The exit condition is that every gated export loads and matches ONNX Runtime
+under the specification's validation rules, the ResNet fixture stays passing,
+and no existing test is weakened. Current model-level status is tracked in
+`specs/2026-10-17-task-models/coverage.md`.
 
-## Phase N1 — Device Layers (In progress)
+## Phase 4 — Hardening and Policy (Complete, 2026-10-16)
 
-Same model + same plan on-device, matching the CPU oracle within tolerance,
-device chosen once at load. Vendor decision (2026-10-16, maintainer):
-hybrid, libraries-first — cuDNN/cuBLAS on NVIDIA, HIP via hipify (both
-targets), Vulkan-then-OpenCL for the portable fallback. Slice log:
-`specs/2026-10-16-tier5-to-N1-orchestration.md` (authoritative).
+This phase settled the policy questions that affect every later feature:
 
-Landed (2026-10-16/17, RTX 3060): N1a scaffold + pilot (Gemm/Relu/Add),
-N1b cuDNN Conv, N1e-1 elementwise (Mul/Sub/Div) + N1e-2 pools + N1e-3
-activations, N1f runtime-bench dedup, N1g-1..5b YOLO set + GPU GATE
-(YOLO26n fully dispatched, 6/6 rows), N1d-M1..M4 OpenCL (device + 8 ops),
-N1c-M1..M3 HIP-on-NVIDIA (device + 5 ops, hipify-perl + GPU-agnostic bar), RF-DETR norm corridor on CUDA (Sqrt/Erf/ReduceSum/LayerNormalization, 126 gap nodes, oracle-matched), R6 + Tier-5 rows on CUDA (31 kernels, oracle-matched), closure rows GridSample/InstanceNormalization/ConvTranspose (cuDNN-gated) — every CPU op on CUDA (ConvTranspose cuDNN-only).
-Dev environment: `.devcontainer` (26.08 stack); host stays toolkit-minimal.
+- `Q-1`: require opset-18 exports and document the conversion step.
+- `Q-3`: resolve RAFT's symbolic spatial dimensions statically per load.
+- `Q-4`: keep CI to the ResNet-18 fixture; run model-zoo parity in Neuriplo.
 
-Queued: OpenCL Flatten/Gemm next (movement six + pools landed 2026-10-18), then OpenCL Conv; HIP pools next, N1e
-slice C bias fusion + executor activation fusion, bench Slice 5 (fixtures
-for the R6/Tier-5 set + Reshape on every table), Vulkan
-shader-toolchain, AMD runner (rocBLAS/MIOpen + HIP-amd build).
+The specification is `specs/2026-10-16-phase4-hardening/`. No operators or
+runtime behavior changed.
 
-Landed 2026-10-18: N1d-M5 OpenCL Reshape, N1c-M5 HIP Reshape, N1e slice A
-cached cuDNN Conv state (5.9x per-call), slice B opt-in cuDNN Frontend
-Conv row.
+## Phase 5 — Namespace Rename (Complete, 2026-10-16)
 
-Measurement note (2026-10-16, `specs/2026-10-16-kernel-bench-harness/`,
-branch `feature/bench-playground-layout`): the opt-in `bench/` harness now
-exists — per-kernel CPU-oracle-vs-device harnesses with timings, starting
-with `gemm` on CUDA + OpenCL C/C++ (RTX 3060: exact match, 5/5 seeds). This
-is tooling only: the runtime stays stdlib-only and the device seam is still
-CPU-only. N1 wires the device layer; it does not re-prove the harness.
+The breaking 0.2.0 rename moved public headers to `include/nert/`, the
+namespace to `nert`, and C++ filenames to lowercase `snake_case` (decision
+`Q-5`). The Neuriplo adapter still needs the matching include and namespace
+update on its side.
+
+Specification: `specs/2026-10-16-phase5-rename/`. No behavior changed.
+
+## Phase N1 — Device Layers (In Progress)
+
+The device-layer goal is simple to state: the same model and the same plan run
+on a device and match the CPU oracle within tolerance, with the device chosen
+once at load. The vendor strategy is hybrid and libraries-first: cuDNN and
+cuBLAS on NVIDIA, HIP through hipify where the toolchain exists, and a portable
+fallback that starts with OpenCL.
+
+The authoritative work log is
+`specs/2026-10-16-tier5-to-N1-orchestration.md`.
+
+What is complete:
+
+- The CUDA device layer, including the YOLO operator set and the full-model
+  YOLO26n gate (six confident rows, minimum IoU `0.9998039`).
+- cuDNN `Conv`, cuDNN backward-data `ConvTranspose`, and the RF-DETR norm
+  corridor (`Sqrt`, `Erf`, `ReduceSum`, `LayerNormalization`).
+- The R6 and Tier-5 CUDA kernels, including `GridSample`,
+  `InstanceNormalization`, and the remaining reduction, comparison, and
+  scatter operators. The CUDA table now covers every CPU operator, including
+  `Einsum`, which received its CUDA row during the OWLv2 bring-up.
+- OpenCL device support and the movement, pool, reshape, `Conv`, `Flatten`,
+  and `Gemm` rows. The OpenCL table is still being expanded; the live
+  model-by-device matrix is in `specs/2026-10-17-task-models/coverage.md`.
+- HIP device support for the original nine operators. HIP parity for the
+  newer rows is blocked on a host with `hipify-perl`, ROCm, and AMD hardware.
+
+The development environment is the `.devcontainer` 26.08 stack; the host stays
+toolkit-minimal.
+
+Still queued: the remaining OpenCL transformer and reduction rows, HIP parity
+where hardware permits, bias fusion and executor activation fusion, additional
+bench fixtures, a Vulkan shader toolchain, and an AMD runner built on rocBLAS
+and MIOpen.
+
+The opt-in `bench/` harness exists under
+`specs/2026-10-16-kernel-bench-harness/`. It provides per-kernel CPU-oracle
+versus device comparisons with timings, starting with `gemm` on CUDA and
+OpenCL C/C++. It is measurement tooling only; the runtime remains
+standard-library-only.
+
+## Tooling — Memory Footprint Report (Planned)
+
+The planned model fit/sizing report adds `MemoryFootprint` to `Model` and an
+opt-in `nert_mem_report` command-line tool. It accounts for NERT-managed bytes
+by category — arena, initializers, inputs and outputs, and device-resident
+copies — together with the planned arena peak.
+
+Specification: `specs/2026-10-18-memory-footprint/`. User guide:
+`docs/memory-footprint-profiling.md` (currently marked planned). The report
+excludes measured resident set size (RSS), device usage, and kernel
+workspaces. Implementation has not started.
 
 ## Specification Rule
 
-Non-trivial work gets a dated `specs/YYYY-MM-DD-feature-name/` packet with
-`requirements.md`, `plan.md`, `validation.md` — validation defined before
-code, evidence recorded after. Small contained changes get a short spec note;
-trivial fixes need no packet.
+Non-trivial work gets a dated specification under
+`specs/YYYY-MM-DD-feature-name/` with `requirements.md`, `plan.md`, and
+`validation.md`. Validation is defined before implementation, and evidence is
+recorded after the checks run. Small, contained changes may use a short spec
+note; trivial fixes need no specification.

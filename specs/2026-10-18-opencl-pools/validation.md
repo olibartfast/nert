@@ -1,40 +1,64 @@
-# Validation — OpenCL pools
+# Validation — OpenCL Pooling Operators
 
-Defined before implementation. Tolerance: `ExpectNear` bench rule
-unless exact. SKIP without an OpenCL GPU platform is recorded.
+Defined before implementation. Comparisons use the benchmark's `ExpectNear`
+tolerance unless a check is exact. Tests record `SKIP` when no OpenCL GPU
+platform is available.
 
-## Checks
+## What Each Check Proves
 
-- [V-P1] MaxPool k2/s2 + pads + ceil_mode + dilation vs oracle.
-- [V-P2] AveragePool count_include_pad 0/1 (incl. ceil-past-input
-  divisor) vs oracle.
-- [V-P3] GlobalAveragePool rank-4 + rank-3 vs oracle (double accum).
-- [V-P4] Negatives: missing kernel_shape, bad output shape, bad pads.
-- [V-D1] OFF leg full `ctest` green. [V-D2] CUDA-ON leg full `ctest`
-  green. [V-D3] OpenCL-ON leg full `ctest` green (RTX 3060).
-  [V-D4] format clean. [V-D5] diff audit: packet paths only.
+**MaxPool.** A stride-2 case is checked against hand-computed values. A
+dilated and padded case is compared with the CPU oracle. Negative cases cover
+a missing `kernel_shape` and invalid padding. The checks exercise `ceil_mode`,
+dilation, and negative infinity for out-of-bounds samples.
 
-## Acceptance (once at the end)
+**AveragePool.** A stride-2 case is checked against hand-computed values. The
+`count_include_pad` cases compare both settings with the CPU oracle, including
+a window that `ceil_mode` extends past the input and the resulting divisor.
+The negative case covers an invalid configuration.
+
+**GlobalAveragePool.** A rank-4 input is checked against hand-computed channel
+means. A rank-3 input covers the rank contract. A bad output shape is rejected
+with a message naming the node and operator. The fp64 capability guard is
+recorded so a device without double precision fails explicitly rather than
+silently changing numeric behavior.
+
+**Build matrix.** The default, CUDA, and OpenCL builds must pass their full
+CTest suites. Formatting must be clean, and the diff must stay within the
+expected paths.
+
+## Acceptance Commands
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel "$(nproc)" && ctest --test-dir build --output-on-failure && ./scripts/format.sh --check
-cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_CUDA=ON && cmake --build build-cuda --parallel "$(nproc)" && ctest --test-dir build-cuda --output-on-failure
-cmake -S . -B build-ocl -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_OPENCL=ON && cmake --build build-ocl --parallel "$(nproc)" && ctest --test-dir build-ocl --output-on-failure
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --parallel "$(nproc)" && \
+    ctest --test-dir build --output-on-failure && \
+    ./scripts/format.sh --check
+
+cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release \
+    -DNERT_ENABLE_CUDA=ON && \
+    cmake --build build-cuda --parallel "$(nproc)" && \
+    ctest --test-dir build-cuda --output-on-failure
+
+cmake -S . -B build-ocl -DCMAKE_BUILD_TYPE=Release \
+    -DNERT_ENABLE_OPENCL=ON && \
+    cmake --build build-ocl --parallel "$(nproc)" && \
+    ctest --test-dir build-ocl --output-on-failure
 ```
 
 ## Evidence
 
-| ID | Command/Check | Result | Date | Notes |
-|----|---------------|--------|------|-------|
-| V-P1 | MaxPool k2/s2 + dilated/padded + ceil_mode + negatives | pass 4/4 new | 2026-10-18 | RTX 3060; -inf OOB, ceil, dilation green; bad-pads negative added on review |
-| V-P2 | AveragePool k2/s2 + count_include_pad 0/1 + ceil-past-input divisor + negative | pass 4/4 new | 2026-10-18 | Test-dim slip + 24-vs-16B Download slip fixed (both oracle-right); ceil+pad divisor added on review |
-| V-P3 | GAP rank-4 + rank-3 + negative | pass 3/3 new | 2026-10-18 | Double accum bit-matches oracle; rank-3 + fp64-requirement guard added on review |
-| V-D1 | OFF leg full `ctest` | pass 12/12 | 2026-10-18 | Fixture fallback |
-| V-D2 | CUDA-ON leg full `ctest` | pass 24/24 | 2026-10-18 | Unchanged by this slice |
-| V-D3 | OpenCL-ON leg full `ctest` | pass 14/14 | 2026-10-18 | Table 15→18 rows |
-| V-D4 | `scripts/format.sh --check` | pass | 2026-10-18 | Post-fix rebuild rerun green |
-| V-D5 | Diff audit + coverage.md sync | pass | 2026-10-18 | Packet paths + matrix recompute |
+| ID | Check | Result | Date | Notes |
+| --- | --- | --- | --- | --- |
+| `V-P1` | `MaxPool`: stride-2, dilated and padded, `ceil_mode`, and negative cases | Pass, 4/4 new | 2026-10-18 | RTX 3060. Negative infinity for out-of-bounds, `ceil_mode`, and dilation pass. A bad-pads negative was added during review. |
+| `V-P2` | `AveragePool`: stride-2, `count_include_pad` 0 and 1, ceil-past-input divisor, and a negative case | Pass, 4/4 new | 2026-10-18 | A test-dimension mistake and a 24-versus-16-byte download bug were fixed against the oracle. The ceil-plus-pad divisor case was added during review. |
+| `V-P3` | `GlobalAveragePool`: rank-4, rank-3, and a negative case | Pass, 3/3 new | 2026-10-18 | Double accumulation matches the oracle bit-for-bit. The rank-3 case and the fp64-requirement guard were added during review. |
+| `V-D1` | Default build full CTest | Pass, 12/12 | 2026-10-18 | Fixture fallback. |
+| `V-D2` | CUDA build full CTest | Pass, 24/24 | 2026-10-18 | Unchanged by this work. |
+| `V-D3` | OpenCL build full CTest | Pass, 14/14 | 2026-10-18 | RTX 3060. The table grew from 15 to 18 rows. |
+| `V-D4` | `scripts/format.sh --check` | Pass | 2026-10-18 | Rebuilt and rerun after the review fixes. |
+| `V-D5` | Diff audit and coverage-matrix synchronization | Pass | 2026-10-18 | Specification paths plus the matrix recomputation. |
 
 ## Deviations
 
-- `implementer` dispatch unavailable (harness); planner implements directly.
+- The implementer dispatch was unavailable in the harness, so the planner
+  implemented the work directly.

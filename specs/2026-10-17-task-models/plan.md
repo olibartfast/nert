@@ -1,36 +1,49 @@
-# Plan — Other task models on NERT
+# Plan — Task-Model Coverage on NERT
 
-One worktree per phase (`wip/nert-task-<n>`). Planner commits touch
-main only; code merges only on full validation evidence. Q-1 (kernel
-single-source home) must be answered before any phase writes a new
-GPU row — CPU parity work can start regardless.
+## Working Convention
 
-## Phase 1 — ResNet-18 on CUDA (classification)
+Use one isolated worktree per phase (`wip/nert-task-<n>`). Specification and
+status commits may go to `main`; implementation merges only with complete
+validation evidence. The kernel-single-source question (`Q-1`) must be settled
+before a phase adds a new GPU row. CPU parity work can start without it.
 
-Dispatch the CI fixture model on the CUDA device and run parity
-against ORT. Expectation: green with no new kernels, since Conv, Gemm,
-Relu, and both pools already have CUDA rows. Any surprise gap becomes
-its own mini-slice, YOLO-ordered.
+## Phase 1 — ResNet-18 on CUDA (Complete)
 
-## Phase 2 — DETR gap analysis (transformer detection)
+Run the CI fixture on the CUDA device and compare it with ONNX Runtime. The
+expected result was a passing gate without new kernels because `Conv`, `Gemm`,
+`Relu`, and the pooling operators already had CUDA rows. The gate passed; if a
+new gap appears on another CUDA model, record it as a separate work item in
+node-count order.
 
-Once the export and harness exist (Q-2): inventory every node and op,
-record which lack GPU rows (LayerNorm is already known), and file the
-missing rows as N1 slices in node-count order. No implementation here —
-this phase delivers the inventory and the slice list.
+## Phase 2 — DETR Gap Analysis
 
-## Phase 3 — Open-vocab parity (OWLv2, Grounding-DINO)
+Once the DETR export and parity harness exist (`Q-2`), inventory every node and
+operator, record which ones lack a GPU row, and turn the missing rows into
+ordered work items. This phase produces the inventory and backlog; it does not
+implement kernels.
 
-CPU-vs-ORT parity first, exercising the Tier-5 kernels; then the same
-dispatch-gap treatment as Phase 2 for the GPU side.
+## Phase 3 — Open-Vocabulary Parity
 
-## Phase 4 — Living coverage matrix
+Start with CPU-versus-ONNX-Runtime parity for OWLv2 and Grounding DINO. OWLv2
+is complete on CPU and CUDA. Grounding DINO now has a loadable, converted
+export, but still needs a full reference gate. After CPU parity, run the same
+dispatch-gap analysis used in Phase 2 and close the remaining device gaps.
 
-A short document (next to this packet) crossing models with devices,
-updated by every slice that lands. A missing check is a roadmap row
-with an owner — never a silent hole.
+## Phase 4 — Living Coverage Matrix
+
+Maintain a short matrix next to this specification that crosses every model
+with every device. Update it whenever a kernel row or a full-model gate lands.
+A missing check must become a roadmap item with an owner; it must never remain
+an invisible hole.
+
+The first measured pass is [`coverage.md`](coverage.md), dated 2026-10-18. It
+records the kernel-table baseline, the loadable models, the opset-blocked
+exports, pending gates, the portable-device backlog, and the Neuriplo adapter
+limitation.
 
 ## Validation
 
-Per-phase evidence lands in
-`specs/2026-10-17-task-models/validation.md` as it is measured.
+Per-phase evidence is recorded in
+[`validation.md`](validation.md) as it is measured. A model is marked as
+passing only when a full-model run against the reference exists; operator
+coverage alone is not a gate.

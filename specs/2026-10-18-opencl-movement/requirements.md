@@ -1,54 +1,60 @@
-# Requirements — OpenCL shared movement rows
+# OpenCL Movement Operators
 
-Date: 2026-10-18. Per `specs/2026-10-17-task-models/coverage.md`
-(Hermes full-matrix pass): CUDA is op-complete — no more CUDA rows.
-The portable gap is OpenCL/HIP at 9/72 rows, with `Conv` (5 models)
-the hard dependency no full model can run without. The useful order
-is shared movement/reduction rows first (independent, reused), then
-pools, then `Conv`, then transformer-specific rows. This packet lands
-the top shared-movement set on OpenCL, in coverage.md order:
-`Transpose` (4 models/252 touches), `Slice` (4/85), `Concat` (4/83),
-`Shape` (4/41), `Unsqueeze` (4/37), `Gather` (4/22).
+Date: 2026-10-18.
 
-## In scope
+## Purpose
 
-- Six hand-written OpenCL C kernels (`src/opencl/`, runtime-compiled
-  via `opencl_runtime`, first-party like the 9 existing rows), table
-  rows in `src/opencl/table.cpp`, `target_sources` entries, tests in
-  `test/opencl_kernels_test.cpp` (hand-computed + oracle-compare +
-  negatives, `GTEST_SKIP` without an OpenCL GPU platform).
-- Oracle policies mirrored exactly (per-op notes below); no new policy.
-  Rank cap 16 on packed-index rows (established pilot limit).
+CUDA covers every CPU operator used by the current models. The portable
+backends are the remaining gap: OpenCL and HIP began with nine operators each,
+and no full model can run on either until `Conv` and the movement operators are
+available.
 
-## Out of scope
+The coverage matrix in
+[`specs/2026-10-17-task-models/coverage.md`](../2026-10-17-task-models/coverage.md)
+ranks operators by model usage and node touches. Shared movement operators are
+the best first investment because they are architecture-independent and reused
+across detection, segmentation, and open-vocabulary graphs.
 
-- HIP mirrors (no hipify toolchain on this host; Q-1), OpenCL `Conv`
-  (own slice after movement+pools), pools (queued next), `bench/`
-  fixtures, loader/shape/executor changes, Neuriplo-side runs.
+| Operator | Models | Node touches |
+| --- | ---: | ---: |
+| `Transpose` | 4 | 252 |
+| `Slice` | 4 | 85 |
+| `Concat` | 4 | 83 |
+| `Shape` | 4 | 41 |
+| `Unsqueeze` | 4 | 37 |
+| `Gather` | 4 | 22 |
 
-## Oracle policies (binding)
+## Scope
 
-- `Transpose`: float32/int64/bool, `perm` attr (default reverse);
-  per-output gather via aligned strides.
-- `Slice`: float32/int64/bool data; int64 starts/ends (+ optional
-  axes/steps) inputs downloaded to host; negative wrap + clamp per
-  oracle.
-- `Concat`: float32/int64, shared dtype+rank, axis wrap; per-block
-  D2D copies (ConcatCopy precedent) — no kernel needed beyond
-  copies, like the CUDA row.
-- `Shape`: int64 out; `start`/`end` int attrs, negative wrap, clamp.
-- `Unsqueeze`: float32/int64/bool; int64 axes input (negative wrap,
-  sorted-unique, range check); buffer copy, shape owned by inference.
-- `Gather`: float32/int64/bool data + int64 indices; `axis` attr
-  default 0 with wrap; negative-index wrap; per-output gather.
+Implement the six operators as first-party OpenCL C in `src/opencl/`, compiled
+through `opencl_runtime`. Add table rows and target sources, and test each
+operator in `test/opencl_kernels_test.cpp` with a hand-computed case, a CPU
+oracle comparison, and negatives. Tests skip without an OpenCL GPU platform.
+The rank cap of 16 on packed-index operators is the established pilot limit.
 
-## Constraints (traced to constitution)
+## Behavior
 
-- stdlib-only default; OpenCL PRIVATE and opt-in. One device per
-  graph, no fallback. Naive readable kernels, `clFinish` sync like
-  the existing rows (Relu precedent).
+| Operator | Data types | Rules |
+| --- | --- | --- |
+| `Transpose` | float32, int64, bool | `perm` attribute, default reverse; gather each output through aligned input and output strides. |
+| `Slice` | float32, int64, bool | Required int64 `starts`/`ends`, optional `axes`/`steps`; parameters downloaded to host; negative wrapping and clamping follow the oracle; zero-sized output is valid. |
+| `Concat` | float32, int64, bool | Shared dtype and rank; negative axis wraps; contiguous device-to-device block copies; supports empty operands. |
+| `Shape` | float32, int64, bool | int64 output; `start`/`end` attributes with negative wrapping and clamping. |
+| `Unsqueeze` | float32, int64, bool | int64 `axes` input; wrap, sort, reject duplicates, and range-check; buffer copy, with shape owned by inference. |
+| `Gather` | float32, int64, bool | int64 indices; `axis` defaults to 0 and wraps; negative indices wrap; out-of-range indices fail with node and operator named. |
 
-## Open questions
+## Boundaries
 
-- None: scope (movement six) and order (coverage.md) decided
-  2026-10-18 (maintainer-directed). Pools next, then Conv.
+Out of scope: HIP mirrors (no hipify toolchain, recorded in `Q-1`), OpenCL
+`Conv`, pools, bench fixtures, loader and shape-inference changes, executor
+changes, and Neuriplo model runs.
+
+The default build remains standard-library-only; OpenCL is private and opt-in.
+A graph uses one device with no per-operator fallback. Kernels stay naive and
+readable, and synchronize with `clFinish` following the existing `Relu` row.
+
+## Decisions
+
+The coverage matrix determined the six operators and their order; the
+maintainer approved them on 2026-10-18. Pools follow, then `Conv`. No open
+questions remain.

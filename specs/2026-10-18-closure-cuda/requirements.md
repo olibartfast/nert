@@ -1,55 +1,69 @@
-# Requirements — CUDA closure: GridSample + ConvTranspose + InstanceNormalization
+# CUDA Operator Closure
 
-Date: 2026-10-18. The CUDA table is complete except `GridSample` (R5,
-4 RF-DETR nodes, explicitly deferred "own slice"),
-`ConvTranspose` (Tier-1 YOLO/segmentation), and
-`InstanceNormalization` (Tier-4 RAFT). This packet lands all three.
-After it, every CPU op is on CUDA except `Einsum` (stays CPU-only per
-V-2) — full closure.
+Date: 2026-10-18.
 
-## In scope
+## Purpose
 
-- `src/cuda/grid_sample.cu` (first-party): bilinear + nearest,
-  zeros/border/reflection, align_corners 0/1 — the oracle's exact
-  coordinate math in double, one thread per (n, ho, wo) position with
-  an inner channel loop. Nearest uses round-half-even (`nearbyint`).
-- `src/cuda/instance_normalization.cu` (first-party): per-(n,c)
-  double-accum rows, rank-1 [C] scale/B, epsilon default 1e-5 —
-  the LayerNormalization pattern with per-channel params.
-- `src/cuda/conv_transpose.cu` (cuDNN, `NERT_HAS_CUDNN` only):
-  `cudnnConvolutionBackwardData` legacy path (descriptors + v7
-  heuristics + first-party bias add), `CUDNN_DEFAULT_MATH`
-  (TF32 forbidden), per-geometry plan cache — the N1b Conv structure.
-  Rank-4 only, explicit pads or VALID (loader rejects the rest, like
-  the oracle). Non-zero `output_padding` and asymmetric pads are
-  rejected on CUDA with a clear message (cuDNN has neither knob);
-  the oracle still accepts them on CPU.
-- Table rows (ConvTranspose inside `#ifdef NERT_HAS_CUDNN`),
-  `target_sources` (same guard), tests: new `test/cuda_sample_test.cpp`
-  + target (GridSample), `test/cuda_norm_test.cpp` (InstanceNorm),
-  `test/cuda_conv_test.cpp` (ConvTranspose, `HasCudaConvTranspose`
-  guard mirroring `HasCudaConv`).
+The CUDA table covered nearly every CPU operator. Three were still missing:
+`GridSample` (four RF-DETR nodes, previously deferred as work item `R5`),
+`ConvTranspose` (YOLO segmentation), and `InstanceNormalization` (RAFT). This
+specification adds all three. Every CPU operator is now available on CUDA,
+including `Einsum`, whose CUDA row was added during the OWLv2 bring-up. The
+earlier `V-2` check treated `Einsum` as CPU-only; that exception is historical.
 
-## Out of scope
+## GridSample
 
-- HIP/OpenCL mirrors (queued hipify/hand-write split), `bench/`
-  fixtures, loader/shape/executor changes, Neuriplo parity runs,
-  per-call algo search / per-call workspace (documented N1b follow-ups).
+The first-party kernel samples a four-dimensional input at normalized grid
+positions. It supports bilinear and nearest sampling, `zeros`, `border`, and
+`reflection` padding, and `align_corners` 0 or 1. Coordinate arithmetic matches
+the CPU oracle in double precision; one thread handles each `(n, ho, wo)`
+position and loops over channels. Nearest sampling uses round-half-even.
 
-## Constraints (traced to constitution)
+Implementation: `src/cuda/grid_sample.cu`; tests:
+`test/cuda_sample_test.cpp`.
 
-- stdlib-only default; CUDA/cuDNN PRIVATE. One device per graph.
-- Naive readable first-party kernels, internal sync, double coordinate
-  and stat accumulation. Rank cap 16 on the packed-index first-party
-  rows (established pilot limit).
-- New rejections (output_padding, asymmetric pads) name node + op and
-  are recorded here as the only deliberate CUDA-narrower-than-CPU
-  policies in this packet.
+## InstanceNormalization
 
-## Open questions
+The first-party kernel normalizes each `(n, c)` row over its spatial elements.
+Statistics accumulate in double precision, scale and bias are rank-1 `[C]`,
+and epsilon defaults to `1e-5`. It follows `LayerNormalization`'s
+one-thread-per-row structure with per-channel parameters.
 
-- None open: scope (all three) and ConvTranspose approach (cuDNN-gated)
-  decided 2026-10-18 (maintainer-directed). Q-1 unchanged.
-- Local verification note: this host has no system cuDNN; the
-  NERT_HAS_CUDNN leg is verified via `CUDNN_ROOT` pointed at a
-  symlink farm to the pip cuDNN 9 package (local-only, no repo change).
+Implementation: `src/cuda/instance_normalization.cu`; tests:
+`test/cuda_norm_test.cpp`.
+
+## ConvTranspose
+
+`ConvTranspose` uses cuDNN and is available only with `NERT_HAS_CUDNN`. It
+follows the existing cuDNN `Conv` structure: `cudnnConvolutionBackwardData`, v7
+heuristics, a per-geometry plan cache, a first-party bias add, and
+`CUDNN_FMA_MATH` so TensorFloat-32 (TF32) is forbidden.
+
+It accepts rank-4 NCHW tensors and explicit padding or `VALID`; other automatic
+padding modes are rejected by the loader, matching the CPU oracle. Non-zero
+`output_padding` and asymmetric padding are rejected on CUDA because cuDNN
+does not provide those knobs. The CPU oracle accepts both, so these are
+deliberate CUDA-narrower policies. The implementation, table row, and
+`target_sources` entry are guarded by `NERT_HAS_CUDNN`; tests live in
+`test/cuda_conv_test.cpp` behind `HasCudaConvTranspose()`.
+
+## Boundaries
+
+Out of scope: HIP and OpenCL mirrors, bench fixtures, loader and
+shape-inference changes, executor changes, Neuriplo parity runs, and per-call
+algorithm or workspace selection.
+
+The default build stays standard-library-only; CUDA and cuDNN link privately.
+A graph uses one device. First-party kernels stay naive and readable, with
+internal synchronization and double-precision accumulation. Packed-index rows
+retain the rank cap of 16. The new rejections name the node and operator and
+are the only deliberate CUDA-narrower-than-CPU policies here.
+
+## Open Questions
+
+None. The maintainer approved the scope and the cuDNN-gated `ConvTranspose`
+approach on 2026-10-18. `Q-1`, the GPU single-source question, is unchanged.
+
+This host has no system cuDNN. The `NERT_HAS_CUDNN` build is verified through
+`CUDNN_ROOT` pointing at a local symlink farm for the pip cuDNN 9 package; the
+farm is a verification aid, not a repository change.

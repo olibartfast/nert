@@ -1,45 +1,49 @@
-# Requirements — Other task models on NERT
+# Task-Model Coverage on NERT
 
-Date: 2026-10-17. YOLO26n proved the pattern on CUDA (fully
-dispatched, gate R-6 passed). This packet extends the same treatment
-to every other task-model class Neuriplo needs, highest node count
-first — the YOLO-ordered rule that already prioritizes the work.
+Date: 2026-10-17.
 
-## Where things stand
+## Purpose
 
-- Detection CNN (YOLO26n, 485 nodes): done on CPU and CUDA.
-- Classification (ResNet-18): runs in CI on CPU; the CUDA run is
-  pending but every op it needs already has a CUDA row.
-- Transformer detection (DETR): waiting on an opset-18 export and the
-  Neuriplo parity harness. Known NERT gap: LayerNorm is CPU-only, so
-  the GPU side will need a new row.
-- Open-vocab detection (OWLv2, Grounding-DINO): the Tier-5 CPU kernels
-  (comparison, bitwise, reduction, and scatter families) already
-  landed; parity still needs Neuriplo plus the model weights.
-- Segmentation and pose models: no exports in hand; tracked as future
-  work, not this packet.
+YOLO26n established the pattern for running a real task model on NERT,
+recorded as gate `R-6`: load the exported graph, match ONNX Runtime on CPU,
+identify the operators that lack a device row, and close those gaps in
+node-count order. This specification extends that pattern to the other model
+families Neuriplo needs.
 
-## In scope
+The live, model-by-device result is maintained in
+[`coverage.md`](coverage.md). That matrix, not this document, is the source of
+truth for which models currently pass, which have operator coverage but no
+full-model gate, and which are blocked on an export.
 
-- For each model class: a CPU-vs-ORT parity run, a GPU dispatch-gap
-  analysis (which nodes lack device rows), and closing those gaps in
-  node-count order.
-- A living coverage matrix (models × devices) so gaps stay visible.
+## Scope
 
-## Out of scope
+For each model family, this work covers:
+
+- a CPU-versus-ONNX-Runtime parity run on a concrete export;
+- a dispatch-gap analysis listing the operators that have no row on the
+  target device;
+- implementation of the missing device rows, ordered by the number of graph
+  nodes they unlock;
+- a full-model gate on each device that can run the graph.
+
+The work also maintains the model-by-device coverage matrix so that a missing
+check becomes an explicit roadmap item rather than an invisible gap.
+
+## Out of Scope
 
 - Training, quantization, and new model architectures.
-- Segmentation/pose models (no exports available).
-- AMD and Vulkan backends for these models (blocked as before: AMD
-  needs its runner, Vulkan needs a shader toolchain).
+- Segmentation and pose models for which no export exists. They remain future
+  work until an export is available.
+- AMD and Vulkan device layers for these models. AMD needs its runner;
+  Vulkan needs a shader toolchain.
 
-## Open questions
+## Open Questions
 
-- Q-1: Where does each new GPU kernel live exactly once? The
-  single-source decision (canonical HIP vs generated HIP vs policed
-  mirrors) is still with the maintainer, and it gates every new GPU
-  row below. CPU rows are unaffected.
-- Q-2: Who supplies the opset-18 DETR and OWLv2 exports — Neuriplo
-  side or NERT side?
-- Q-3: ORT stays pinned at 1.27.0 for parity (the YOLO precedent), or
-  move with Neuriplo's pin?
+- **`Q-1` — Where should each GPU kernel have its single source?** The choice
+  between a canonical HIP implementation, generated HIP, and policed mirrors
+  is still with the maintainer. It affects every new GPU row; CPU work can
+  proceed independently.
+- **`Q-2` — Who supplies the opset-18 DETR and OWLv2 exports?** The export can
+  come from the Neuriplo side or from NERT.
+- **`Q-3` — Which ONNX Runtime version defines parity?** The YOLO work used
+  1.27.0. The alternative is to follow Neuriplo's current pin.

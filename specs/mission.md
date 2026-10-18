@@ -1,71 +1,83 @@
 # NERT Mission
 
-> Status: constitution for the standalone NERT repository, derived 2026-10-10
-> from the neuriplo packets `2026-09-17-native-engine-cpu-spine`,
-> `2026-10-01-yolo26-native`, and `2026-10-10-native-tasks-op-coverage`
-> (tiers 1–3 landed; tiers 4–5 open). Implementation and executable checks
-> take precedence if this file drifts.
+> Status: constitution for the standalone NERT repository. Derived on
+> 2026-10-10 from the Neuriplo packets `2026-09-17-native-engine-cpu-spine`,
+> `2026-10-01-yolo26-native`, and `2026-10-10-native-tasks-op-coverage`.
+> If this document and the implementation disagree, the implementation and
+> its executable checks win.
 
-## Why NERT Exists
+## What NERT Is
 
-NERT (Neuriplo Engine Runtime) is a first-party ONNX inference runtime: a CPU
-reference interpreter for ONNX opset 18. It parses the graph, infers shapes
-for the requested input, plans a single arena allocation, and executes nodes
-one by one in topological order. It computes in float32, with int64/bool
-shape data and I/O.
+NERT (Neuriplo Engine Runtime) is a first-party inference runtime for models in
+the Open Neural Network Exchange (ONNX) format. It reads a model, resolves
+static shapes for the requested inputs, plans one arena for intermediate
+tensors, and executes the graph node by node. Compute is float32; int64 and
+bool are used for shapes, indices, masks, and graph inputs or outputs.
 
-NERT exists so Neuriplo has a self-contained CPU backend with no vendor SDK
-underneath, and so a future accelerated path has an executable correctness
-oracle to be checked against — not a performance target.
+The project is deliberately small in scope. It is a CPU reference interpreter,
+not a compiler, a serving stack, or a performance product. It exists so
+Neuriplo has a self-contained backend with no vendor SDK underneath, and so
+accelerated device layers have an executable correctness oracle to measure
+against.
 
 ## Who It Serves
 
-- Neuriplo, which consumes NERT as its `NERT` backend via FetchContent pinned
-  by `NERT_VERSION`, adapting it to `InferenceInterface`. NERT itself has no
+- **Neuriplo** consumes NERT as its `NERT` backend through a pinned
+  `FetchContent` dependency and adapts it to `InferenceInterface`. NERT has no
   knowledge of Neuriplo.
-- Maintainers adding operator coverage kernel by kernel, with hand-computed
-  tests and parity against ONNX Runtime through Neuriplo's model-zoo harness.
-- Future device layers (Phase N1), which plug into the device seam without
-  touching the device-agnostic core.
+- **Maintainers** add operator coverage one kernel at a time, with
+  hand-computed tests and parity runs against ONNX Runtime through
+  Neuriplo's model-zoo harness.
+- **Device-layer authors** plug new backends into the device seam without
+  changing the device-agnostic core.
 
-## Product Promise
+## Product Commitments
 
-- A dependency-free runtime: C++ standard library only (tests use GoogleTest;
-  fixture provisioning uses torch/torchvision, never the runtime).
-- An interpreter, not a compiler: no graph lowering, fusion (beyond
-  load-time constant folding), autotuning, or serialized engines.
-- One device per loaded graph, chosen at load. A graph that cannot run
-  entirely on the requested device is rejected at load; there is no per-op
-  fallback at run time.
-- CPU kernels that are deliberately naive, readable, and unoptimized — the
-  correctness oracle, never a performance claim.
-- Static shapes resolved at load from concrete input shapes. Load rejects
-  unknown ops, unsupported attribute combinations, and unresolvable dims with
-  node name and op type — never at first inference, never by guessing.
+- **No runtime dependencies.** The library uses the C++ standard library only.
+  Tests use GoogleTest; fixture provisioning uses PyTorch and torchvision as
+  tooling, never as runtime links.
+- **An interpreter, not a compiler.** NERT does not lower, fuse (beyond
+  load-time constant folding), autotune, or emit serialized engines.
+- **One device per graph.** The device is chosen when the model is loaded. A
+  graph that cannot run entirely on that device is rejected at load; there is
+  no per-operator fallback at inference time.
+- **A readable CPU oracle.** CPU kernels are intentionally naive and
+  unoptimized. They define correctness; they are not a performance claim.
+- **Static shapes resolved at load.** The loader rejects unknown operators,
+  unsupported attribute combinations, and unresolvable dimensions, naming the
+  node and operator. It never defers these failures to the first inference or
+  guesses a shape.
+- **Failures are explicit.** Unsupported paths are rejected with a useful
+  message rather than silently approximated.
 
 ## Boundaries and Non-Goals
 
-- NERT does not reimplement vendor SDKs for their own sake and never hides
-  their constraints; vendor backends stay the reference NERT is measured
-  against (in Neuriplo).
-- No CUDA in the current scope (Phase N1 owns the GPU device layer).
-- No quantization, FP16/INT8, batching beyond declared dims, or dynamic-shape
-  runtime machinery beyond static per-load planning ([D-8] in tech-stack).
-- No task pre/postprocessing, serving APIs, or product UI — those belong in
-  Neuriplo, neuriplo-tasks, or consumers.
-- NERT does not promise every ONNX op: coverage grows by surveyed exports,
-  one tier at a time, each proven by parity.
+- NERT does not reimplement vendor SDKs for their own sake, and it does not
+  hide vendor constraints. Vendor libraries remain the reference against which
+  NERT is measured in Neuriplo.
+- The CPU interpreter is the required path. GPU device layers are opt-in
+  extensions delivered under Phase N1; they share the same device seam and do
+  not change the core contract.
+- No quantization, FP16 or INT8 compute, batching beyond declared dimensions,
+  or dynamic-shape machinery beyond static per-load planning (decision `D-8`).
+- No task pre/postprocessing, serving API, or product UI. Those belong in
+  Neuriplo, `neuriplo-tasks`, or the consumer.
+- NERT does not promise every ONNX operator. Coverage grows from surveyed
+  exports, one operator family at a time, and each addition is proven by
+  parity.
 
-## Engineering Values
+## Engineering Principles
 
-Correctness and readability over speed. Direct, operational docs: supported
-paths, exact commands, failure behavior, no implied coverage. Every
-non-trivial change carries requirements → plan → validation, with validation
-defined before code and evidence recorded after execution.
+Correctness and readability come before speed. Documentation should state the
+supported path, the exact command, and the failure behavior without implying
+coverage the code does not provide. Every non-trivial change carries
+requirements, a plan, and validation; validation is defined before the code is
+written and evidence is recorded after it runs.
 
-## Open Product Questions
+## Open Questions and Decisions
 
-- Quantitative latency/memory targets: none (CPU path is explicitly not a
-  performance target).
-- [Q-5] decided 2026-10-16 (Phase 5, breaking 0.2): `include/nert/` +
-  namespace `nert`, all C++ filenames lowercase `snake_case`.
+- No quantitative latency or memory targets exist. The CPU path is explicitly
+  not a performance target.
+- The public API lives under `include/nert/` in namespace `nert`, with
+  lowercase `snake_case` filenames. This was decided in the Phase 5 rename and
+  is recorded as `[Q-5]` in the specification history.

@@ -1,46 +1,55 @@
-# Plan — CUDA closure: GridSample + ConvTranspose + InstanceNormalization
+# Plan — CUDA Operator Closure
 
-Work in the main tree. Forbidden: `bench/`, `specs/2026-10-17-cudnn-frontend-spike/`,
-`.github/`. `implementer` dispatch still unavailable (harness);
-planner implements directly.
+Work in the main tree. Do not modify `bench/`,
+`specs/2026-10-17-cudnn-frontend-spike/`, or `.github/`.
 
-## Phase A — GridSample (first-party)
+## GridSample
 
-Pattern: Resize-linear precedent (device coordinate math) + the oracle's
-`SourceCoordinate`/`Reflect`/`at` in double, ported verbatim as
-`__device__` helpers. Grid-stride threads over (n, ho, wo); inner loop
-over channels. Tests: bilinear interior + zeros edge, border, reflection,
-nearest half-even, align_corners=1, negatives (bad mode, bad padding,
-batch mismatch, rank).
+Port the CPU oracle's `SourceCoordinate`, `Reflect`, and `at` helpers to
+`__device__` functions in double precision. Use grid-stride threads over
+`(n, ho, wo)` positions, with an inner loop over channels.
 
-## Phase B — InstanceNormalization (first-party)
+Tests cover bilinear interior and zero-padded edges, border and reflection
+padding, nearest half-even, `align_corners=1`, and negatives for an invalid
+mode, an invalid padding mode, a batch mismatch, and a non-4D input.
 
-Pattern: `layer_normalization.cu` one-thread-per-row, double accum;
-row = (n, c), inner = spatial product; scale/bias rank-1 [C] validated
-(`ChannelParam` rule). Tests in `test/cuda_norm_test.cpp`: basic + rank-2
-(single spatial) + negatives (bad scale size, rank-1 input).
+## InstanceNormalization
 
-## Phase C — ConvTranspose (cuDNN bwd-data, gated)
+Follow `layer_normalization.cu`: one thread per `(n, c)` row, double-precision
+statistics, and rank-1 `[C]` scale and bias validated with the `ChannelParam`
+rule. Tests in `test/cuda_norm_test.cpp` cover a basic case, a rank-2 input,
+and negatives for a bad scale size and a rank-1 input.
 
-Structure copied from `src/cuda/conv.cu`: attribute parsing with
-ConvTranspose messages, NCHW validation, oracle output-shape formula
-check, bias rank-1 [M] + first-party bias kernel, plan cache keyed by
-geometry, v7 `cudnnGetConvolutionBackwardDataAlgorithm_v7`, workspace
-once per key, `CUDNN_DEFAULT_MATH`. Mapping: dyDesc=[N,C,H,W] (our X),
-wDesc=[C,M/group,kH,kW], dxDesc=[N,M,Ho,Wo] (our Y). Extra rejections:
-non-zero output_padding, asymmetric pads. Tests in
-`test/cuda_conv_test.cpp` behind `HasCudaConvTranspose()`:
-2x2 stride-2 no-bias hand-computed, 3x3 stride-1 pad-1 with bias vs
-oracle, negatives (bad output shape, output_padding reject).
+## ConvTranspose
 
-## Per-phase bars
+Copy the structure of `src/cuda/conv.cu`: attribute parsing, NCHW validation,
+the oracle output-shape check, a rank-1 `[M]` bias and first-party bias kernel,
+a per-geometry plan cache, `cudnnGetConvolutionBackwardDataAlgorithm_v7`,
+workspace allocated once per key, and `CUDNN_FMA_MATH` so TensorFloat-32
+(TF32) is forbidden.
 
-Hand-computed + oracle-compare + negatives; targeted target green;
-final acceptance once at end: OFF all-green + CUDA-ON all-green
-(+ cuDNN leg via local CUDNN_ROOT farm) + format clean + diff audit
-= packet paths only.
+Mapping for the backward-data call:
+
+```text
+dyDesc = [N, C, H, W]        (input X)
+wDesc  = [C, M/group, kH, kW]
+dxDesc = [N, M, Ho, Wo]      (output Y)
+```
+
+Reject non-zero `output_padding` and asymmetric padding with clear errors.
+Tests in `test/cuda_conv_test.cpp`, behind `HasCudaConvTranspose()`, cover a
+2x2 stride-2 no-bias case with hand-computed output, a 3x3 stride-1 pad-1 case
+with bias compared with the oracle, and negatives for a bad output shape and
+rejected `output_padding`.
+
+## Acceptance
+
+Each operator needs a hand-computed case, an oracle comparison, and negatives.
+Run the targeted target during implementation, then the full matrix: default
+build, CUDA build, cuDNN build via the local `CUDNN_ROOT` farm, format check,
+and a diff audit limited to the expected paths.
 
 ## Validation
 
-Evidence in `specs/2026-10-18-closure-cuda/validation.md`.
-Roadmap + CHANGELOG sync on landing (planner-owned).
+Evidence is recorded in [`validation.md`](validation.md). Update the roadmap
+and changelog when the change lands.

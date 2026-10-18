@@ -1,60 +1,86 @@
-# Validation — CUDA closure: GridSample + ConvTranspose + InstanceNormalization
+# Validation — CUDA Operator Closure
 
-Defined before implementation. Tolerance: `ExpectNear` bench rule
-unless exact. SKIP without device/cuDNN is recorded.
+Defined before implementation. The comparison uses the benchmark's
+`ExpectNear` tolerance unless a check is exact. A missing CUDA device or cuDNN
+installation records `SKIP` with the reason.
 
-## Checks
+## What Each Check Proves
 
-- [V-A] GridSample: bilinear hand values + zeros/border/reflection
-  edges + nearest half-even + align_corners, CPU vs CUDA; negatives
-  (mode, padding_mode, batch mismatch, non-4D).
-- [V-B] InstanceNorm: hand values, rank-2 input, per-channel scale/B;
-  negatives (scale size, rank<2, dtype).
-- [V-C] ConvTranspose (cuDNN leg): stride-2 hand-computed, padded+bias
-  vs oracle within tolerance; negatives (output shape, output_padding
-  reject, asymmetric-pad reject). CPU-only leg unaffected (row absent
-  without cuDNN).
-- [V-D1] OFF leg full `ctest` green. [V-D2] CUDA-ON leg full `ctest`
-  green (RTX 3060). [V-D3] cuDNN leg (`CUDNN_ROOT` farm) full `ctest`
-  green. [V-D4] format clean. [V-D5] diff audit: packet paths only.
+**GridSample.** Hand-computed bilinear values, edge behavior for zeros,
+border, and reflection padding, nearest sampling with half-even rounding, and
+`align_corners` are compared between CPU and CUDA. Negative cases cover an
+invalid mode, an invalid padding mode, a batch mismatch, and a non-4D input.
 
-## Acceptance (once at the end)
+**InstanceNormalization.** Hand-computed values, a rank-2 input, and
+per-channel scale and bias are compared with the CPU oracle. Negative cases
+cover a bad scale size, a rank below 2, and a mismatched dtype.
+
+**ConvTranspose.** On the cuDNN build, a stride-2 case is checked against a
+hand-computed result and a padded case with bias is compared with the oracle.
+Negative cases cover a bad output shape, non-zero `output_padding`, and
+asymmetric padding. The CPU-only build is unaffected because the row is absent
+without cuDNN.
+
+**Build matrix.** The default build, the CUDA build without cuDNN, and the
+CUDA build with cuDNN must all pass their full CTest suites. Formatting must be
+clean, and the diff must stay within the expected specification and source
+paths.
+
+## Acceptance Commands
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel "$(nproc)" && ctest --test-dir build --output-on-failure && ./scripts/format.sh --check
-cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_CUDA=ON && cmake --build build-cuda --parallel "$(nproc)" && ctest --test-dir build-cuda --output-on-failure
-CUDNN_ROOT=/tmp/opencode/cudnn cmake -S . -B build-cudnn -DCMAKE_BUILD_TYPE=Release -DNERT_ENABLE_CUDA=ON && cmake --build build-cudnn --parallel "$(nproc)" && LD_LIBRARY_PATH=/home/oli/.local/lib/python3.12/site-packages/nvidia/cudnn/lib ctest --test-dir build-cudnn --output-on-failure
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --parallel "$(nproc)" && \
+    ctest --test-dir build --output-on-failure && \
+    ./scripts/format.sh --check
+
+cmake -S . -B build-cuda -DCMAKE_BUILD_TYPE=Release \
+    -DNERT_ENABLE_CUDA=ON && \
+    cmake --build build-cuda --parallel "$(nproc)" && \
+    ctest --test-dir build-cuda --output-on-failure
+
+CUDNN_ROOT=/tmp/opencode/cudnn \
+    cmake -S . -B build-cudnn -DCMAKE_BUILD_TYPE=Release \
+    -DNERT_ENABLE_CUDA=ON && \
+    cmake --build build-cudnn --parallel "$(nproc)" && \
+    LD_LIBRARY_PATH=/home/oli/.local/lib/python3.12/site-packages/nvidia/cudnn/lib \
+    ctest --test-dir build-cudnn --output-on-failure
 ```
 
-Host prerequisite: a bare `ctest` in `build-cudnn` aborts on this host
-with `Cannot load symbol cublasLtGetVersion` unless `LD_LIBRARY_PATH`
-points at a CUDA-12-matched pip cuDNN (above) or at
+## Host Prerequisite
+
+A bare `ctest` in `build-cudnn` aborts on this host with
+`Cannot load symbol cublasLtGetVersion` unless `LD_LIBRARY_PATH` points at a
+CUDA-12-matched pip cuDNN, as in the command above, or at
 `$HOME/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64`.
-The latter is the CUDA-13 runtime + 9.25 farm; both were verified 24/24.
+The second path is the CUDA-13 runtime with the 9.25 cuDNN farm. Both paths
+were verified with 24 of 24 tests passing.
 
 ## Evidence
 
-| ID | Command/Check | Result | Date | Notes |
-|----|---------------|--------|------|-------|
-| V-A | `nert_cuda_sample_test` bilinear/border/reflect/nearest/align + 2 negatives | pass 7/7 | 2026-10-18 | New target; half-even + align hand values |
-| V-B | `nert_cuda_norm_test` InstanceNorm exact/rank-2/negative | pass 3/3 new | 2026-10-18 | Suite 9/9; per-(n,c) double-accum rows |
-| V-C | `nert_cuda_conv_test` ConvTranspose stride-2/bias/negative | pass 3/3 new | 2026-10-18 | cuDNN farm leg; bwd-data + first-party bias |
-| V-D1 | OFF leg full `ctest` | pass 12/12 | 2026-10-18 | Fixture fallback |
-| V-D2 | CUDA-ON (no cuDNN) full `ctest` | pass 24/24 | 2026-10-18 | RTX 3060; probe relocated (see deviations) |
-| V-D3 | CUDA-ON cuDNN farm full `ctest` | pass 24/24 | 2026-10-18 | `CUDNN_ROOT` pip-9 farm; probe skips, CT runs |
-| V-D4 | `scripts/format.sh --check` | pass | 2026-10-18 | `--fix` on new tests only |
-| V-D5 | Diff audit | pass | 2026-10-18 | Packet paths + 2 cross-session repairs (below) |
+| ID | Check | Result | Date | Notes |
+| --- | --- | --- | --- | --- |
+| `V-A` | `nert_cuda_sample_test`: bilinear, border, reflection, nearest, `align_corners`, plus two negative cases | Pass, 7/7 | 2026-10-18 | New test target. Half-even and `align_corners` values are hand-computed. |
+| `V-B` | `nert_cuda_norm_test`: InstanceNormalization exact values, rank-2 input, negative case | Pass, 3/3 new | 2026-10-18 | Full suite 9/9. Per-`(n, c)` rows use double accumulation. |
+| `V-C` | `nert_cuda_conv_test`: ConvTranspose stride-2, bias, negative case | Pass, 3/3 new | 2026-10-18 | cuDNN farm build. Uses backward-data plus the first-party bias add. |
+| `V-D1` | Default build full CTest | Pass, 12/12 | 2026-10-18 | Fixture fallback. |
+| `V-D2` | CUDA build without cuDNN, full CTest | Pass, 24/24 | 2026-10-18 | RTX 3060. The unknown-operator probe moved; see deviations. |
+| `V-D3` | CUDA build with the cuDNN farm, full CTest | Pass, 24/24 | 2026-10-18 | `CUDNN_ROOT` pip-9 farm. The probe skips and CTest runs. |
+| `V-D4` | `scripts/format.sh --check` | Pass | 2026-10-18 | `--fix` applied only to new tests. |
+| `V-D5` | Diff audit | Pass | 2026-10-18 | Specification paths plus two cross-session repairs, listed below. |
 
 ## Deviations
 
-- `implementer` dispatch unavailable (harness); planner implements directly.
-- Cross-session repair 1: `src/cuda/table.cu` carried a broken guard
-  since `4b4a962` — first-party `Einsum`'s decl sat inside
-  `#ifdef NERT_HAS_CUDNN` while its row (and unconditional compile)
-  sat outside, breaking every non-cuDNN CUDA build. Moved the decl
-  out (one line); first-party rows must never sit in toolkit guards.
-- Cross-session repair 2: `UnknownOpRejectsNamingNodeAndOp` probed
-  InstanceNormalization ("never needs moving again"); CUDA closure
-  gave it a row. Probe moved to ConvTranspose — the last
-  device-conditional row — with a runtime row check that skips on
-  cuDNN builds, plus a comment stating the next move.
+- The implementer dispatch was unavailable in the harness, so the planner
+  implemented the work directly.
+- **Cross-session repair 1.** `src/cuda/table.cu` had carried a broken guard
+  since commit `4b4a962`: the declaration for the first-party `Einsum` row sat
+  inside `#ifdef NERT_HAS_CUDNN`, while its table entry and unconditional
+  compilation sat outside. This broke every non-cuDNN CUDA build. The
+  declaration was moved out. First-party rows must never sit inside toolkit
+  guards.
+- **Cross-session repair 2.** The `UnknownOpRejectsNamingNodeAndOp` test used
+  `InstanceNormalization` as its unknown-operator probe, but this closure gave
+  that operator a CUDA row. The probe moved to `ConvTranspose`, the last
+  device-conditional row. It now checks the row at runtime and skips on cuDNN
+  builds, with a comment explaining where it should move next.

@@ -1,44 +1,69 @@
 # NERT Technical Stack
 
-> Status: constitution, derived 2026-10-10 from neuriplo `specs/tech-stack.md`
-> (First-Party NERT section) and the three native-engine packets. The
-> implementation and executable checks take precedence on drift.
+> Status: constitution. Derived on 2026-10-10 from Neuriplo's `specs/tech-stack.md`
+> (First-Party NERT section) and the native-engine packets. If this document
+> and the implementation disagree, the implementation and its executable
+> checks win.
 
-## Core Stack
+## Stack at a Glance
 
-| Area | Choice | Boundary |
+| Area | Choice | Practical consequence |
 | --- | --- | --- |
-| Library | C++17 static library `nert` (alias `nert::nert`, compat alias `neuriplo_engine`) | Do not raise the standard without an explicit decision. Public headers: `include/nert/` (namespace `nert` since 0.2). All C++ filenames lowercase `snake_case` `.hpp`/`.cpp`. |
-| Build | CMake ≥ 3.16 | `cmake -S . -B build && cmake --build build`. Tests on when top-level (`NERT_BUILD_TESTS`, default ON top-level / OFF when consumed; `BUILD_INFERENCE_ENGINE_TESTS` still honoured for Neuriplo). |
-| Required libraries | C++ standard library only | No new runtime dependency without explicit approval. Tests: GoogleTest. Fixture provisioning: torch + torchvision 0.27.0 (tooling only, never linked). |
-| ONNX | opset 18, ONNX domain only; hand-written protobuf wire reader | Loader targets opset 18. Other opsets convert with `onnx.version_converter` for validation ([Q-1] open: accept natively or require 18 + conversion note). |
-| Compute | float32 compute; int64/bool shape data and graph I/O | Reductions accumulate in double, round once per output ([D-15]). DOUBLE constants/value-info narrow to float32 ([D-5]). BOOL constants/initializers load ([D-10]). |
-| Tests | GoogleTest + CTest, suites `nert_*` (renamed from `engine_*` in 0.2) | Fixture: opset-18 ResNet-18 via `tools/provision_resnet18.py`, selected by `NERT_FIXTURE`. |
-| Quality | clang-format (check `scripts/format.sh --check`) | Keep the checked-in script scope; CI pins clang-format 18. |
+| Library | C++17 static library `nert`, alias `nert::nert`, compatibility alias `neuriplo_engine` | Do not raise the language standard without an explicit decision. Public headers live under `include/nert/` in namespace `nert`. C++ filenames use lowercase `snake_case`. |
+| Build | CMake 3.16 or newer | A top-level build enables tests by default through `NERT_BUILD_TESTS`; a consumed build disables them unless requested. `BUILD_INFERENCE_ENGINE_TESTS` is still accepted for Neuriplo compatibility. |
+| Runtime dependencies | C++ standard library only | No new runtime dependency without explicit approval. GoogleTest is test-only; PyTorch and torchvision 0.27.0 are fixture tooling and are never linked into the runtime. |
+| ONNX input | Opset 18, ONNX domain only; hand-written protobuf wire reader | The loader accepts opset 18 only. Other opsets must be converted with `onnx.version_converter` before validation, as recorded in decision `Q-1`. |
+| Compute | Float32 compute; int64 and bool for shape data and graph inputs/outputs | Reductions accumulate in double and round once per output. DOUBLE constants and value-info narrow to float32; BOOL constants and initializers load as bool. |
+| Tests | GoogleTest with CTest; suites named `nert_*` | The standard fixture is an opset-18 ResNet-18 model provisioned by `tools/provision_resnet18.py` and selected with `NERT_FIXTURE`. |
+| Quality | clang-format via `scripts/format.sh --check` | Keep the checked-in script's scope. CI pins clang-format 18. |
 
-## Architecture (binding)
+## Architecture
 
-- Interpreter: `src/ModelLoader.cpp` (parse) → `src/ShapeInference.cpp`
-  (shapes) → `src/MemoryPlanner.cpp` (arena) → `src/Executor.cpp`
-  (sequential dispatch) → `src/kernels/` (CPU table behind `src/CpuDevice.cpp`).
-- IR: `include/engine/Graph.hpp` — node list in topological order, typed
-  tensor value table (float32/int64/bool), initializer storage with dtype
-  tags, explicit graph inputs / initializers / intermediates.
-- Device seam (`include/engine/Device.hpp`): core is device-agnostic;
-  allocator, transfer, and op-keyed kernel table are per-device. CPU is the
-  only layer. Adding a device = adding a kernel table, not a refactor.
-- Load-time constant folding (`src/ConstantFolding.cpp`, [D-4]): a node whose
-  inputs are all initializers runs once at load with the CPU kernels and
-  becomes an initializer. Reuses shape inference on a one-node graph.
-- Shape seam: shape inference and the planner take concrete input shapes and
-  return a plan — never one-time load side effects. Re-planning for another
-  shape touches no parser, IR, or kernel. Symbolic dims load as -1 and are
-  fixed per load through full input shapes ([D-8]); explicit non-positive
-  dim values stay rejected.
-- One device per graph, chosen at load; per-op host round-trips forbidden by
-  design.
-- CPU kernels: one file per op under `src/kernels/`, naive and readable, no
-  vectorization/threading without an approved packet.
+NERT is a sequential interpreter. A model moves through four stages:
+
+1. `src/model_loader.cpp` parses the ONNX graph.
+2. `src/shape_inference.cpp` resolves concrete shapes for the requested inputs.
+3. `src/memory_planner.cpp` assigns intermediate tensors to one arena.
+4. `src/executor.cpp` dispatches nodes in topological order through the
+   selected device's kernel table.
+
+The intermediate representation lives in `include/nert/graph.hpp`. It stores
+nodes in execution order, a typed table of tensor values (float32, int64, and
+bool), initializer storage with dtype tags, and the distinction between graph
+inputs, initializers, and intermediates.
+
+The device seam is defined in `include/nert/device.hpp`. The core is
+device-agnostic; each device supplies an allocator, host/device transfers, and
+an operator-keyed kernel table. The CPU implementation lives in
+`src/cpu_device.cpp` and `src/kernels/`. CUDA, OpenCL, and HIP are optional
+device layers built behind the same seam. Adding a device means adding a
+kernel table, not restructuring the interpreter.
+
+Load-time constant folding is implemented in `src/constant_folding.cpp`. A
+node whose inputs are all initializers runs once during load with the CPU
+kernels and becomes an initializer. The implementation reuses shape inference
+on a one-node graph rather than maintaining a second execution path.
+
+Shape inference and planning are a seam, not a load-time side effect. They take
+concrete input shapes and return a plan. Re-planning for another shape does not
+touch the parser, the IR, or any kernel. Symbolic dimensions load as `-1` and
+are fixed for that load through full input shapes. Explicit non-positive
+dimensions remain rejected.
+
+A graph uses exactly one device, chosen at load. Per-operator host round-trips
+are forbidden by design. CPU kernels live one file per operator under
+`src/kernels/`; they stay naive and readable, and no vectorization or threading
+is added without an approved specification.
+
+The decision records that shape this architecture are:
+
+- `D-4` — load-time constant folding uses the CPU kernels and reuses shape
+  inference on a one-node graph.
+- `D-5` — DOUBLE constants and value-info narrow to float32.
+- `D-8` — symbolic dimensions load as `-1` and are fixed per load through full
+  input shapes.
+- `D-10` — BOOL constants and initializers load as bool.
+- `D-15` — reductions accumulate in double and round once per output.
 
 ## Durable Sources of Truth
 
@@ -46,48 +71,52 @@
 | --- | --- |
 | Mission and boundaries | `specs/mission.md` |
 | Delivery order | `specs/roadmap.md` |
-| Active work | `specs/YYYY-MM-DD-feature-name/{requirements,plan,validation}.md` |
-| Public version and history | `CHANGELOG.md` (0.1.0 unreleased) |
-| What NERT is / build / test / consume | `README.md` |
+| Active work | `specs/YYYY-MM-DD-feature-name/requirements.md`, `plan.md`, and `validation.md` |
+| Public version and history | `CHANGELOG.md` (0.2.0 unreleased) |
+| What NERT is, how to build, test, and consume it | `README.md` |
 
-## Explicit Non-Choices
+## Deliberate Non-Choices
 
-- No dependency from NERT on Neuriplo (or any consumer) — the arrow points
-  one way; Neuriplo adapts NERT, never the reverse.
-- No per-operator device fallback.
-- No CPU kernel optimization without an approved packet.
+- NERT never depends on Neuriplo or any other consumer. The dependency arrow
+  points one way; consumers adapt NERT, never the reverse.
+- No per-operator device fallback. A graph either runs on its chosen device or
+  is rejected at load.
+- No CPU kernel optimization without an approved specification.
 - No OpenCV, protobuf, or ONNX library in the runtime link closure.
-- No framework/language migration to simplify one feature.
+- No framework or language migration to simplify a single feature.
 
-## Validation Entrypoints (immutable acceptance = ResNet fixture ctest)
+## Validation Entry Points
+
+The immutable acceptance path is the ResNet-18 fixture under CTest:
 
 ```bash
 cmake -S . -B build
 cmake --build build
-python3 tools/provision_resnet18.py fixtures   # needs torch + torchvision 0.27.0
+python3 tools/provision_resnet18.py fixtures   # requires torch + torchvision 0.27.0
 NERT_FIXTURE=fixtures/resnet18.onnx ctest --test-dir build --output-on-failure
 scripts/format.sh --check
 ```
 
 Parity against ONNX Runtime and the model-zoo harness live in Neuriplo
-(`NertInferTest`, `nert_model_zoo_parity_test`); NERT-side packets record
-their evidence there but never gate on exports NERT cannot provision itself.
+(`NertInferTest`, `nert_model_zoo_parity_test`). NERT-side specifications record
+that evidence, but NERT never gates on exports it cannot provision itself.
 
-## Open Technical Decisions
+## Decisions that Shape the Stack
 
-Decided 2026-10-16 (Phase 4):
+These decisions were made on 2026-10-16 during the Phase 4 hardening pass.
 
-- [Q-1] Opset policy: **require opset-18 exports + conversion note**
-  (was: recommendation). Loader accepts opset 18 only; README documents
-  the `onnx.version_converter` command. No native 12–17 support.
-- [Q-3] RAFT symbolic spatial dims: **static per load** via input shapes
-  ([D-8]) — confirmed by Tier-4 RAFT parity (`max_scaled_diff=6.10e-05`,
-  2026-10-10). No plan cache.
-- [Q-4] CI model subset: **ResNet-18 fixture only** (provisioned by
-  `.github/workflows/ci.yml` via `tools/provision_resnet18.py`). The
-  model zoo stays out of CI; parity runs live in Neuriplo
-  (`NertInferTest`, `nert_model_zoo_parity_test`).
-- [Q-5] Decided 2026-10-16 (Phase 5, breaking 0.2.0): namespace `nert`,
-  `include/nert/`, all C++ filenames lowercase `snake_case`. Neuriplo
-  adapter change: includes + namespace (CMake alias `neuriplo_engine`
-  kept).
+- **`Q-1` — Opset policy.** Require opset-18 exports and document the
+  conversion step. The loader accepts opset 18 only; `README.md` shows the
+  `onnx.version_converter` command. Native opset 12–17 loading is not
+  supported.
+- **`Q-3` — RAFT symbolic spatial dimensions.** Resolve them statically per
+  load from the supplied input shapes, with no plan cache. Tier-4 RAFT parity
+  (`max_scaled_diff=6.10e-05` on 2026-10-10) confirmed the choice.
+- **`Q-4` — CI model subset.** CI carries only the ResNet-18 fixture,
+  provisioned by `.github/workflows/ci.yml` through
+  `tools/provision_resnet18.py`. The model zoo stays out of CI; parity runs
+  live in Neuriplo.
+- **`Q-5` — Public naming.** Namespace `nert`, headers under `include/nert/`,
+  and lowercase `snake_case` C++ filenames, delivered as one breaking 0.2.0
+  change. The Neuriplo adapter updates includes and namespace; the
+  `neuriplo_engine` CMake alias remains for compatibility.
