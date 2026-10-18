@@ -56,12 +56,14 @@ Active packet: `specs/2026-10-10-raft-open-vocab/`.
 - Exit: every gated export loads and matches ONNX Runtime per the packet's
   [V-3] (atol 1e-3 scaled, detection/DETR rows confident-only); ResNet
   fixture ctest stays green; no existing test weakened.
-- OWLv2 bring-up + GPU gate (2026-10-18): real-model dispatch found and
+- OWLv2 bring-up + parity (2026-10-18): real-model dispatch found and
   closed int32 `Cast`, Einsum ellipsis (CPU), bool movement
   (`Flatten`/`Gather`/`Concat`/`Slice`/`Transpose`/`Unsqueeze`), empty
-  `ConstantOfShape`, and CUDA `Einsum`. Full 1219-node CUDA dispatch in
-  7 s vs the ORT reference: logits bit-identical, boxes maxdiff 1.9e-04
-  (0 rows over tolerance). Evidence: task-models `validation.md` V-3b.
+  `ConstantOfShape`, and CUDA `Einsum`. CPU vs ORT: logits bit-identical
+  (top-1 3600/3600), boxes maxdiff 1.3e-04. Full 1219-node CPU dispatch
+  3037 s Release; CUDA dispatch 7 s with logits bit-identical and boxes
+  maxdiff 1.9e-04 (0 rows over tolerance). Evidence: task-models
+  `validation.md` V-3/V-3b.
 
 ## Phase 4 — Hardening + Policy (Complete 2026-10-16)
 
