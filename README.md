@@ -35,6 +35,12 @@ family (RT-DETR v4, D-FINE/DEIM, DEIMv2, RF-DETR, RF-DETR-Seg), RAFT
 (`InstanceNormalization`, Tier 4), and the Tier-5 open-vocabulary kernel
 set. Open-vocabulary end-to-end parity is the open integration gate.
 
+## Documentation
+
+- [Memory footprint profiling](docs/memory-footprint-profiling.md) —
+  planned model fit/sizing report (API + CLI), the accounting model, and
+  a current plan-level workaround.
+
 ## Devices
 
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
@@ -62,6 +68,8 @@ table, checked against the CPU oracle within tolerance. Pick devices via
   `bench/README.md`.
 - `tools/provision_resnet18.py`: exports the ResNet-18 test fixture.
 - `scripts/format.sh`: clang-format check.
+- `docs/`: user guides (memory footprint profiling is specified but not
+  yet implemented).
 - `specs/`: mission, tech stack, roadmap, and per-feature packets.
 
 ## Build
