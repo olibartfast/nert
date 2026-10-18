@@ -203,6 +203,8 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/max_pool.cpp src/opencl/average_pool.cpp src/opencl/global_average_pool.cpp)
     target_sources(nert PRIVATE src/opencl/flatten.cpp src/opencl/gemm.cpp)
     target_sources(nert PRIVATE src/opencl/conv.cpp)
+    target_sources(nert PRIVATE src/opencl/mat_mul.cpp)
+    target_sources(nert PRIVATE src/opencl/layer_normalization.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)

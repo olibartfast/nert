@@ -6,7 +6,8 @@ seg-small and RAFT had complete CUDA op coverage but no full-model gate.
 ## In scope
 
 - Run the RF-DETR seg-small CUDA gate against the ORT reference.
-- Run the RAFT gate if a local opset-18 export exists.
+- Provision the real torchvision RAFT-large export and run the CUDA
+  gate against ORT.
 - Fix only blockers the gates surface; no speculative kernel work.
 
 ## Out of scope
@@ -24,15 +25,15 @@ seg-small and RAFT had complete CUDA op coverage but no full-model gate.
   near-tie TopK selections, which changed decoder slot assignment and
   the outputs by O(0.5). Fixed here with `CUBLAS_PEDANTIC_MATH` and
   `CUDNN_FMA_MATH`.
-- **RAFT cannot be gated here.** The local `ref.onnx` is a
-  pose-registration refiner (inputs `A`/`B` 6×160×160, outputs
+- **RAFT was misidentified, then provisioned.** The local `ref.onnx`
+  is a pose-registration refiner (inputs `A`/`B` 6×160×160, outputs
   `trans`/`rot`), not torchvision RAFT (which outputs flow and uses
-  correlation/GRU ops). The coverage matrix's 156-node RAFT row came
-  from that file by mistake. No opset-18 RAFT export is present
-  locally; CPU parity remains recorded through Neuriplo's manifest
-  harness.
+  correlation/GRU ops). A real torchvision RAFT-large export was then
+  produced at opset 18 (1,836 ONNX nodes, 1,299 folded) and gated:
+  CUDA-vs-ORT flow maxdiff 1.344e-04 (tolerance 5.324e-03) on a real
+  `bus.jpg` pair with a 4 px shift.
 
 ## Open questions
 
-- Provision the torchvision RAFT-large opset-18 export before any RAFT
-  device gate.
+- RAFT CPU cross-check on the new export is running; the CUDA gate is
+  already against ORT on the same graph.

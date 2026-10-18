@@ -72,6 +72,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strides, dilations, explicit/SAME pads, bias) — table 20→21.
   ResNet-18 is op-complete on OpenCL (0 missing types); YOLO26n's gap
   drops to 12 types, OWLv2 to 16, RF-DETR to 25.
+- OpenCL `MatMul` (1-D promotion, NumPy batch broadcast) and
+  `LayerNormalization` (axis/epsilon, scale/bias, float accumulation) —
+  table 21→23. YOLO26n drops to 11 types, OWLv2 to 14, RF-DETR to 23;
+  RAFT-large's OpenCL gap is 10 types/122 nodes.
+- RAFT-large: real torchvision opset-18 export provisioned (1,836 ONNX
+  nodes) and the full CUDA gate passes against ORT — flow maxdiff
+  1.344e-04 (tolerance 5.324e-03) on a real image pair. The earlier
+  `ref.onnx` was a FoundationPose refiner, not RAFT.
 
 ## [0.1.0] - Unreleased
 
