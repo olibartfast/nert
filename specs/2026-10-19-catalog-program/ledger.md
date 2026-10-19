@@ -82,7 +82,8 @@ on the maintainer host.
 | `6d99da9` | 18 OpenCL rows (37 → 55); YOLO26n / RF-DETR seg-small / RAFT-large OpenCL gates; int64 Clip CPU/CUDA |
 | `b905792` | 13 more OpenCL rows (55 → 68); coverage, ledger and changelog |
 | `346cb29` | FIX-1: ScatterND ordering, Or arity, ReduceMean noop, Identity/Squeeze rank cap; catalog gate evidence; HIP unsupported |
-| `3c2acae` | CUDA asymmetric-pad `Conv` support (explicit zero pre-pad in both CUDA Conv rows) + its device tests; RT-DETRv4-s's full-model CUDA gate |
+| `14cbde8` | CUDA asymmetric-pad `Conv` support (explicit zero pre-pad in both CUDA Conv rows) + its device tests; RT-DETRv4-s's full-model CUDA gate |
+| `8a00aab` | The closing gates: Grounding DINO (CPU/CUDA task-equivalence, OpenCL backend gap), RF-DETR seg-nano-576 (SN-DEV deviation), RT-DETRv4-s CUDA; matrix, changelog, README, census and ledger |
 
 ## Sessions and resets
 
@@ -90,6 +91,7 @@ on the maintainer host.
 | --- | --- |
 | Rows 1–26 | `ses_eaca1c986ffeFJdfdPOFfK3mDh` |
 | Rows 31+ (boundary 1) | `ses_eab2639b3ffeP9kkTjzb3bVpvB` |
+| Export-first batch (boundary 3) | `ses_ea9a8c0e2ffesxGThz1IUdG8Qf` |
 
 Boundary handoff: [handoff-boundary-1.md](handoff-boundary-1.md). The fresh
 session reads only the handoff, this ledger, the inventory and the coverage
@@ -932,6 +934,22 @@ still uncommitted on top of HEAD. `src/cuda/conv.cu` and
 accepted remedy diff. The `nert_cuda_conv` ctest entry has **no gtest filter**
 and runs the whole binary (14 tests).
 
+### Reconciliation with `origin/main` (2026-10-20)
+
+The push of this boundary's first commit was **rejected**: the maintainer had
+pushed `604ee3e` ("docs: remove local home paths from specs") at 00:18 from a
+**stale** copy of `inventory.md` — the 354-line pre-slim census — while the
+slimmed 105-line census (21:19, carrying the `$HERMES_CACHE` pointer to the
+pre-slim archive) had only ever been in their working tree. Reconciled by
+rebasing onto `origin/main` and resolving `inventory.md` in favour of the
+**slimmed** form: it is the maintainer's working-tree state, it already contains
+**no** local home paths (so it satisfies the intent of `604ee3e`), it carries
+the archive pointer, and it holds the corrected 15/1/14/2 scoreboard. The
+ledger and this boundary's handoff were also stripped of their last local home
+paths, and the handoff's legend now defines `$HERMES_CACHE` alongside
+`$NERT_REPO`, `$LOCAL_ARTIFACTS` and `${HOME}` — the review had noted that the
+pre-slim archive was unreachable from the handoff as written.
+
 ### The boundary-reset path is verified (2026-10-20)
 
 The ledger's harness note records that the `orchestrator` agent cannot run as a
@@ -952,9 +970,9 @@ implementer and reviewer agents were re-pointed earlier today.
 maintainer has been editing the spec documents throughout this session: the
 slimming of `coverage.md` and `inventory.md` (21:19), the README status
 sentence (21:23), the path parameterisation in `handoff-boundary-1.md`
-(`/home/oli/repos/nert` → `$NERT_REPO`, `/home/oli/repos/tritonic/…` →
+(the repository root → `$NERT_REPO`, the local artifacts root →
 `$LOCAL_ARTIFACTS/…`) and in `2026-10-18-closure-cuda/validation.md`
-(`/home/oli/.local/…` → `${HOME}/.local/…`), and the ledger's own slimming.
+(the user's library path → `${HOME}/.local/…`), and the ledger's own slimming.
 These are **settled, coherent edits** — the coverage slimming is what the new
 rows are written into, so the integration cannot land without them. The
 boundary-2 handoff therefore uses the **same placeholder convention**, with a
