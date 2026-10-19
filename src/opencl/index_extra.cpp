@@ -2,18 +2,21 @@
 // ScatterND, and ReduceMean.
 //
 // Mirrors the CPU oracles: Identity and Squeeze copy the input buffer byte
-// for byte (shape inference owns the output dims); CumSum scans one axis
-// lane per work-item (float32 accumulates in double and rounds once per
-// output element, int64 accumulates exactly; `exclusive`/`reverse` default
-// to 0 and the axis is an int64 scalar input read back to the host);
+// for byte (shape inference owns the output dims) and take any rank; CumSum
+// scans one axis lane per work-item (float32 accumulates in double and rounds
+// once per output element, int64 accumulates exactly; `exclusive`/`reverse`
+// default to 0 and the axis is an int64 scalar input read back to the host);
 // EyeLike paints ones on the k-th diagonal and zeros elsewhere; ScatterND
-// copies `data` and then scatters `updates` slices at `indices` (the int64
-// indices are read back so out-of-range errors match the oracle, negatives
-// wrap, duplicates apply in order, and only reduction "none" is supported);
-// ReduceMean averages over the requested axes in double (the device must
-// report cl_khr_fp64). Rank is capped at 16 where index math is packed into
-// kernel arguments. The OpenCL C sources compile once per process via the
-// shared runtime.
+// copies `data` and then applies the `updates` slices with one kernel launch
+// each in slice order (the int64 indices are read back to the host, which
+// validates them against the oracle, wraps negatives, and computes each
+// slice's base offset, so duplicate indices apply in order and the last
+// duplicate wins); ReduceMean averages over the requested axes in double (the
+// device must report cl_khr_fp64; the axes resolution matches the oracle, so
+// an absent axes input reduces every axis and noop_with_empty_axes applies
+// only to a present-but-empty axes input). CumSum, ScatterND, and ReduceMean
+// cap rank at 16 where index math is packed into kernel arguments. The OpenCL
+// C sources compile once per process via the shared runtime.
 
 #include "nert/device.hpp"
 #include "runtime.hpp"
@@ -70,21 +73,6 @@ std::vector<int64_t> Strides(const std::vector<int64_t>& dims) {
         strides[i - 1] = strides[i] * dims[i];
     }
     return strides;
-}
-
-struct StrideSet {
-    cl_long s[kMaxRank];
-};
-
-StrideSet Pack(const std::vector<int64_t>& values, const std::string& context) {
-    if (values.size() > kMaxRank) {
-        throw InferenceException(context + ": rank exceeds the pilot limit of 16");
-    }
-    StrideSet packed{};
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        packed.s[i] = values[i];
-    }
-    return packed;
 }
 
 // Reads an int64 tensor back to the host. The rows in this file validate
@@ -175,31 +163,25 @@ __kernel void eye_like_b(__global uchar* y, long cols, long k, long total) {
 }
 )CLC";
 
-constexpr const char* kScatterNDSource = R"CLC(
-typedef struct { long s[16]; } StrideSet;
-#define SCATTER_BODY \
-    long u = (long)get_global_id(0); \
-    if (u >= total) { return; } \
-    long s = u / sliceSize; \
-    long e = u - s * sliceSize; \
-    long base = 0; \
-    for (int j = 0; j < k; ++j) { \
-        long c = idx[s * k + j]; \
-        if (c < 0) { c += dims.s[j]; } \
-        base += c * strides.s[j]; \
-    } \
-    out[base + e] = upd[u];
-__kernel void scatter_f32(__global const long* idx, __global const float* upd, __global float* out, long total,
-                          int k, long sliceSize, StrideSet dims, StrideSet strides) {
-    SCATTER_BODY
+// One launch per update slice: the host computes each slice's target base
+// offset from the indices read back before the launch, and the in-order
+// queue applies the slices in slice order, so duplicate indices apply in
+// order and the last duplicate wins, exactly like the CPU oracle.
+constexpr const char* kScatterNDSliceSource = R"CLC(
+#define SCATTER_SLICE_BODY \
+    long e = (long)get_global_id(0); \
+    if (e >= sliceSize) { return; } \
+    out[base + e] = upd[uOff + e];
+__kernel void scatter_slice_f32(__global const float* upd, __global float* out, long uOff, long base,
+                                long sliceSize) {
+    SCATTER_SLICE_BODY
 }
-__kernel void scatter_i64(__global const long* idx, __global const long* upd, __global long* out, long total,
-                          int k, long sliceSize, StrideSet dims, StrideSet strides) {
-    SCATTER_BODY
+__kernel void scatter_slice_i64(__global const long* upd, __global long* out, long uOff, long base,
+                                long sliceSize) {
+    SCATTER_SLICE_BODY
 }
-__kernel void scatter_b(__global const long* idx, __global const uchar* upd, __global uchar* out, long total,
-                        int k, long sliceSize, StrideSet dims, StrideSet strides) {
-    SCATTER_BODY
+__kernel void scatter_slice_b(__global const uchar* upd, __global uchar* out, long uOff, long base, long sliceSize) {
+    SCATTER_SLICE_BODY
 }
 )CLC";
 
@@ -289,9 +271,6 @@ void Identity(const Node& node, const std::vector<TensorView>& inputs, const std
         throw InferenceException(context + ": input and output dtypes differ");
     }
     const std::size_t element = ElementSize(in.dtype, context);
-    if (in.dims.size() > kMaxRank || out.dims.size() > kMaxRank) {
-        throw InferenceException(context + ": rank exceeds the pilot limit of 16");
-    }
     if (in.dims != out.dims) {
         throw InferenceException(context + ": input and output shapes differ");
     }
@@ -320,9 +299,6 @@ void Squeeze(const Node& node, const std::vector<TensorView>& inputs, const std:
         throw InferenceException(context + ": input and output dtypes differ");
     }
     const std::size_t element = ElementSize(in.dtype, context);
-    if (in.dims.size() > kMaxRank || out.dims.size() > kMaxRank) {
-        throw InferenceException(context + ": rank exceeds the pilot limit of 16");
-    }
     const int64_t count = ElementCount(out.dims, context);
     if (ElementCount(in.dims, context) != count) {
         throw InferenceException(context + ": element-count mismatch");
@@ -483,9 +459,11 @@ void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const st
     if (inputs.size() != 3 || outputs.size() != 1) {
         throw InferenceException(context + ": expected data, indices, updates, and one output");
     }
-    // Only reduction "none" is supported; reject anything else before any
-    // device work, matching the oracle's strictness about unsupported
-    // options.
+    // Only reduction "none" is supported. The CPU oracle has no reduction
+    // option at all (it always replaces the targeted slice and ignores
+    // attributes), so this check is deliberately stricter than the oracle:
+    // a pilot-side guard that rejects unsupported attribute values up
+    // front, before any device work.
     for (const Attribute& attr : node.attributes) {
         if (attr.name == "reduction") {
             const std::string* value = std::get_if<std::string>(&attr.value);
@@ -560,7 +538,7 @@ void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const st
     const std::size_t elemSize = ElementSize(data.dtype, context);
     const std::size_t bytes = static_cast<std::size_t>(dataCount) * elemSize;
     if (bytes > 0) {
-        // Copy data first; the in-order queue runs the scatter kernel
+        // Copy data first; the in-order queue runs the scatter launches
         // after the copy completes.
         CopyDeviceBuffer(data, out, bytes, context);
     }
@@ -569,36 +547,45 @@ void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const st
         const char* entry = nullptr;
         const char* cache_key = nullptr;
         if (data.dtype == DataType::Float32) {
-            entry = "scatter_f32";
+            entry = "scatter_slice_f32";
             cache_key = "ScatterND/float";
         } else if (data.dtype == DataType::Int64) {
-            entry = "scatter_i64";
+            entry = "scatter_slice_i64";
             cache_key = "ScatterND/int64";
         } else {
-            entry = "scatter_b";
+            entry = "scatter_slice_b";
             cache_key = "ScatterND/bool";
         }
-        cl_kernel kernel = opencl_runtime::KernelFor(cache_key, kScatterNDSource, entry);
-        cl_mem idxm = reinterpret_cast<cl_mem>(const_cast<void*>(indices.data));
+        cl_kernel kernel = opencl_runtime::KernelFor(cache_key, kScatterNDSliceSource, entry);
         cl_mem updm = reinterpret_cast<cl_mem>(const_cast<void*>(updates.data));
         cl_mem outm = reinterpret_cast<cl_mem>(out.data);
-        const StrideSet dims_arg = Pack(data.dims, context);
-        const StrideSet strides_arg = Pack(dataStrides, context);
-        const cl_long total_arg = total;
-        const cl_int k_arg = static_cast<cl_int>(k);
         const cl_long slice_size_arg = sliceSize;
-        CheckCl(clSetKernelArg(kernel, 0, sizeof(idxm), &idxm), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 1, sizeof(updm), &updm), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 2, sizeof(outm), &outm), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 3, sizeof(total_arg), &total_arg), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 4, sizeof(k_arg), &k_arg), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 5, sizeof(slice_size_arg), &slice_size_arg), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 6, sizeof(dims_arg), &dims_arg), "clSetKernelArg", context);
-        CheckCl(clSetKernelArg(kernel, 7, sizeof(strides_arg), &strides_arg), "clSetKernelArg", context);
-        const std::size_t global = static_cast<std::size_t>(total);
-        CheckCl(
-            clEnqueueNDRangeKernel(opencl_runtime::Queue(), kernel, 1, nullptr, &global, nullptr, 0, nullptr, nullptr),
-            "clEnqueueNDRangeKernel", context);
+        CheckCl(clSetKernelArg(kernel, 0, sizeof(updm), &updm), "clSetKernelArg", context);
+        CheckCl(clSetKernelArg(kernel, 1, sizeof(outm), &outm), "clSetKernelArg", context);
+        CheckCl(clSetKernelArg(kernel, 4, sizeof(slice_size_arg), &slice_size_arg), "clSetKernelArg", context);
+        // One launch per update slice, in slice order: the in-order queue
+        // serializes the launches, so a duplicated target offset is
+        // overwritten by the later slice and the last duplicate wins,
+        // exactly like the CPU oracle. The base offsets are computed here
+        // from the indices read back above; the device does no index math.
+        const std::size_t global = static_cast<std::size_t>(sliceSize);
+        for (int64_t s = 0; s < sliceCount; ++s) {
+            int64_t base = 0;
+            for (int64_t j = 0; j < k; ++j) {
+                int64_t coord = idx[static_cast<std::size_t>(s * k + j)];
+                if (coord < 0) {
+                    coord += data.dims[static_cast<std::size_t>(j)];
+                }
+                base += coord * dataStrides[static_cast<std::size_t>(j)];
+            }
+            const cl_long u_off_arg = s * sliceSize;
+            const cl_long base_arg = base;
+            CheckCl(clSetKernelArg(kernel, 2, sizeof(u_off_arg), &u_off_arg), "clSetKernelArg", context);
+            CheckCl(clSetKernelArg(kernel, 3, sizeof(base_arg), &base_arg), "clSetKernelArg", context);
+            CheckCl(clEnqueueNDRangeKernel(opencl_runtime::Queue(), kernel, 1, nullptr, &global, nullptr, 0, nullptr,
+                                           nullptr),
+                    "clEnqueueNDRangeKernel", context);
+        }
     }
     CheckCl(clFinish(opencl_runtime::Queue()), "clFinish", context);
 }
@@ -626,8 +613,13 @@ void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const s
     const int64_t keepdims = IntAttribute(node, "keepdims", 1, context);
     const int64_t noopEmpty = IntAttribute(node, "noop_with_empty_axes", 0, context);
 
-    // Resolve the axes: absent means every axis; an empty axes tensor means
-    // every axis unless noop_with_empty_axes asks for an identity copy.
+    // Resolve the axes exactly like the CPU oracle (src/kernels/
+    // reduce_mean.cpp): an absent axes input reduces every axis and
+    // noop_with_empty_axes does not apply there; a present axes input
+    // carries the axes, and only a present-but-empty axes input turns the
+    // attribute into an identity copy. (A zero-element axes tensor is
+    // rejected by the dimension check today, so the identity branch mirrors
+    // the oracle without currently firing.)
     std::vector<int64_t> axes;
     bool identity = false;
     if (inputs.size() == 2) {
@@ -643,15 +635,18 @@ void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const s
             // The axes tensor lives in device memory; read the small values
             // back so the host can validate them like the CPU oracle.
             axes = ReadInt64(axesView, axesCount, context);
-        }
-    }
-    if (axes.empty()) {
-        if (noopEmpty != 0) {
+        } else if (noopEmpty != 0) {
             identity = true;
         } else {
             for (int64_t i = 0; i < rank; ++i) {
                 axes.push_back(i);
             }
+        }
+    } else {
+        // The axes input is absent: reduce every axis; noop_with_empty_axes
+        // does not apply (the CPU oracle ignores it here too).
+        for (int64_t i = 0; i < rank; ++i) {
+            axes.push_back(i);
         }
     }
 

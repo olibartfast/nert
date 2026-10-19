@@ -10,11 +10,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <limits>
 #include <string>
 #include <vector>
 
-// Defined in src/opencl/math_extra2.cpp. Declared here (not wired into the
-// OpenCL kernel table yet) so this suite links and calls the rows directly on
+// Defined in src/opencl/math_extra2.cpp and wired into the OpenCL kernel
+// table; declared here so this suite links and calls the rows directly on
 // device views.
 namespace nert {
 namespace opencl_kernels {
@@ -354,6 +355,153 @@ TEST(NertOpenCLMathExtra2, OrBroadcast) {
     ocl.allocator().release(da);
     ocl.allocator().release(db);
     ocl.allocator().release(dy);
+}
+
+// Shared by the negative-path tests below: run fn and require an
+// InferenceException whose message names the node and the op.
+void ExpectThrowNamesNode(nert::KernelFn fn, const nert::Node& node, const std::vector<nert::TensorView>& inputs,
+                          const std::vector<nert::TensorView>& outputs) {
+    try {
+        fn(node, inputs, outputs);
+        FAIL() << "expected InferenceException for " << node.op_type;
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find(node.name), std::string::npos) << message;
+        EXPECT_NE(message.find(node.op_type), std::string::npos) << message;
+    }
+}
+
+nert::TensorView TypeOnly(nert::DataType dtype, std::vector<int64_t> dims) {
+    nert::TensorView view;
+    view.dtype = dtype;
+    view.dims = std::move(dims);
+    return view;
+}
+
+// Or takes exactly two inputs, like the CPU oracle: a two-input call is
+// accepted and one- or three-input calls are rejected with the op and node
+// named.
+TEST(NertOpenCLMathExtra2, OrArityMatchesOracle) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    // Exactly two inputs are accepted.
+    std::vector<std::uint8_t> a = {1, 0};
+    std::vector<std::uint8_t> b = {0, 1};
+    std::vector<std::uint8_t> ref(2, 0);
+    nert::Node ok = MakeNode("or_two", "Or");
+    ok.inputs = {"a", "b"};
+    ok.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Or")(ok, {HostBool(a, {2}), HostBool(b, {2})}, {HostBool(ref, {2})});
+    EXPECT_EQ(ref, (std::vector<std::uint8_t>{1, 1}));
+    void* da = nullptr;
+    void* db = nullptr;
+    void* dy = nullptr;
+    UploadBytes(ocl, da, a);
+    UploadBytes(ocl, db, b);
+    UploadBytes(ocl, dy, std::vector<std::uint8_t>(2, 0));
+    nert::opencl_kernels::Or(ok, {DeviceBool(da, {2}), DeviceBool(db, {2})}, {DeviceBool(dy, {2})});
+    std::vector<std::uint8_t> got(2, 0);
+    ocl.transfer().device_to_host(got.data(), dy, 2);
+    EXPECT_EQ(got, ref);
+    ocl.allocator().release(da);
+    ocl.allocator().release(db);
+    ocl.allocator().release(dy);
+
+    // One input is rejected.
+    nert::Node one = MakeNode("or_one", "Or");
+    ExpectThrowNamesNode(&nert::opencl_kernels::Or, one, {TypeOnly(nert::DataType::Bool, {2})},
+                         {TypeOnly(nert::DataType::Bool, {2})});
+
+    // Three inputs are rejected.
+    nert::Node three = MakeNode("or_three", "Or");
+    ExpectThrowNamesNode(
+        &nert::opencl_kernels::Or, three,
+        {TypeOnly(nert::DataType::Bool, {2}), TypeOnly(nert::DataType::Bool, {2}), TypeOnly(nert::DataType::Bool, {2})},
+        {TypeOnly(nert::DataType::Bool, {2})});
+}
+
+// Max and Min reject input counts beyond the eight device input slots,
+// naming the op and the node.
+TEST(NertOpenCLMathExtra2, VariadicDeviceCap) {
+    std::vector<nert::TensorView> nine;
+    for (int i = 0; i < 9; ++i) {
+        nine.push_back(TypeOnly(nert::DataType::Float32, {2}));
+    }
+
+    nert::Node max_nine = MakeNode("max_nine", "Max");
+    try {
+        nert::opencl_kernels::Max(max_nine, nine, {TypeOnly(nert::DataType::Float32, {2})});
+        FAIL() << "expected InferenceException for Max with nine inputs";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("Max"), std::string::npos) << message;
+        EXPECT_NE(message.find(max_nine.name), std::string::npos) << message;
+        EXPECT_NE(message.find("limit of 8"), std::string::npos) << message;
+    }
+
+    nert::Node min_nine = MakeNode("min_nine", "Min");
+    try {
+        nert::opencl_kernels::Min(min_nine, nine, {TypeOnly(nert::DataType::Float32, {2})});
+        FAIL() << "expected InferenceException for Min with nine inputs";
+    } catch (const nert::InferenceException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("Min"), std::string::npos) << message;
+        EXPECT_NE(message.find(min_nine.name), std::string::npos) << message;
+        EXPECT_NE(message.find("limit of 8"), std::string::npos) << message;
+    }
+}
+
+// Max and Min fold three inputs in input order; quiet NaNs pin the fold
+// chain against the CPU oracle (the ternary comparisons keep the running
+// value on NaN, so a NaN never wins unless it is the first input).
+TEST(NertOpenCLMathExtra2, MaxMinThreeInputNaNFold) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+
+    auto run_case = [&](const char* name, const char* op, std::vector<float> a, std::vector<float> b,
+                        std::vector<float> c) {
+        nert::Node node = MakeNode(name, op);
+        node.inputs = {"a", "b", "c"};
+        node.outputs = {"y"};
+        std::vector<float> ref(1, 0.0F);
+        nert::CpuDevice().kernels().find(op)(node, {HostFloat(a, {1}), HostFloat(b, {1}), HostFloat(c, {1})},
+                                             {HostFloat(ref, {1})});
+        void* da = Upload(ocl, a);
+        void* db = Upload(ocl, b);
+        void* dc = Upload(ocl, c);
+        void* dy = Upload(ocl, std::vector<float>(1, 0.0F));
+        if (op == std::string("Max")) {
+            nert::opencl_kernels::Max(node, {DeviceFloat(da, {1}), DeviceFloat(db, {1}), DeviceFloat(dc, {1})},
+                                      {DeviceFloat(dy, {1})});
+        } else {
+            nert::opencl_kernels::Min(node, {DeviceFloat(da, {1}), DeviceFloat(db, {1}), DeviceFloat(dc, {1})},
+                                      {DeviceFloat(dy, {1})});
+        }
+        const std::vector<float> got = Download(ocl, dy, 1);
+        ASSERT_EQ(got.size(), ref.size());
+        if (std::isnan(ref[0])) {
+            EXPECT_TRUE(std::isnan(got[0])) << name;
+        } else {
+            EXPECT_EQ(got[0], ref[0]) << name;
+        }
+        ocl.allocator().release(da);
+        ocl.allocator().release(db);
+        ocl.allocator().release(dc);
+        ocl.allocator().release(dy);
+    };
+
+    // NaN first: it stays the running value through the whole fold.
+    run_case("max_nan_first", "Max", {nan}, {nan}, {3.0F});
+    run_case("min_nan_first", "Min", {nan}, {4.0F}, {1.0F});
+    // NaN in a later slot: the running value survives it.
+    run_case("max_nan_mid", "Max", {2.0F}, {nan}, {3.0F});
+    run_case("min_nan_mid", "Min", {2.0F}, {nan}, {1.0F});
 }
 
 // Negative paths name the node and the op.

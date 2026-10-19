@@ -118,12 +118,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       OpenCL vs CPU 1.2832e-04, 4m17s.
 - OpenCL catalog completion: `Clip` (float32/int64), `Log`, `Pow`,
   `Max`, `Min`, `Or`, `Identity`, `Squeeze`, `CumSum`, `EyeLike`,
-  `ScatterND`, `ReduceMean` and `ConvTranspose` — table 55→68. Every
-  loadable catalog model now has 0 missing OpenCL op types, including
-  Grounding DINO, RF-DETR keypoint, YOLO26n-depth, RT-DETRv4-s and the
-  FoundationPose scorer. Converted variants remain OPS until their
-  full-model reference gates run; no new PASS is claimed. OpenCL suite
-  28/28, format clean.
+  `ScatterND`, `ReduceMean` and `ConvTranspose` — final row set 68
+  rows (table 55→68, verified against `src/opencl/table.cpp`):
+  first-party `Relu`/`Add`/`Mul`/`Sub`/`Div`/`Sigmoid`/`Tanh`/`Softmax`/
+  `Reshape`, movement `Transpose`/`Gather`/`Slice`/`Concat`/`Shape`/
+  `Unsqueeze`, pools `MaxPool`/`AveragePool`/`GlobalAveragePool`,
+  `Flatten`/`Gemm`/`Conv`/`MatMul`/`LayerNormalization`, `Expand`/
+  `Where`, the OWLv2 batch `Cast`/`ConstantOfShape`/`Equal`/`Greater`/
+  `LessOrEqual`/`And`/`IsNaN`/`Erf`/`Elu`/`ReduceL2`/`ArgMax`/`Einsum`,
+  the P0 batch `Sqrt`/`Cos`/`Sin`/`Exp`/`Not`/`Less`/`ReduceSum`/
+  `ReduceMax`/`Split`/`GatherElements`/`TopK`/`Mod`/`Tile`/`Resize`/
+  `GridSample`/`InstanceNormalization`/`Range`/`Pad`, and the
+  completion batch listed above. Every loadable catalog model now has
+  0 missing OpenCL op types, including Grounding DINO, RF-DETR
+  keypoint, YOLO26n-depth, RT-DETRv4-s and the FoundationPose scorer.
+  OpenCL suite 28/28, format clean. Full-model gates recorded
+  2026-10-19 against ORT (tolerance `1e-3*(1+|ref|)`):
+    - YOLO11s: 321 folded nodes; 0 elements over tolerance on CPU,
+      OpenCL and CUDA; max abs CPU 9.77e-04, OpenCL 1.92e-03, CUDA
+      1.97e-03; OpenCL 436 ms, CUDA 1.4 s, CPU 119 s.
+    - YOLOv8n-pose: 267 nodes; 0 over tolerance on all three devices;
+      max abs CPU 4.88e-04, OpenCL 9.61e-04, CUDA 1.31e-03.
+    - YOLO26s-pose: 401 folded nodes; 0 over tolerance on all three
+      devices; max abs CPU 4.88e-04, OpenCL 8.70e-04, CUDA 1.50e-03;
+      same top-38 anchors as ORT, box and keypoint error <= 1.9e-04 px.
+    - RF-DETR nano-1101: 1,002 folded nodes; dets max abs OpenCL
+      5.44e-05, CUDA 1.25e-05; labels max abs OpenCL 3.48e-04, CUDA
+      2.50e-04; labels top-1 300/300 on all devices; 0 over tolerance.
+    - YOLO26n-depth: 328 folded nodes; 0 over tolerance on all three
+      devices; max abs CPU 1.34e-05, OpenCL 4.20e-05, CUDA 1.72e-05;
+      `ConvTranspose` dispatched on every device.
+    - RF-DETR keypoint-preview: 2,355 folded nodes; dets max abs
+      OpenCL 1.34e-05; labels max abs OpenCL 2.98e-05, top-1 100/100
+      on all devices; keypoints max abs OpenCL 2.13e-03, max tolerance
+      ratio 0.197; 0 over tolerance; OpenCL `Identity` x3 and
+      `ScatterND` x17 dispatched.
+    - YOLO26s / YOLO26x: PASS with the R-6 deviation — 10/1800
+      elements over tolerance in the sub-0.001 confidence tail, a TopK
+      tie flip between two candidates ~3e-8 apart that reproduces
+      identically on the CPU control; confident rows identical (7/7
+      and 5/5, score max abs 5.6e-06 / 1.2e-07, box IoU >= 0.999999).
+    - RF-DETR seg-nano-576: CPU matches ORT (dets max 2.10e-05, labels
+      top-1 100/100, mask IoU min 0.99980); OpenCL and CUDA fail on
+      ONE TopK near-tie at rank 99 (candidate scores tied to 1.43e-06
+      in the reference vs fp32 reduction-order noise 4.82e-05 on the
+      same score vector); with the TopK selection pinned to ORT's, all
+      three devices reach 0 over tolerance — blocker owned by the
+      export/topology, not a kernel row.
+    - RT-DETRv4-s: CPU and OpenCL pass (boxes max abs CPU 7.63e-04,
+      OpenCL 1.50e-03; scores 1.05e-05 / 3.83e-05; labels int64
+      identical 300/300); CUDA is a GAP — the graph's one
+      asymmetric-pad `Conv` (`/model/backbone/stem/stem2b/conv/Conv`,
+      pads [0,0,1,1]) is rejected by the CUDA frontend (cuDNN requires
+      symmetric spatial padding).
+    - Grounding DINO: the previous int64 `Clip` BLOCKED reason is gone;
+      the CPU full-model run completed (exit 0); the CUDA run, the ORT
+      comparison and the OpenCL leg are still pending. All 26 op types
+      the model uses are present in the 68-row OpenCL table.
 
 ### Fixed
 
@@ -137,6 +188,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coercing, and the CPU/CUDA `Clip` rows accept int64 — unblocking
   Grounding DINO's reference gate at `/model/model/Clip` (gate re-run
   pending).
+- Review-driven OpenCL corrections landed after `b905792`: `ScatterND`
+  now applies duplicate update slices in order (last duplicate wins,
+  matching the CPU oracle), `Or` enforces the oracle's two-input
+  arity, `ReduceMean`'s `noop_with_empty_axes` now applies only when an
+  axes input is supplied (shape inference aligned with the CPU
+  kernel), and the rank cap was removed from the `Identity` and
+  `Squeeze` copy rows.
 
 ## [0.1.0] - Unreleased
 

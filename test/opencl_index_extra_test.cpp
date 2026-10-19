@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-// Defined in src/opencl/index_extra.cpp. Declared here (not wired into the
-// OpenCL kernel table yet) so this suite links and calls the rows directly
-// on device views.
+// Defined in src/opencl/index_extra.cpp and wired into the OpenCL kernel
+// table; declared here so this suite links and calls the rows directly on
+// device views.
 namespace nert {
 namespace opencl_kernels {
 
@@ -178,8 +178,8 @@ TEST(NertOpenCLIndexExtra, SqueezeShapes) {
 
 // CumSum variants on {1,2,3,4} shape {2,2}, each checked against the CPU
 // oracle: axis 1 (default, exclusive, reverse, reverse+exclusive), axis 0
-// (reverse, reverse+exclusive), and an exact int64 case beyond float32's
-// exact integer range.
+// (reverse, reverse+exclusive), a negative axis (-1 counts back from the
+// last axis), and an exact int64 case beyond float32's exact integer range.
 TEST(NertOpenCLIndexExtra, CumSumVariants) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
@@ -218,6 +218,7 @@ TEST(NertOpenCLIndexExtra, CumSumVariants) {
     run_case("cum_revex1", 1, 1, 1, {2.0F, 0.0F, 4.0F, 0.0F});
     run_case("cum_rev0", 0, 0, 1, {4.0F, 6.0F, 3.0F, 4.0F});
     run_case("cum_revex0", 0, 1, 1, {3.0F, 4.0F, 0.0F, 0.0F});
+    run_case("cum_negaxis", -1, 0, 0, {1.0F, 3.0F, 3.0F, 7.0F});
 
     {
         // The int64 row is exact where float32 would round the running sum.
@@ -291,6 +292,31 @@ TEST(NertOpenCLIndexExtra, EyeLikeK) {
     }
 }
 
+// EyeLike with a bool output exercises the eye_like_b kernel: ones on the
+// k-th diagonal as bytes, everything else zero, against the CPU oracle.
+TEST(NertOpenCLIndexExtra, EyeLikeBoolOutput) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    nert::Node node = MakeNode("eye_b", "EyeLike");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.attributes.push_back(nert::Attribute("k", static_cast<int64_t>(-1)));
+    std::vector<float> in(12, 2.0F);
+    std::vector<std::uint8_t> ref(12, 7);
+    nert::CpuDevice().kernels().find("EyeLike")(node, {HostFloat(in, {3, 4})}, {HostBool(ref, {3, 4})});
+    EXPECT_EQ(ref, (std::vector<std::uint8_t>{0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0}));
+
+    void* dx = Upload(ocl, in);
+    void* dy = nullptr;
+    UploadBytes(ocl, dy, std::vector<std::uint8_t>(12, 0));
+    nert::opencl_kernels::EyeLike(node, {DeviceFloat(dx, {3, 4})}, {DeviceBool(dy, {3, 4})});
+    EXPECT_EQ(DownloadBytes(ocl, dy, 12), ref);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
 // ScatterND replaces whole slices; a negative index counts back and a K=2
 // index addresses one element of the 2-D data. Device matches the oracle.
 TEST(NertOpenCLIndexExtra, ScatterNDBasic) {
@@ -331,6 +357,93 @@ TEST(NertOpenCLIndexExtra, ScatterNDBasic) {
                 {0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 9});
     run_scatter("sc_k2", std::vector<float>(12, 0.0F), {4, 3}, {1, 2}, {1, 2}, {99}, {1},
                 {0, 0, 0, 0, 0, 99, 0, 0, 0, 0, 0, 0});
+}
+
+// ScatterND duplicate indices apply in slice order: the last duplicate wins
+// on the device exactly like the CPU oracle (indices {3,3,3} with updates
+// {1,2,3} leaves out[3] = 3). The int64 and bool data rows are byte-exact.
+TEST(NertOpenCLIndexExtra, ScatterNDDuplicatesAndDtypes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    // Duplicate indices: the last update slice must win on both sides.
+    {
+        nert::Node node = MakeNode("sc_dup", "ScatterND");
+        node.inputs = {"data", "indices", "updates"};
+        node.outputs = {"y"};
+        std::vector<float> data(4, 0.0F);
+        std::vector<int64_t> idx = {3, 3, 3};
+        std::vector<float> upd = {1.0F, 2.0F, 3.0F};
+        std::vector<float> ref(4, -1.0F);
+        nert::CpuDevice().kernels().find("ScatterND")(
+            node, {HostFloat(data, {4}), HostInt64(idx, {3, 1}), HostFloat(upd, {3})}, {HostFloat(ref, {4})});
+        EXPECT_EQ(ref, (std::vector<float>{0.0F, 0.0F, 0.0F, 3.0F}));
+        void* dd = Upload(ocl, data);
+        void* di = UploadInt64(ocl, idx);
+        void* du = Upload(ocl, upd);
+        void* dou = Upload(ocl, std::vector<float>(4, 0.0F));
+        nert::opencl_kernels::ScatterND(node, {DeviceFloat(dd, {4}), DeviceInt64(di, {3, 1}), DeviceFloat(du, {3})},
+                                        {DeviceFloat(dou, {4})});
+        EXPECT_EQ(Download(ocl, dou, 4), ref);
+        ocl.allocator().release(dd);
+        ocl.allocator().release(di);
+        ocl.allocator().release(du);
+        ocl.allocator().release(dou);
+    }
+    // int64 data with a negative index wrapping to the last row.
+    {
+        nert::Node node = MakeNode("sc_i64", "ScatterND");
+        node.inputs = {"data", "indices", "updates"};
+        node.outputs = {"y"};
+        std::vector<int64_t> data = {1, 2, 3, 4};
+        std::vector<int64_t> idx = {-1};
+        std::vector<int64_t> upd = {99, 98};
+        std::vector<int64_t> ref(4, 0);
+        nert::CpuDevice().kernels().find("ScatterND")(
+            node, {HostInt64(data, {2, 2}), HostInt64(idx, {1, 1}), HostInt64(upd, {1, 2})}, {HostInt64(ref, {2, 2})});
+        EXPECT_EQ(ref, (std::vector<int64_t>{1, 2, 99, 98}));
+        void* dd = UploadInt64(ocl, data);
+        void* di = UploadInt64(ocl, idx);
+        void* du = UploadInt64(ocl, upd);
+        void* dou = UploadInt64(ocl, std::vector<int64_t>(4, 0));
+        nert::opencl_kernels::ScatterND(node,
+                                        {DeviceInt64(dd, {2, 2}), DeviceInt64(di, {1, 1}), DeviceInt64(du, {1, 2})},
+                                        {DeviceInt64(dou, {2, 2})});
+        EXPECT_EQ(DownloadInt64(ocl, dou, 4), ref);
+        ocl.allocator().release(dd);
+        ocl.allocator().release(di);
+        ocl.allocator().release(du);
+        ocl.allocator().release(dou);
+    }
+    // bool data, one replaced element.
+    {
+        nert::Node node = MakeNode("sc_b", "ScatterND");
+        node.inputs = {"data", "indices", "updates"};
+        node.outputs = {"y"};
+        std::vector<std::uint8_t> data = {0, 1, 0, 1};
+        std::vector<int64_t> idx = {2};
+        std::vector<std::uint8_t> upd = {1};
+        std::vector<std::uint8_t> ref(4, 0);
+        nert::CpuDevice().kernels().find("ScatterND")(
+            node, {HostBool(data, {4}), HostInt64(idx, {1, 1}), HostBool(upd, {1})}, {HostBool(ref, {4})});
+        EXPECT_EQ(ref, (std::vector<std::uint8_t>{0, 1, 1, 1}));
+        void* dd = nullptr;
+        void* du = nullptr;
+        void* dou = nullptr;
+        UploadBytes(ocl, dd, data);
+        void* di = UploadInt64(ocl, idx);
+        UploadBytes(ocl, du, upd);
+        UploadBytes(ocl, dou, std::vector<std::uint8_t>(4, 0));
+        nert::opencl_kernels::ScatterND(node, {DeviceBool(dd, {4}), DeviceInt64(di, {1, 1}), DeviceBool(du, {1})},
+                                        {DeviceBool(dou, {4})});
+        EXPECT_EQ(DownloadBytes(ocl, dou, 4), ref);
+        ocl.allocator().release(dd);
+        ocl.allocator().release(di);
+        ocl.allocator().release(du);
+        ocl.allocator().release(dou);
+    }
 }
 
 // ReduceMean over the requested axes with double accumulation; the device
@@ -378,6 +491,76 @@ TEST(NertOpenCLIndexExtra, ReduceMeanAxes) {
         nert::opencl_kernels::ReduceMean(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dax, {1})},
                                          {DeviceFloat(dy, {3})});
         ExpectNear(Download(ocl, dy, 3), ref);
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dax);
+        ocl.allocator().release(dy);
+    }
+}
+
+// ReduceMean with the axes input absent reduces every axis, and
+// noop_with_empty_axes does not apply in that case (the CPU oracle's
+// convention, which the OpenCL row mirrors). A present non-empty axes input
+// reduces exactly those axes even when the attribute is set.
+TEST(NertOpenCLIndexExtra, ReduceMeanAbsentAxesAndNoop) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+
+    // Absent axes input: mean over every axis, keepdims defaulting to 1.
+    {
+        nert::Node node = MakeNode("mean_absent", "ReduceMean");
+        node.inputs = {"x"};
+        node.outputs = {"y"};
+        std::vector<float> ref(1, 0.0F);
+        nert::CpuDevice().kernels().find("ReduceMean")(node, {HostFloat(x, {2, 3})}, {HostFloat(ref, {1, 1})});
+        ExpectNear(ref, {3.5F});
+        void* dx = Upload(ocl, x);
+        void* dy = Upload(ocl, std::vector<float>(1, 0.0F));
+        nert::opencl_kernels::ReduceMean(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {1, 1})});
+        ExpectNear(Download(ocl, dy, 1), ref);
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dy);
+    }
+    // Absent axes input with noop_with_empty_axes=1: still reduces every
+    // axis to the same {1,1} mean — the attribute must not turn the node
+    // into an identity copy of the {2,3} input.
+    {
+        nert::Node node = MakeNode("mean_absent_noop", "ReduceMean");
+        node.inputs = {"x"};
+        node.outputs = {"y"};
+        node.attributes.push_back(nert::Attribute("noop_with_empty_axes", int64_t{1}));
+        std::vector<float> ref(1, 0.0F);
+        nert::CpuDevice().kernels().find("ReduceMean")(node, {HostFloat(x, {2, 3})}, {HostFloat(ref, {1, 1})});
+        ASSERT_EQ(ref.size(), static_cast<std::size_t>(1));
+        EXPECT_EQ(ref[0], 3.5F);
+        void* dx = Upload(ocl, x);
+        void* dy = Upload(ocl, std::vector<float>(1, 0.0F));
+        nert::opencl_kernels::ReduceMean(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {1, 1})});
+        ExpectNear(Download(ocl, dy, 1), ref);
+        ocl.allocator().release(dx);
+        ocl.allocator().release(dy);
+    }
+    // Present axes {1} with noop_with_empty_axes=1: a normal reduction of
+    // exactly those axes; the attribute only concerns empty axes inputs.
+    {
+        nert::Node node = MakeNode("mean_axes_noop", "ReduceMean");
+        node.inputs = {"x", "axes"};
+        node.outputs = {"y"};
+        node.attributes.push_back(nert::Attribute("keepdims", static_cast<int64_t>(1)));
+        node.attributes.push_back(nert::Attribute("noop_with_empty_axes", int64_t{1}));
+        std::vector<int64_t> axesHost = {1};
+        std::vector<float> ref(2, 0.0F);
+        nert::CpuDevice().kernels().find("ReduceMean")(node, {HostFloat(x, {2, 3}), HostInt64(axesHost, {1})},
+                                                       {HostFloat(ref, {2, 1})});
+        EXPECT_EQ(ref, (std::vector<float>{2.0F, 5.0F}));
+        void* dx = Upload(ocl, x);
+        void* dax = UploadInt64(ocl, axesHost);
+        void* dy = Upload(ocl, std::vector<float>(2, 0.0F));
+        nert::opencl_kernels::ReduceMean(node, {DeviceFloat(dx, {2, 3}), DeviceInt64(dax, {1})},
+                                         {DeviceFloat(dy, {2, 1})});
+        ExpectNear(Download(ocl, dy, 2), ref);
         ocl.allocator().release(dx);
         ocl.allocator().release(dax);
         ocl.allocator().release(dy);

@@ -1350,7 +1350,10 @@ TensorInfo reducemean_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
-        if (noop_empty) {
+        // noop_with_empty_axes applies only when an empty axes input is
+        // present; with the axes input absent the mean reduces every axis,
+        // matching the CPU oracle in src/kernels/reduce_mean.cpp.
+        if (noop_empty && axes_supplied) {
             return TensorInfo{DataType::Float32, out};
         }
         for (int64_t i = 0; i < rank; ++i) {

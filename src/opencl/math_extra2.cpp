@@ -5,7 +5,8 @@
 // launch; Log is a float32 unary map with no special cases (negative -> NaN,
 // 0 -> -inf); Pow broadcasts two float32 inputs and squares on an exact
 // exponent of 2 like the oracle; Max/Min fold one shared float32 or int64
-// dtype across NumPy-broadcast inputs in input order; Or folds bool inputs.
+// dtype across NumPy-broadcast inputs in input order; Or takes exactly two
+// bool inputs (the oracle's arity) and broadcasts them.
 // One work-item per output element with zero strides on broadcast axes; the
 // variadic rows carry up to eight pointers plus the input count. The OpenCL C
 // source compiles once per process via the shared runtime, keyed per
@@ -550,11 +551,10 @@ void Min(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 
 void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     const std::string context = "Or (node '" + node.name + "')";
-    if (inputs.size() < 1 || outputs.size() != 1) {
-        throw InferenceException(context + ": expected at least one input and one output");
-    }
-    if (inputs.size() > kMaxInputs) {
-        throw InferenceException(context + ": input count exceeds the pilot device limit of 8");
+    // Exactly two inputs, like the CPU oracle (src/kernels/or.cpp): the
+    // kernel below is variadic, but the wrapper rejects every other arity.
+    if (inputs.size() != 2 || outputs.size() != 1) {
+        throw InferenceException(context + ": expected two inputs and one output");
     }
     for (const TensorView& in : inputs) {
         if (in.dtype != DataType::Bool) {
