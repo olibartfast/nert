@@ -82,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full OpenCL gate** (logits exact, top-1 3600/3600, boxes max
   5.093e-04, 0 over tolerance, 4 s). YOLO26n drops to 6 types/21 nodes,
   RF-DETR to 14/84, RAFT to 7/116.
+- Grounding DINO: the CPU/CUDA reference gate is blocked at
+  `/model/model/Clip` — the export clips int64 token ids while the Clip
+  row is float32-only. Op-type coverage did not catch this dtype variant;
+  an ORT reference was generated and the blocker is recorded in the
+  matrix.
 - RAFT-large: real torchvision opset-18 export provisioned (1,836 ONNX
   nodes) and the full CPU+CUDA gate passes against ORT — flow maxdiff
   1.317e-04 (CPU) / 1.344e-04 (CUDA), tolerance 5.324e-03, on a real

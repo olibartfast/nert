@@ -105,10 +105,12 @@ HIP-only gap beyond the OpenCL list is:
 
 `onnx.version_converter.convert_version(model, 18)` plus
 `onnx.checker`; each row then loaded through NERT's own loader and
-shape inference. **CPU and CUDA op coverage is complete for every row**
-(0 missing types), but no reference gate has been run for these
-variants — they are OPS, not PASS. OpenCL/HIP gaps are ONNX op-type
-counts (Constant excluded).
+shape inference. **CPU and CUDA op-type coverage is complete for every
+row** (0 missing types), but op-type counts hide dtype variants:
+Grounding DINO clips int64 token ids (`/model/model/Clip`) and both
+CPU and CUDA rows are float32-only, so its gate is BLOCKED. The other
+variants have no reference gate yet — they are OPS, not PASS. OpenCL/HIP
+gaps are ONNX op-type counts (Constant excluded).
 
 | Model | Source opset | NERT nodes | OpenCL gap | HIP gap |
 | --- | ---: | ---: | --- | --- |
@@ -154,10 +156,9 @@ folded nodes.
 | OWLv2 | PASS | PASS | PASS | GAP(24/453) | V-3/V-3b; OpenCL gate 2026-10-19: logits exact, top-1 3600/3600, boxes max 5.093e-04, 0 over tolerance, 4 s. |
 | RF-DETR seg-small | PASS | PASS | GAP(14/84) | GAP(33/701) | CUDA gate boxes 9.938e-04, labels 3.080e-04, top-1 100%, mask IoU 0.999528. |
 | RAFT-large | PASS | PASS | GAP(7/116) | GAP(19/501) | Full gate 2026-10-19 on a real `bus.jpg` pair: CPU maxdiff 1.317e-04 (1,074 s), CUDA 1.344e-04; tolerance 5.324e-03. |
-| Grounding DINO | OPS | OPS | GAP(35/5,235) | GAP(45/15,336) | Loads (19,224 folded nodes), CPU/CUDA op-complete; reference gate pending. |
+| Grounding DINO | BLOCKED | BLOCKED | GAP(26/1,960) | GAP(45/15,336) | Loads (19,224 folded nodes), but both CPU and CUDA fail at `/model/model/Clip`: int64 token ids with a float32-only Clip row. ORT reference generated; gate blocked on an int64 Clip variant. |
 | Converted YOLO/RF-DETR variants | OPS | OPS | per converted table | per converted table | Load + shape inference only; no reference gate yet. |
 | DETR/ViT/ViTPose/Depth-Anything/VideoMAE/ViViT/TimeSformer | BLOCKED | BLOCKED | BLOCKED | BLOCKED | No local export (searched 2026-10-18). |
-| DETR family | Recorded (roadmap Phase 2) | Not run | Opset-18 export/harness still the gate. |
 
 ## Portable-backend priority (OpenCL)
 
@@ -212,12 +213,16 @@ Einsum) took YOLO26n to 6 types/21 nodes, RF-DETR to 14/84 and RAFT to
    `neuriplo/docs/backends.yaml` now records NERT as `gpu: true`
    (build-time opt-in). NERT kernel coverage alone does not change the
    consumer matrix.
-3. **Pending gates.** RF-DETR's CUDA gate now passes (2026-10-18).
-   RAFT is blocked on a missing export, not on kernels.
-   OWLv2/YOLO26n/ResNet gates pass.
+3. **Pending gates.** ResNet-18 and OWLv2 pass CPU/CUDA/OpenCL;
+   YOLO26n and RF-DETR pass CPU/CUDA but not OpenCL; RAFT passes
+   CPU/CUDA. OpenCL gaps are Split/GatherElements/Resize/TopK plus the
+   remaining model-specific rows.
 4. **Grounding DINO.** Converted and loading (19,224 folded nodes; all
-   CPU/CUDA op types covered). CPU parity and the CUDA gate still need
-   reference inputs; it is the largest open-vocab export.
+   CPU/CUDA op **types** covered), but the CPU/CUDA reference gate is
+   BLOCKED at `/model/model/Clip`: the export clips int64 token ids and
+   the Clip row is float32-only. An int64 Clip variant is required
+   before the gate; an ORT reference has been generated
+   (logits `[1,900,256]`, pred_boxes `[1,900,4]`).
 
 ## Environment notes
 

@@ -34,6 +34,7 @@ reference gate. Tolerance: `ExpectNearOcl` unless exact.
 | V-M7 | Where: mask/broadcast/int64 + 3 negatives | pass 4/4 | 2026-10-19 | Lane kernel needed its launch locals renamed (TensorView shadowing). |
 | V-M8 | OWLv2 row batch: Cast, ConstantOfShape, Equal/Greater/LessOrEqual/And, IsNaN/Erf/Elu, ReduceL2/ArgMax, two Einsum equations | pass 9/9 tests | 2026-10-19 | Table 25→37; einsum supports `...pd,...qd->...pq` and `bchw,bnc->bnhw` only, with a named error otherwise. |
 | V-M9 | OWLv2 full OpenCL gate vs ORT: logits exact, top-1 3600/3600, pred_boxes max 5.093e-04, 0 over tolerance | pass | 2026-10-19 | 952-node model, 4 s; runner uses the same zero-pixel/ids fixture as the CPU/CUDA gate. |
+| V-M10 | Grounding DINO CPU/CUDA reference gate | blocked | 2026-10-19 | Both devices fail at `/model/model/Clip`: "tensors must be float32" (int64 token ids). ORT reference: logits [1,900,256], pred_boxes [1,900,4]. Requires an int64 Clip variant; not claimed. |
 | V-D6 | Diff audit | pass | 2026-10-19 | Kernel/test files + executor + shared registration + coverage/CHANGELOG. |
 
 ## Deviations
