@@ -6,7 +6,7 @@ the coverage matrix; nothing else is needed to continue.
 
 ## Where the program stands
 
-- Repo: `/home/oli/repos/nert`, branch `main`, pushed commits `6d99da9`,
+- Repo: `$NERT_REPO`, branch `main`, pushed commits `6d99da9`,
   `b905792` (maintainer-committed), `346cb29`. Working tree clean.
 - OpenCL operator table: **68 rows** (was 37). CPU 72, CUDA 72 unchanged.
 - In-scope catalog target: **30 ONNX entries** of 32 (image understanding and
@@ -39,7 +39,7 @@ Open, with owners:
 4. **14 missing ONNX exports** — export-first: provision opset-18, probe the op
    set, then add only the rows that graph needs. Highest leverage next:
    YOLOv8n detector, YOLO11m-seg (checkpoint local at
-   `/home/oli/repos/tritonic/yolo11m-seg.pt`), OWL-ViT, ResNet-50, ViTPose,
+   `$LOCAL_ARTIFACTS/tritonic/yolo11m-seg.pt`), OWL-ViT, ResNet-50, ViTPose,
    Depth-Anything-V2, VideoMAE/ViViT/TimeSformer, RAFT-small, YOLO v5-v12.
    Network is reachable (huggingface.co, github.com, pypi.org all 200);
    ultralytics 8.4.113, onnx 1.22, onnxruntime 1.27, transformers 4.35, torch 2.12.

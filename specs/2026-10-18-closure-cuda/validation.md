@@ -43,7 +43,7 @@ CUDNN_ROOT=/tmp/opencode/cudnn \
     cmake -S . -B build-cudnn -DCMAKE_BUILD_TYPE=Release \
     -DNERT_ENABLE_CUDA=ON && \
     cmake --build build-cudnn --parallel "$(nproc)" && \
-    LD_LIBRARY_PATH=/home/oli/.local/lib/python3.12/site-packages/nvidia/cudnn/lib \
+    LD_LIBRARY_PATH=${HOME}/.local/lib/python3.12/site-packages/nvidia/cudnn/lib \
     ctest --test-dir build-cudnn --output-on-failure
 ```
 
