@@ -155,6 +155,41 @@ __global__ void BiasAddKernel(float* y, const float* bias, int64_t batch, int64_
     }
 }
 
+// One thread per input element over the contiguous NCHW planes:
+// src[n, c, i1, i2, i3] -> dst[n, c, i1 + o1, i2 + o2, i3 + o3], where
+// (d2, d3) are the source plane's inner dims, (t2, t3) the destination
+// plane's inner dims (the full zero pre-pad), and (o1, o2, o3) the
+// begin-pad offset of the input inside it. Missing spatial dims stay dim 1
+// / offset 0, so the same kernel serves the raw rank-3, rank-4, and rank-5
+// layouts (the rank-3 lift prepends an H of 1 without changing the memory).
+__global__ void PadCopyKernel(float* dst, const float* src, int64_t count, int64_t srcPlane, int64_t dstPlane,
+                              int64_t d2, int64_t d3, int64_t t2, int64_t t3, int64_t o1, int64_t o2, int64_t o3) {
+    const int64_t d23 = d2 * d3;
+    for (int64_t i = blockIdx.x * blockDim.x + threadIdx.x; i < count; i += blockDim.x * gridDim.x) {
+        const int64_t plane = i / srcPlane;
+        const int64_t rest = i - plane * srcPlane;
+        const int64_t i1 = rest / d23;
+        const int64_t rem = rest - i1 * d23;
+        const int64_t i2 = rem / d3;
+        const int64_t i3 = rem - i2 * d3;
+        dst[plane * dstPlane + (i1 + o1) * (t2 * t3) + (i2 + o2) * t3 + (i3 + o3)] = src[i];
+    }
+}
+
+// Scope guard for the asymmetric pre-pad temporary: cudaFree runs when the
+// guard leaves scope, on the success path and on every throw path after the
+// allocation (descriptor setup, algo search, launches, sync). A destructor
+// cannot report, so an error from cudaFree is ignored; the pointer is always
+// memory this row allocated or null.
+struct PaddedTempGuard {
+    float* ptr = nullptr;
+    ~PaddedTempGuard() {
+        if (ptr != nullptr) {
+            (void)cudaFree(ptr);
+        }
+    }
+};
+
 // Cached engine choice + descriptors + workspace per resolved geometry. The
 // handle and these objects are process-lifetime (single-threaded executor
 // use, like the tables); the map intentionally does not clean up at exit.
@@ -248,7 +283,9 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
     if (strides.size() != spatial || dilations.size() != spatial) {
         throw InferenceException(context + ": stride and dilation must have one entry per spatial dimension");
     }
-    const std::vector<int64_t> in_spatial(x.dims.begin() + 2, x.dims.end());
+    // Grown in place by the asymmetric pre-pad below (which also clears
+    // pad_begin/pad_end); untouched when the pads are symmetric.
+    std::vector<int64_t> in_spatial(x.dims.begin() + 2, x.dims.end());
     const std::vector<int64_t> kernel(w.dims.begin() + 2, w.dims.end());
     for (std::size_t i = 0; i < spatial; ++i) {
         if (strides[i] <= 0 || dilations[i] <= 0) {
@@ -274,6 +311,82 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
     }
     if (x.data == nullptr || w.data == nullptr || out.data == nullptr || (hasBias && bias == nullptr)) {
         throw InferenceException(context + ": null buffer");
+    }
+
+    // Asymmetric zero pre-pad: cuDNN takes one pad per spatial dim (begin ==
+    // end), so an asymmetric request — pads=[0,0,1,1] (top/left 0,
+    // bottom/right 1) or the odd remainder of a SAME_UPPER/SAME_LOWER
+    // resolution above — is served by materialising x' = pad_zeros(x, pS,
+    // eS) in a device temporary and running this row over x' with pad=0.
+    // ONNX Conv with zero padding is y = cross_corr(pad_zeros(x, pS, eS), w)
+    // + b with out-of-bound reads exactly +0.0f; the temporary is that
+    // byte-exact pre-pad (cudaMemset writes IEEE +0.0f, the copy lands at
+    // spatial offset pS) and the output shape below already counts the full
+    // pS+eS ring, so the unchanged setup sums exactly the same windows. The
+    // only numeric difference versus CPU/ORT is cuDNN's own float32
+    // summation order — the tolerance regime every other Conv gate already
+    // passes under. Checked on the resolved begin/end pairs: the rank-3 lift
+    // prepends a dim of pads 0/0, so any lifted pS[i] != eS[i] shows up here.
+    const bool prePad = [&] {
+        for (std::size_t i = 0; i < spatial; ++i) {
+            if (pad_begin[i] != pad_end[i]) {
+                return true;
+            }
+        }
+        return false;
+    }();
+    // Input pointer and geometry the rest of the row runs over; identical to
+    // today's values when the pads are symmetric (prePad false).
+    PaddedTempGuard paddedGuard;
+    void* xRun = x.data;
+    if (prePad) {
+        // pad_zeros is only defined for non-negative pads; a negative begin
+        // pad would also make the copy offset negative and write before the
+        // temporary. Reject rather than corrupt memory (pre-fix this geometry
+        // threw "asymmetric padding is not supported" anyway). Symmetric
+        // negative pads still reach cuDNN exactly as before.
+        for (std::size_t i = 0; i < spatial; ++i) {
+            if (pad_begin[i] < 0 || pad_end[i] < 0) {
+                throw InferenceException(context + ": negative padding is not supported on CUDA here");
+            }
+        }
+        // Raw (unlifted) plane geometry for the copy, snapshotted before
+        // in_spatial grows: source dims, destination dims (the full
+        // begin+end pre-pad), and the begin-pad offset of the input inside
+        // the destination. Missing dims stay dim 1 / offset 0.
+        int64_t srcDim[3] = {1, 1, 1};
+        int64_t dstDim[3] = {1, 1, 1};
+        int64_t srcOff[3] = {0, 0, 0};
+        int64_t srcPlane = 1;
+        int64_t dstPlane = 1;
+        for (std::size_t i = 0; i < spatial; ++i) {
+            srcDim[i] = in_spatial[i];
+            dstDim[i] = in_spatial[i] + pad_begin[i] + pad_end[i];
+            srcOff[i] = pad_begin[i];
+            srcPlane *= srcDim[i];
+            dstPlane *= dstDim[i];
+        }
+        const int64_t count = n_batch * inChannels * srcPlane;
+        const std::size_t bytes = static_cast<std::size_t>(dstPlane) * n_batch * inChannels * sizeof(float);
+        float* padded = nullptr;
+        CheckCuda(cudaMalloc(reinterpret_cast<void**>(&padded), bytes), "cudaMalloc", context);
+        paddedGuard.ptr = padded; // freed on every path from here on
+        CheckCuda(cudaMemset(padded, 0, bytes), "cudaMemset", context);
+        const int block = 256;
+        const int grid = static_cast<int>(std::min<int64_t>((count + block - 1) / block, 65535));
+        PadCopyKernel<<<grid, block>>>(padded, static_cast<const float*>(x.data), count, srcPlane, dstPlane, srcDim[1],
+                                       srcDim[2], dstDim[1], dstDim[2], srcOff[0], srcOff[1], srcOff[2]);
+        CheckCuda(cudaGetLastError(), "PadCopyKernel launch", context);
+        // The row below runs over the pre-padded input with zero pads: grow
+        // the spatial dims in place and clear the ring so the lift, the
+        // output shape (already counting the full ring), and the descriptors
+        // all see the padded geometry.
+        for (std::size_t i = 0; i < spatial; ++i) {
+            in_spatial[i] += pad_begin[i] + pad_end[i];
+            pad_begin[i] = 0;
+            pad_end[i] = 0;
+        }
+        xRun = padded;
     }
 
     // Lift rank-3 to 4D (H=1 shares the buffer: the flat layout is identical);
@@ -397,7 +510,7 @@ void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::ve
     }
 
     const float alpha = 1.0F, beta = 0.0F;
-    CheckCudnn(cudnnConvolutionForward(handle, &alpha, plan->x_desc, x.data, plan->w_desc, w.data, plan->conv_desc,
+    CheckCudnn(cudnnConvolutionForward(handle, &alpha, plan->x_desc, xRun, plan->w_desc, w.data, plan->conv_desc,
                                        plan->algo, plan->workspace, plan->workspace_bytes, &beta, plan->y_desc,
                                        out.data),
                "cudnnConvolutionForward", context);

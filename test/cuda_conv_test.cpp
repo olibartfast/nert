@@ -208,6 +208,269 @@ TEST(NertCudaConv, ModelConvMatchesCpu) {
     ExpectNear(cuda.Run(inputs).outputs.at("y"), expected);
 }
 
+// The RT-DETRv4-s stem geometry that CUDA used to reject ('/model/backbone/
+// stem/stem2b/conv/Conv'): kernel 2x2, pads=[0,0,1,1] (top/left 0,
+// bottom/right 1), strides/dilations 1, group 1, float32, rank-1 bias, and
+// the 16x8x2x2 weight shape of onnx::Conv_2844. The row must serve it via
+// the zero pre-pad and match the CPU oracle.
+TEST(NertCudaConv, AsymmetricPadBottomRightWithBias) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 8 * 3 * 3);
+    std::vector<float> w(16 * 8 * 2 * 2);
+    std::vector<float> b(16);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(static_cast<int>(i % 17) - 8) * 0.25F;
+    }
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        w[i] = static_cast<float>(static_cast<int>(i % 11) - 5) * 0.125F;
+    }
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        b[i] = static_cast<float>(i) * 0.5F - 4.0F;
+    }
+    nert::Node node = MakeNode("cv_asym", "Conv");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{0, 0, 1, 1});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    // H = W = 3 + 0 + 1 - 2 + 1 = 3: the ring is bottom row + right column.
+    const std::vector<float> expected = RunCpuConv(node, x, {1, 8, 3, 3}, w, {16, 8, 2, 2}, &b, {1, 16, 3, 3});
+    ASSERT_EQ(expected.size(), 1u * 16 * 3 * 3);
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpu(16 * 3 * 3, 0.0F);
+    void* dy = Upload(cuda, gpu);
+    nert::CudaDevice().kernels().find("Conv")(
+        node, {DeviceFloat(dx, {1, 8, 3, 3}), DeviceFloat(dw, {16, 8, 2, 2}), DeviceFloat(db, {16})},
+        {DeviceFloat(dy, {1, 16, 3, 3})});
+    gpu = Download(cuda, dy, 16 * 3 * 3);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpu, expected);
+}
+
+// auto_pad=SAME_UPPER with an odd pad total resolves asymmetric (here
+// begin 0 / end 1 per dim) — the same path the stem geometry takes when a
+// model pads automatically. Compared against the CPU oracle.
+TEST(NertCudaConv, SameUpperAsymmetricPad) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 2 * 3 * 3);
+    std::vector<float> w(2 * 2 * 2 * 2);
+    std::vector<float> b = {1.5F, -2.5F};
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.5F;
+    }
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        w[i] = static_cast<float>(static_cast<int>(i % 7) - 3) * 0.25F;
+    }
+    nert::Node node = MakeNode("cv_same", "Conv");
+    node.attributes.emplace_back("auto_pad", std::string{"SAME_UPPER"});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    // out = ceil(3/1) = 3, total = (3-1)*1 + 2 - 3 = 1 -> begin 0, end 1.
+    const std::vector<float> expected = RunCpuConv(node, x, {1, 2, 3, 3}, w, {2, 2, 2, 2}, &b, {1, 2, 3, 3});
+    ASSERT_EQ(expected.size(), 1u * 2 * 3 * 3);
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpu(2 * 3 * 3, 0.0F);
+    void* dy = Upload(cuda, gpu);
+    nert::CudaDevice().kernels().find("Conv")(
+        node, {DeviceFloat(dx, {1, 2, 3, 3}), DeviceFloat(dw, {2, 2, 2, 2}), DeviceFloat(db, {2})},
+        {DeviceFloat(dy, {1, 2, 3, 3})});
+    gpu = Download(cuda, dy, 2 * 3 * 3);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpu, expected);
+}
+
+// Begin-pad asymmetry: pads=[1,0,0,2] (top/left 1,0; bottom/right 0,2)
+// resolves pad_begin=[1,0], pad_end=[0,2], so the input lands at spatial
+// offset (1,0) inside the zero pre-pad. Both dims are asymmetric and the
+// begin pad is non-zero in dim 0 — unlike the two cases above, whose
+// begin pads are [0,0] — so a row that ignored pad_begin, or that only
+// served a bottom/right ring, would shift the windows and miss the CPU
+// oracle. The pre-remedy row rejected any pS[i] != eS[i] outright, so this
+// geometry threw there and cannot pass without the pre-pad.
+TEST(NertCudaConv, AsymmetricBeginPadMixedWithBias) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 2 * 3 * 3);
+    std::vector<float> w(2 * 2 * 2 * 2);
+    std::vector<float> b = {0.75F, -1.25F};
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.5F;
+    }
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        w[i] = static_cast<float>(static_cast<int>(i % 7) - 3) * 0.25F;
+    }
+    nert::Node node = MakeNode("cv_beginpad", "Conv");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 0, 0, 2});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    // pad_begin = [1, 0], pad_end = [0, 2] -> pre-padded input 4x5.
+    // H = 3 + 1 + 0 - 2 + 1 = 3; W = 3 + 0 + 2 - 2 + 1 = 4.
+    const std::vector<float> expected = RunCpuConv(node, x, {1, 2, 3, 3}, w, {2, 2, 2, 2}, &b, {1, 2, 3, 4});
+    ASSERT_EQ(expected.size(), 1u * 2 * 3 * 4);
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpu(2 * 3 * 4, 0.0F);
+    void* dy = Upload(cuda, gpu);
+    nert::CudaDevice().kernels().find("Conv")(
+        node, {DeviceFloat(dx, {1, 2, 3, 3}), DeviceFloat(dw, {2, 2, 2, 2}), DeviceFloat(db, {2})},
+        {DeviceFloat(dy, {1, 2, 3, 4})});
+    gpu = Download(cuda, dy, 2 * 3 * 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpu, expected);
+}
+
+// Width-axis begin-pad asymmetry: pads=[0,1,0,0] (top/left 0,1;
+// bottom/right 0,0) resolves pad_begin=[0,1], pad_end=[0,0], so the input
+// lands at spatial offset (0,1) inside the 3x4 zero pre-pad. The three
+// asymmetric cases above resolve pad_begin=[0,0], [0,0], [1,0]: only dim 0
+// is offset there, so srcOff[1]/o3 (the inner width offset) is never
+// exercised. Here it is 1. A regression confined to the width axis would
+// leave the input in columns 0..2 of the same 3x4 temporary and give
+// y[0,0,0,0] = 10.5 (and y[0,1,0,0] = 2.125) where the oracle has
+// 0.75 and -1.25; ExpectNear fails on that shift.
+TEST(NertCudaConv, AsymmetricWidthBeginPadWithBias) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 2 * 3 * 3);
+    std::vector<float> w(2 * 2 * 2 * 2);
+    std::vector<float> b = {0.75F, -1.25F};
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        x[i] = static_cast<float>(static_cast<int>(i % 13) - 6) * 0.5F;
+    }
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        w[i] = static_cast<float>(static_cast<int>(i % 7) - 3) * 0.25F;
+    }
+    nert::Node node = MakeNode("cv_width_beginpad", "Conv");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{0, 1, 0, 0});
+    node.inputs = {"x", "w", "b"};
+    node.outputs = {"y"};
+    // pad_begin = [0, 1], pad_end = [0, 0] -> pre-padded input 3x4.
+    // H = 3 + 0 + 0 - 2 + 1 = 2; W = 3 + 1 + 0 - 2 + 1 = 3.
+    const std::vector<float> expected = RunCpuConv(node, x, {1, 2, 3, 3}, w, {2, 2, 2, 2}, &b, {1, 2, 2, 3});
+    ASSERT_EQ(expected.size(), 1u * 2 * 2 * 3);
+
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* db = Upload(cuda, b);
+    std::vector<float> gpu(2 * 2 * 3, 0.0F);
+    void* dy = Upload(cuda, gpu);
+    nert::CudaDevice().kernels().find("Conv")(
+        node, {DeviceFloat(dx, {1, 2, 3, 3}), DeviceFloat(dw, {2, 2, 2, 2}), DeviceFloat(db, {2})},
+        {DeviceFloat(dy, {1, 2, 2, 3})});
+    gpu = Download(cuda, dy, 2 * 2 * 3);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(db);
+    cuda.allocator().release(dy);
+    ExpectNear(gpu, expected);
+}
+
+// pads=[-1,0,0,1] resolves pad_begin=[-1,0], pad_end=[0,1]: the dims are
+// asymmetric (prePad true) and a negative begin pad would make the pre-pad
+// copy offset negative, writing before the temporary. The row must reject
+// it with InferenceException before allocating, with this exact reason.
+TEST(NertCudaConv, RejectsNegativePadding) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 1 * 3 * 3, 1.0F);
+    std::vector<float> w(1 * 1 * 2 * 2, 1.0F);
+    std::vector<float> y(1 * 1 * 1 * 3, 0.0F);
+    nert::Node node = MakeNode("cv_negpad", "Conv");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{-1, 0, 0, 1});
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* dy = Upload(cuda, y);
+    std::string message;
+    auto run = [&] {
+        try {
+            nert::CudaDevice().kernels().find("Conv")(
+                node, {DeviceFloat(dx, {1, 1, 3, 3}), DeviceFloat(dw, {1, 1, 2, 2})}, {DeviceFloat(dy, {1, 1, 1, 3})});
+        } catch (const nert::InferenceException& e) {
+            message = e.what();
+            throw;
+        }
+    };
+    EXPECT_THROW(run(), nert::InferenceException);
+    EXPECT_NE(message.find("negative padding is not supported on CUDA here"), std::string::npos) << message;
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(dy);
+}
+
+// pads=[1,0,0,-1] resolves pad_begin=[1,0], pad_end=[0,-1]: the begin pad
+// makes the dims asymmetric (prePad true) and the negative end pad shrinks
+// the destination width while the copy still lands at offset pad_begin.
+// RejectsNegativePadding above makes only pad_begin[0] negative; this case
+// exercises the pad_end[i] < 0 half of the guard. InferenceException must
+// carry the node name and the same named reason, before any allocation.
+TEST(NertCudaConv, RejectsNegativeEndPadding) {
+    if (!HasCudaConv()) {
+        GTEST_SKIP() << "no CUDA Conv (device or cuDNN build)";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(1 * 1 * 3 * 3, 1.0F);
+    std::vector<float> w(1 * 1 * 2 * 2, 1.0F);
+    std::vector<float> y(1 * 1 * 3 * 1, 0.0F);
+    nert::Node node = MakeNode("cv_negpad_end", "Conv");
+    node.attributes.emplace_back("pads", std::vector<int64_t>{1, 0, 0, -1});
+    node.inputs = {"x", "w"};
+    node.outputs = {"y"};
+    void* dx = Upload(cuda, x);
+    void* dw = Upload(cuda, w);
+    void* dy = Upload(cuda, y);
+    std::string message;
+    auto run = [&] {
+        try {
+            nert::CudaDevice().kernels().find("Conv")(
+                node, {DeviceFloat(dx, {1, 1, 3, 3}), DeviceFloat(dw, {1, 1, 2, 2})}, {DeviceFloat(dy, {1, 1, 3, 1})});
+        } catch (const nert::InferenceException& e) {
+            message = e.what();
+            throw;
+        }
+    };
+    EXPECT_THROW(run(), nert::InferenceException);
+    EXPECT_NE(message.find("cv_negpad_end"), std::string::npos) << message;
+    EXPECT_EQ(message, "Conv (node 'cv_negpad_end'): negative padding is not supported on CUDA here");
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dw);
+    cuda.allocator().release(dy);
+}
+
 bool HasCudaConvTranspose() {
     int count = 0;
     if (cudaGetDeviceCount(&count) != cudaSuccess || count < 1) {
