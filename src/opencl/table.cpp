@@ -8,7 +8,11 @@
 // (movement rows), MaxPool/AveragePool/GlobalAveragePool (pools),
 // Flatten/Gemm, Conv, MatMul/LayerNormalization, Expand/Where, and the
 // OWLv2 family (Cast/ConstantOfShape/compare/And/IsNaN/Erf/Elu/ReduceL2/
-// ArgMax/Einsum).
+// ArgMax/Einsum), the extra math rows (Sqrt/Cos/Sin/Exp/Not/Less), the
+// reduction rows (ReduceSum/ReduceMax), and the index-move/integer rows
+// (Split/GatherElements/TopK/Mod/Tile), and the resampling rows
+// (Resize/GridSample), and the normalization/range/pad rows
+// (InstanceNormalization/Range/Pad).
 
 #include "nert/device.hpp"
 
@@ -56,6 +60,25 @@ void Elu(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void ArgMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sqrt(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Cos(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sin(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Exp(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Not(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Less(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Split(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void GatherElements(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Mod(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Tile(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void GridSample(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void InstanceNormalization(const Node& node, const std::vector<TensorView>& inputs,
+                           const std::vector<TensorView>& outputs);
+void Range(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Pad(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindOpenCLKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
@@ -96,6 +119,24 @@ KernelFn FindOpenCLKernel(const std::string& op_type) {
         {"ReduceL2", &ReduceL2},
         {"ArgMax", &ArgMax},
         {"Einsum", &Einsum},
+        {"Sqrt", &Sqrt},
+        {"Cos", &Cos},
+        {"Sin", &Sin},
+        {"Exp", &Exp},
+        {"Not", &Not},
+        {"Less", &Less},
+        {"ReduceSum", &ReduceSum},
+        {"ReduceMax", &ReduceMax},
+        {"Split", &Split},
+        {"GatherElements", &GatherElements},
+        {"TopK", &TopK},
+        {"Mod", &Mod},
+        {"Tile", &Tile},
+        {"Resize", &Resize},
+        {"GridSample", &GridSample},
+        {"InstanceNormalization", &InstanceNormalization},
+        {"Range", &Range},
+        {"Pad", &Pad},
 
     };
     const auto it = table.find(op_type);

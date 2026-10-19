@@ -213,6 +213,12 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/unary_ops.cpp)
     target_sources(nert PRIVATE src/opencl/reduce_ops.cpp)
     target_sources(nert PRIVATE src/opencl/einsum.cpp)
+    target_sources(nert PRIVATE src/opencl/math_unary_extra.cpp)
+    target_sources(nert PRIVATE src/opencl/reduce_extra.cpp)
+    target_sources(nert PRIVATE src/opencl/index_move.cpp)
+    target_sources(nert PRIVATE src/opencl/resize.cpp)
+    target_sources(nert PRIVATE src/opencl/grid_sample.cpp)
+    target_sources(nert PRIVATE src/opencl/norm_range_pad.cpp)
     # PRIVATE: no OpenCL type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)

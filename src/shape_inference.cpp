@@ -2718,10 +2718,12 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     if (op == "Relu" || op == "Sigmoid" || op == "Softmax" || op == "Floor" ||
         op == "Erf" || op == "Sqrt" || op == "Tanh" || op == "Exp" ||
-        op == "Log" || op == "Cos" || op == "Sin" || op == "Clip" || op == "Elu") {
+        op == "Log" || op == "Cos" || op == "Sin" || op == "Elu") {
         return {TensorInfo{DataType::Float32, need(0).dims}};
     }
-    if (op == "Abs" || op == "Neg") {
+    // Clip is dtype-preserving (float32 or int64 data, optional scalar bounds
+    // of the same dtype), so its output is exactly its data input.
+    if (op == "Clip" || op == "Abs" || op == "Neg") {
         return {need(0)};
     }
     if (op == "MatMul") {

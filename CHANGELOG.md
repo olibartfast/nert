@@ -100,6 +100,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Where` (bool condition, f32/i64 values, broadcast) — table 23→25.
   YOLO26n drops to 9 types/28 nodes, OWLv2 to 12/42, RF-DETR to 21/153;
   RAFT-large to 9/119.
+- OpenCL catalog rows and P0 gates: 18 new rows (`Sqrt`, `Cos`, `Sin`,
+  `Exp`, `Not`, `Less`, `ReduceSum` incl. int64, `ReduceMax`, `Split`,
+  `GatherElements`, `TopK`, `Mod`, `Tile`, `Resize` dual-mode,
+  `GridSample` align 0/1, `InstanceNormalization`, `Range`, `Pad`) —
+  table 37→55. YOLO26n, RF-DETR seg-small and RAFT-large full OpenCL
+  gates pass; int64 `Clip` on CPU/CUDA unblocks Grounding DINO.
+    - YOLO26n: 421 nodes dispatched, output0 [1,300,6], maxdiff
+      4.8828e-04 (mean 1.4135e-05), 0/1800 over 1e-3*(1+|ref|), 6/6
+      confident rows with identical classes, min IoU 0.99999840,
+      837 ms.
+    - RF-DETR seg-small: 1,255 folded nodes dispatched, dets maxdiff
+      6.822e-04 (0/400 over tolerance), labels top-1 100/100, mask IoU
+      at logit>=0 min 0.999668655 / mean 0.999996687, 2.27 s.
+    - RAFT-large: 1,299 folded nodes dispatched, flow maxdiff
+      1.3232e-04 (mean 1.5064e-05), 0/365,056 over 5.324e-03,
+      OpenCL vs CPU 1.2832e-04, 4m17s.
+
+### Fixed
+
+- OpenCL `ReduceSum` int64 path, found by the RF-DETR seg-small gate:
+  `/transformer/ReduceSum` (bool→Cast int64 data, axes [-1],
+  keepdims 1) threw "data tensors must be float32"; `ReduceSum` now
+  plans float32 or int64 data (output dtype matching) and launches a
+  dedicated `ReduceSum/int64` kernel.
+- int64 `Clip` dtype preservation in shape inference: the `Clip` output
+  now keeps the data input's dtype (float32 or int64) instead of
+  coercing, and the CPU/CUDA `Clip` rows accept int64 — unblocking
+  Grounding DINO's reference gate at `/model/model/Clip` (gate re-run
+  pending).
 
 ## [0.1.0] - Unreleased
 

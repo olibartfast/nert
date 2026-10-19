@@ -1301,6 +1301,66 @@ TEST(NertCudaMisc, ClipRejectsNonScalarBound) {
     cuda.allocator().release(dy);
 }
 
+// Clip on int64 data matches the CPU oracle exactly, both bounds present.
+TEST(NertCudaMisc, ClipInt64Bounds) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<int64_t> x = {-5, 0, 7, 20};
+    std::vector<int64_t> lo = {-1};
+    std::vector<int64_t> hi = {10};
+    std::vector<int64_t> cpuOut(4, 0);
+    nert::Node node = MakeNode("clip_i64", "Clip");
+    node.inputs = {"x", "lo", "hi"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Clip")(node, {HostInt64(x, {4}), HostInt64(lo, {1}), HostInt64(hi, {1})},
+                                             {HostInt64(cpuOut, {4})});
+    EXPECT_EQ(cpuOut, (std::vector<int64_t>{-1, 0, 7, 10}));
+
+    void* dx = UploadInt64(cuda, x);
+    void* dlo = UploadInt64(cuda, lo);
+    void* dhi = UploadInt64(cuda, hi);
+    std::vector<int64_t> gpuOut(4, 0);
+    void* dy = UploadInt64(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Clip")(
+        node, {DeviceInt64(dx, {4}), DeviceInt64(dlo, {1}), DeviceInt64(dhi, {1})}, {DeviceInt64(dy, {4})});
+    gpuOut = DownloadInt64(cuda, dy, 4);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dlo);
+    cuda.allocator().release(dhi);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// Clip on int64 with no bounds is the identity, int64 extremes included.
+TEST(NertCudaMisc, ClipInt64Identity) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max()};
+    std::vector<int64_t> cpuOut(x.size(), 0);
+    nert::Node node = MakeNode("clip_i64_id", "Clip");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("Clip")(node, {HostInt64(x, {static_cast<int64_t>(x.size())})},
+                                             {HostInt64(cpuOut, {static_cast<int64_t>(cpuOut.size())})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = UploadInt64(cuda, x);
+    std::vector<int64_t> gpuOut(x.size(), 0);
+    void* dy = UploadInt64(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Clip")(node, {DeviceInt64(dx, {static_cast<int64_t>(x.size())})},
+                                              {DeviceInt64(dy, {static_cast<int64_t>(x.size())})});
+    gpuOut = DownloadInt64(cuda, dy, x.size());
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
 // ReduceMean over axis 1 of [2,3] with keepdims: {2, 5}, both tables.
 TEST(NertCudaMisc, ReduceMeanAxisExact) {
     if (!HasCudaDevice()) {

@@ -1,8 +1,8 @@
 // OpenCL pilot kernels (N1d-M2): first-party Relu/Add vs the CPU oracle.
 //
 // Needs an OpenCL GPU platform at run time; without one every test SKIPs
-// (never fails). Gemm never lands on OpenCL (cuBLAS-only), so it is the
-// permanent no-row probe.
+// (never fails). The unknown-op probe names an op no table will ever
+// register, so the rejection test cannot go stale.
 
 #include "device_test_helpers.hpp"
 #include "nert/device.hpp"
@@ -86,7 +86,10 @@ TEST(NertOpenCLKernels, AddBroadcastInt64Exact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
-// Sin has no OpenCL row: rejected at Run, naming node + op.
+// An op with no kernel row (never registered anywhere): the model pipeline
+// rejects it, naming node + op. Shape inference refuses the unsupported
+// op_type during Model construction, before Run can reach the device's
+// kernel lookup, so the rejection surfaces as a ModelLoadException.
 TEST(NertOpenCLKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
@@ -94,20 +97,20 @@ TEST(NertOpenCLKernels, UnknownOpRejectsNamingNodeAndOp) {
 
     nert::Graph graph;
     graph.inputs = {{"x", {nert::DataType::Float32, {}}}};
-    nert::Node sin = MakeNode("sin_bad", "Sin");
-    sin.inputs = {"x"};
-    sin.outputs = {"y"};
-    graph.nodes = {sin};
+    nert::Node unknown = MakeNode("unknown_bad", "DefinitelyNotAnOp");
+    unknown.inputs = {"x"};
+    unknown.outputs = {"y"};
+    graph.nodes = {unknown};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model ocl(graph, {{"x", {4}}}, nert::OpenCLDevice());
     try {
+        nert::Model ocl(graph, {{"x", {4}}}, nert::OpenCLDevice());
         ocl.Run({{"x", std::vector<float>(4, 1.0F)}});
-        FAIL() << "expected InferenceException for an op with no OpenCL kernel";
-    } catch (const nert::InferenceException& e) {
+        FAIL() << "expected a rejection for an op with no OpenCL kernel";
+    } catch (const nert::ModelLoadException& e) {
         const std::string message = e.what();
-        EXPECT_NE(message.find("sin_bad"), std::string::npos) << message;
-        EXPECT_NE(message.find("Sin"), std::string::npos) << message;
+        EXPECT_NE(message.find("unknown_bad"), std::string::npos) << message;
+        EXPECT_NE(message.find("DefinitelyNotAnOp"), std::string::npos) << message;
     }
 }
 

@@ -1,4 +1,4 @@
-// OpenCL device scaffold (N1d-M1): allocator, transfers, empty kernel table.
+// OpenCL device scaffold (N1d-M1): allocator, transfers, kernel table rows.
 //
 // Needs an OpenCL GPU platform at run time; without one every test SKIPs
 // (never fails). Presence is probed through the seam (constructing the
@@ -33,8 +33,7 @@ TEST(NertOpenCLDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(ocl).transfer());
 }
 
-// Table rows resolve; Sin is still missing so the executor rejects the
-// node naming op + node.
+// Table rows resolve; an op that was never registered resolves to null.
 TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     if (!HasOpenCLDevice()) {
         GTEST_SKIP() << "no OpenCL GPU platform";
@@ -52,7 +51,7 @@ TEST(NertOpenCLDevice, KernelTableServesPilotRows) {
     EXPECT_NE(ocl.kernels().find("Flatten"), nullptr);
     EXPECT_NE(ocl.kernels().find("Gemm"), nullptr);
     EXPECT_NE(ocl.kernels().find("Conv"), nullptr);
-    EXPECT_EQ(ocl.kernels().find("Sin"), nullptr);
+    EXPECT_EQ(ocl.kernels().find("DefinitelyNotAnOp"), nullptr);
 }
 
 // Non-positive sizes allocate null without touching the driver.

@@ -3410,6 +3410,100 @@ TEST(NertKernels, ClipOnlyMax) {
     EXPECT_EQ(out, (std::vector<float>{-2.0f, 3.0f, 6.0f}));
 }
 
+// Clip on int64 data clamps to [min, max] with exact integer semantics.
+TEST(NertKernels, ClipInt64Bounds) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> x = {-5, 0, 7, 20};
+    std::vector<int64_t> lo = {-1};
+    std::vector<int64_t> hi = {10};
+    std::vector<int64_t> out(4, 0);
+    nert::Node node = MakeNode("clip_i64", "Clip");
+    std::vector<nert::TensorView> inputs = {Int64View(x, {4}), Int64View(lo, {}), Int64View(hi, {})};
+    std::vector<nert::TensorView> outputs = {Int64View(out, {4})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{-1, 0, 7, 10}));
+}
+
+// Clip on int64 with only a min bound leaves the upper side unbounded.
+TEST(NertKernels, ClipInt64OnlyMin) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> x = {-5, 0, 7, 20};
+    std::vector<int64_t> lo = {-1};
+    std::vector<int64_t> out(4, 0);
+    nert::Node node = MakeNode("clip_i64_min", "Clip");
+    std::vector<nert::TensorView> inputs = {Int64View(x, {4}), Int64View(lo, {}), nert::TensorView{}};
+    std::vector<nert::TensorView> outputs = {Int64View(out, {4})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{-1, 0, 7, 20}));
+}
+
+// Clip on int64 with only a max bound (min omitted) leaves the lower side
+// unbounded.
+TEST(NertKernels, ClipInt64OnlyMax) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> x = {-5, 0, 7, 20};
+    std::vector<int64_t> hi = {10};
+    std::vector<int64_t> out(4, 0);
+    nert::Node node = MakeNode("clip_i64_max", "Clip");
+    std::vector<nert::TensorView> inputs = {Int64View(x, {4}), nert::TensorView{}, Int64View(hi, {})};
+    std::vector<nert::TensorView> outputs = {Int64View(out, {4})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<int64_t>{-5, 0, 7, 10}));
+}
+
+// Clip on int64 with no bounds is the identity, int64 extremes included: the
+// absent-bound fallbacks (INT64_MIN/INT64_MAX) never disturb a value.
+TEST(NertKernels, ClipInt64Identity) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(),
+        std::numeric_limits<int64_t>::max()};
+    std::vector<int64_t> out(x.size(), 0);
+    nert::Node node = MakeNode("clip_i64_id", "Clip");
+    std::vector<nert::TensorView> inputs = {Int64View(x, {static_cast<int64_t>(x.size())})};
+    std::vector<nert::TensorView> outputs = {Int64View(out, {static_cast<int64_t>(out.size())})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, x);
+}
+
+// Clip rejects a float32/int64 dtype mix (int64 min on float32 data), naming
+// node + op.
+TEST(NertKernelsNegative, ClipRejectsMixedDtypes) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> x = {-5.0f, 0.0f, 7.0f, 20.0f};
+    std::vector<int64_t> lo = {-1};
+    std::vector<float> out(4, 0.0f);
+    nert::Node node = MakeNode("clip_mixed", "Clip");
+    std::vector<nert::TensorView> inputs = {FloatView(x, {4}), Int64View(lo, {})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {4})};
+
+    try {
+        kernel(node, inputs, outputs);
+        FAIL() << "expected InferenceException";
+    } catch (const nert::InferenceException& error) {
+        const std::string message = error.what();
+        EXPECT_NE(message.find("Clip"), std::string::npos) << message;
+        EXPECT_NE(message.find("clip_mixed"), std::string::npos) << message;
+    }
+}
+
 // Exp rejects int64 input and names the op.
 TEST(NertKernelsNegative, ExpRejectsInt64) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Exp");
