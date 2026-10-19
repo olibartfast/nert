@@ -80,7 +80,14 @@ Orchestrator session for rows 1–26: `ses_eaca1c986ffeFJdfdPOFfK3mDh`.
 
 | Checkpoint | New orchestrator session | When |
 |---|---|---|
-| After the 13-row catalog boundary (commit `346cb29`) | `ses_eab7c07feffe0Lf0lMbP1D7gFb` (dispatched as agent `orchestrator`) | end of session `ses_eaca1c986ffeFJdfdPOFfK3mDh` |
+| After the 13-row catalog boundary (commit `346cb29`, docs `2bc113d`) | `ses_eab2639b3ffeP9kkTjzb3bVpvB` | end of session `ses_eaca1c986ffeFJdfdPOFfK3mDh` |
+
+Harness note: the `orchestrator` agent cannot run as a subagent
+("Agent orchestrator cannot run as a subagent"), so a boundary reset uses the CLI:
+`opencode api session.create -d '{"title":"..."}'` to create the session, then
+`opencode run --agent orchestrator --session <id> --auto "<handoff prompt>"` in the
+background. The new session reads only the handoff, this ledger, the inventory and
+the coverage matrix.
 
 Rule applied: at a model boundary the orchestrator writes the handoff, stops the
 implementing worker, and starts a fresh orchestrator session that reads only the
