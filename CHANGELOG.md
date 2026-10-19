@@ -38,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CUDA closure: `GridSample` (first-party bilinear/nearest,
   zeros/border/reflection, align 0/1), `InstanceNormalization`
   (first-party per-(n,c) rows), `ConvTranspose` (cuDNN backward-data,
-  `NERT_HAS_CUDNN` only; non-zero output_padding and asymmetric pads
-  rejected on CUDA). Every CPU op now has a CUDA row (`ConvTranspose`
+  `NERT_HAS_CUDNN` only, non-zero output_padding and asymmetric pads still
+  rejected on CUDA `ConvTranspose`). Every CPU op now has a CUDA row (`ConvTranspose`
   only under `NERT_HAS_CUDNN`) — tables complete.
 - OpenCL shared movement rows: `Transpose`, `Slice`, `Concat`,
   `Shape`, `Unsqueeze`, `Gather` (hand-written OpenCL C, oracle
@@ -172,9 +172,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       pads [0,0,1,1]) is rejected by the CUDA frontend (cuDNN requires
       symmetric spatial padding).
     - Grounding DINO: the previous int64 `Clip` BLOCKED reason is gone;
-      the CPU full-model run completed (exit 0); the CUDA run, the ORT
-      comparison and the OpenCL leg are still pending. All 26 op types
+      the CPU and CUDA full-model runs pass and the ORT comparison is
+      recorded; the OpenCL leg is a backend gap. All 26 op types
       the model uses are present in the 68-row OpenCL table.
+- CUDA `Conv` supports asymmetric padding via an internal explicit zero
+  pre-pad in both the legacy and the cuDNN-frontend rows (the input is
+  copied at spatial offset `pad_begin` into a zero-filled temporary and
+  cuDNN then runs with pad=0); the symmetric path is unchanged. Negative
+  pads are rejected with a named error. RT-DETRv4-s's full-model CUDA
+  gate now passes — boxes 0/1200 (max 7.93e-04), scores 0/300 (max
+  2.46e-05), labels 300/300 exact, 11 detections over 0.25.
+- Grounding DINO task-equivalence gate: CPU and CUDA pass — `pred_boxes`
+  0/3600 over `1e-3(1+|ref|)` (max 7.00e-05 / 7.03e-05), per-box IoU
+  min 0.99973 (900/900), top-1 900/900 after canonicalizing the TopK
+  near-tie permutation, decoded detection set identical at the 0.25/0.25
+  Hugging Face proxy (1 kept query, margin 1.39e-02). The OpenCL leg is a
+  backend gap: the handle path demands 11,028.5 MiB on a 5,803.3 MiB device
+  against a 1,687.9 MiB live set.
+- RF-DETR seg-nano-576: PASS with the documented rank-99 TopK near-tie
+  deviation — ORT selects 182 and the GPUs 1503 on a 1.43e-06 tie against
+  4.82e-05 of fp32 reduction-order noise; with the selection pinned to
+  ORT's (a single-input counterfactual, ORT-neutral) all three devices give
+  `dets` 0/400, `labels` 0/9,100, top-1 100/100, and mask IoU min 0.999800
+  at `raw>=0` (CUDA 0.984375 at `raw>=0.5`). No engine change was made or
+  is authorised.
 
 ### Fixed
 
@@ -186,8 +207,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - int64 `Clip` dtype preservation in shape inference: the `Clip` output
   now keeps the data input's dtype (float32 or int64) instead of
   coercing, and the CPU/CUDA `Clip` rows accept int64 — unblocking
-  Grounding DINO's reference gate at `/model/model/Clip` (gate re-run
-  pending).
+  Grounding DINO's reference gate at `/model/model/Clip`; the gate
+  re-run has since passed on CPU and CUDA under the task-equivalence bar, with
+  the OpenCL leg a backend gap).
 - Review-driven OpenCL corrections landed after `b905792`: `ScatterND`
   now applies duplicate update slices in order (last duplicate wins,
   matching the CPU oracle), `Or` enforces the oracle's two-input
