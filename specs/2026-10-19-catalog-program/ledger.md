@@ -40,6 +40,8 @@ Catalog: 32 entries — 2 fully covered (ResNet-18 gated export, OWLv2),
 | 6 | P0a-3 index/move rows | implementer | 1 | 2 new files | same | PASS 19/19, scratch 8/8 | accepted |
 | 7 | P0a-7a wiring | implementer | 1 | table.cpp, CMakeLists.txt, test/CMakeLists.txt | 22/22 | FAIL 20/22 (stale `Sin` negatives) | integration defect, re-dispatch |
 | 8 | P0a-7b corrected wiring | implementer | 1 | 2 test files | 22/22 | PASS 22/22, format clean | accepted |
+| 9 | P0 catalog rows + gates | integration | 1 | 18 new rows + table/CMake/tests | build-ocl + ctest + format | PASS (suite green); YOLO26n, RF-DETR and RAFT gates pass | accepted |
+| 10 | Catalog completion rows | integration | 1 | 13 new rows + table/CMake/tests | build-ocl + ctest + format | PASS 28/28; all loadable OpenCL op gaps 0 | accepted |
 
 ## Shared OpenCL rows
 
@@ -49,8 +51,9 @@ Implemented once, reused across models:
 - P0a-2: `ReduceSum`, `ReduceMax` — `src/opencl/reduce_extra.cpp`
 - P0a-3: `Split`, `GatherElements`, `TopK`, `Mod`, `Tile` — `src/opencl/index_move.cpp`
 
-Pending shared rows: `Resize` (dual mode), `GridSample` (align 0/1),
-`InstanceNormalization`/`Range`/`Pad`, plus the Grounding DINO extras.
+No shared OpenCL rows are pending for the loadable catalog. Remaining
+work is full-model gates for converted variants, dtype/shape variants,
+and the HIP decision (no ROCm toolchain or AMD hardware).
 
 ## Context-reset checkpoints
 

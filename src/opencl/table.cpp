@@ -12,7 +12,10 @@
 // reduction rows (ReduceSum/ReduceMax), and the index-move/integer rows
 // (Split/GatherElements/TopK/Mod/Tile), and the resampling rows
 // (Resize/GridSample), and the normalization/range/pad rows
-// (InstanceNormalization/Range/Pad).
+// (InstanceNormalization/Range/Pad), the second math rows
+// (Clip/Log/Pow/Max/Min/Or), and the index/shape rows
+// (Identity/Squeeze/CumSum/EyeLike/ScatterND/ReduceMean), and the
+// transposed-convolution row (ConvTranspose).
 
 #include "nert/device.hpp"
 
@@ -79,6 +82,19 @@ void InstanceNormalization(const Node& node, const std::vector<TensorView>& inpu
                            const std::vector<TensorView>& outputs);
 void Range(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Pad(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Clip(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Log(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Pow(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Max(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Min(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Or(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Identity(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Squeeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void CumSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void EyeLike(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ScatterND(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ConvTranspose(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindOpenCLKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
@@ -137,6 +153,19 @@ KernelFn FindOpenCLKernel(const std::string& op_type) {
         {"InstanceNormalization", &InstanceNormalization},
         {"Range", &Range},
         {"Pad", &Pad},
+        {"Clip", &Clip},
+        {"Log", &Log},
+        {"Pow", &Pow},
+        {"Max", &Max},
+        {"Min", &Min},
+        {"Or", &Or},
+        {"Identity", &Identity},
+        {"Squeeze", &Squeeze},
+        {"CumSum", &CumSum},
+        {"EyeLike", &EyeLike},
+        {"ScatterND", &ScatterND},
+        {"ReduceMean", &ReduceMean},
+        {"ConvTranspose", &ConvTranspose},
 
     };
     const auto it = table.find(op_type);

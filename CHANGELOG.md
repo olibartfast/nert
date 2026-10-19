@@ -116,6 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - RAFT-large: 1,299 folded nodes dispatched, flow maxdiff
       1.3232e-04 (mean 1.5064e-05), 0/365,056 over 5.324e-03,
       OpenCL vs CPU 1.2832e-04, 4m17s.
+- OpenCL catalog completion: `Clip` (float32/int64), `Log`, `Pow`,
+  `Max`, `Min`, `Or`, `Identity`, `Squeeze`, `CumSum`, `EyeLike`,
+  `ScatterND`, `ReduceMean` and `ConvTranspose` — table 55→68. Every
+  loadable catalog model now has 0 missing OpenCL op types, including
+  Grounding DINO, RF-DETR keypoint, YOLO26n-depth, RT-DETRv4-s and the
+  FoundationPose scorer. Converted variants remain OPS until their
+  full-model reference gates run; no new PASS is claimed. OpenCL suite
+  28/28, format clean.
 
 ### Fixed
 

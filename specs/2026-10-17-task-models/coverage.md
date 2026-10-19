@@ -39,13 +39,15 @@ is folded `Constant` nodes.
 | --- | ---: | --- |
 | CPU (oracle) | 72 | Reference set; every inventoried model's op types are covered after constant folding. |
 | CUDA | 72 | Identical set to CPU. `Conv` and `ConvTranspose` are cuDNN-gated; a CUDA build without cuDNN lacks those two rows. Strict float32: cuBLAS runs `CUBLAS_PEDANTIC_MATH` and cuDNN `CUDNN_FMA_MATH`, so TF32 is off on Ampere+. |
-| OpenCL | 55 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`, `Transpose`, `Slice`, `Concat`, `Shape`, `Unsqueeze`, `Gather`, `MaxPool`, `AveragePool`, `GlobalAveragePool`, `Flatten`, `Gemm`, `Conv`, `MatMul`, `LayerNormalization`, `Expand`, `Where`, `Cast`, `ConstantOfShape`, `Equal`, `Greater`, `LessOrEqual`, `And`, `IsNaN`, `Erf`, `Elu`, `ReduceL2`, `ArgMax`, `Einsum`, `Sqrt`, `Cos`, `Sin`, `Exp`, `Not`, `Less`, `ReduceSum`, `ReduceMax`, `Split`, `GatherElements`, `TopK`, `Mod`, `Tile`, `Resize`, `GridSample`, `InstanceNormalization`, `Range`, `Pad` (2026-10-19 P0 catalog batch: 37 → 55). |
+| OpenCL | 68 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`, `Transpose`, `Slice`, `Concat`, `Shape`, `Unsqueeze`, `Gather`, `MaxPool`, `AveragePool`, `GlobalAveragePool`, `Flatten`, `Gemm`, `Conv`, `MatMul`, `LayerNormalization`, `Expand`, `Where`, `Cast`, `ConstantOfShape`, `Equal`, `Greater`, `LessOrEqual`, `And`, `IsNaN`, `Erf`, `Elu`, `ReduceL2`, `ArgMax`, `Einsum`, `Sqrt`, `Cos`, `Sin`, `Exp`, `Not`, `Less`, `ReduceSum`, `ReduceMax`, `Split`, `GatherElements`, `TopK`, `Mod`, `Tile`, `Resize`, `GridSample`, `InstanceNormalization`, `Range`, `Pad`, `Clip`, `Log`, `Pow`, `Max`, `Min`, `Or`, `Identity`, `Squeeze`, `CumSum`, `EyeLike`, `ScatterND`, `ReduceMean`, `ConvTranspose` (2026-10-19 P0 batch: 37 → 55; catalog completion: 55 → 68). |
 | HIP | 9 | `Add`, `Div`, `Mul`, `Relu`, `Reshape`, `Sigmoid`, `Softmax`, `Sub`, `Tanh`. Lags OpenCL by the movement six and the three pools. |
 
 The CUDA table being op-complete is the key result: **there are no
-missing CUDA op types to add for any current model.** New CUDA kernel
-work cannot unlock these models; full-model gates and variant coverage
-can. The portable layers are where kernel coverage is missing.
+missing CUDA op types to add for any current model.** The OpenCL table
+now also covers every op type in the loadable catalog (68 rows). The
+remaining portable risk is dtype/shape variants, full-model gates for
+converted variants, and HIP, which still has only the original nine
+rows.
 
 ## Models NERT can load (opset 18)
 
@@ -64,14 +66,13 @@ RAFT-large was re-provisioned as a real torchvision export (opset 18, 1,836 ONNX
 Counts are NERT post-fold node touches. HIP is a subset of this table
 plus the OpenCL-only movement/pool rows; its exact gaps follow.
 
-The 2026-10-19 P0 batch (`Sqrt`, `Cos`, `Sin`, `Exp`, `Not`, `Less`,
-`ReduceSum`, `ReduceMax`, `Split`, `GatherElements`, `TopK`, `Mod`,
-`Tile`, `Resize`, `GridSample`, `InstanceNormalization`, `Range`,
-`Pad`) closed every gap below that needed only those rows. Variant and
-converted-model counts were recomputed against the current
-`src/opencl/table.cpp` from the 2026-10-19 inventory census (post-fold
-op types minus the 18 new rows), not re-probed; full-model gates are
-pending where noted.
+The P0 batch (`Sqrt` … `Pad`, 18 rows) and the catalog-completion batch
+(`Clip`, `Log`, `Pow`, `Max`, `Min`, `Or`, `Identity`, `Squeeze`,
+`CumSum`, `EyeLike`, `ScatterND`, `ReduceMean`, `ConvTranspose`,
+13 rows) closed every OpenCL op-type gap in the loadable catalog.
+Counts are recomputed against the current 68-row `src/opencl/table.cpp`
+from the inventory census (post-fold op types), not re-probed. A zero
+gap is OPS, not PASS; full-model gates are still pending where noted.
 
 - **YOLO26n — 0 types.** Op-complete and full-model gated on OpenCL
   (2026-10-19). Former gap: `Split=12`, `GatherElements=3`,
@@ -92,52 +93,37 @@ pending where noted.
   types** (recomputed; full-model gates pending). Their former gaps
   were subsets of `Split`, `Resize`, `GatherElements`, `TopK`,
   `ReduceMax`, `Mod` and `Tile`, all implemented.
-- **YOLO26n-depth — 3 types, 3 nodes:** `Clip=1`, `ConvTranspose=1`,
-  `Pow=1` (recomputed from 6/21 after `Exp`, `Resize` and `Split`
-  landed; gate pending).
-- **RF-DETR keypoint-preview — 2 types, 20 nodes:** `Identity=3`,
-  `ScatterND=17` (recomputed from 15/133; gate pending).
+- **YOLO26n-depth — 0 types.** Former gap: `Clip=1`, `ConvTranspose=1`,
+  `Pow=1`; all three rows landed 2026-10-19. Full-model gate pending.
+- **RF-DETR keypoint-preview — 0 types.** Former gap: `Identity=3`,
+  `ScatterND=17`; both rows landed 2026-10-19. Full-model gate pending.
   **RF-DETR seg-nano-576 / nano-1101 — 0 types** (recomputed from
   14/83 and 13/71; gates pending).
-- **Grounding DINO — 10 types, 1,217 nodes** (recomputed from
-  26/1,960): `Squeeze=513`, `Max=255`, `Min=255`, `ScatterND=115`,
-  `Identity=44`, `Clip=13`, `Log=12`, `CumSum=8`, `Or=1`, `EyeLike=1`.
-  The int64 `Clip` CPU/CUDA rows and the shape-inference dtype
-  preservation landed 2026-10-19, unblocking its reference gate
-  (re-run pending).
-- **RT-DETRv4-s — 5 types, 63 nodes** after the 16→18 conversion
-  (recomputed from 15/112): `Squeeze=16`, `ReduceMean=25`, `Pow=12`,
-  `Clip=9`, `Log=1`.
-- **FoundationPose scorer (out-of-scope) — 2 types, 2 nodes:**
-  `ReduceMean=1`, `Squeeze=1` (unchanged).
+- **Grounding DINO — 0 types.** Former gap: 10 types/1,217 nodes
+  (`Squeeze=513`, `Max=255`, `Min=255`, `ScatterND=115`, `Identity=44`,
+  `Clip=13`, `Log=12`, `CumSum=8`, `Or=1`, `EyeLike=1`). The int64
+  `Clip` CPU/CUDA rows, the shape-inference dtype preservation, and the
+  OpenCL completion rows landed 2026-10-19. Reference gate re-run
+  pending; no PASS is claimed.
+- **RT-DETRv4-s — 0 types** after the 16→18 conversion. Former gap:
+  5 types/63 nodes (`Squeeze=16`, `ReduceMean=25`, `Pow=12`, `Clip=9`,
+  `Log=1`); all rows landed 2026-10-19. Full-model gate pending.
+- **FoundationPose scorer (out-of-scope) — 0 types.** Former gap:
+  `ReduceMean=1`, `Squeeze=1`; both rows landed 2026-10-19.
 
 ### Missing HIP rows by model
 
-HIP carries only the original nine rows, so every OpenCL gap applies
-and the movement six plus the pools are also missing. The extra
-HIP-only gap beyond the OpenCL list is:
+HIP carries only the original nine rows, so its per-model gap is every
+op type outside that set. The full primary-model lists are:
 
-- **ResNet-18 — 5 types, 24 nodes:** `Conv=20`,
-  `GlobalAveragePool=1`, `MaxPool=1`, `Flatten=1`, `Gemm=1`.
-- **YOLO26n — 21 types, 197 nodes:** OpenCL gap plus `Conv=102`,
-  `Concat=28`, `Unsqueeze=11`, `Transpose=6`, `MatMul=4`, `MaxPool=3`,
-  `Slice=2`, `Expand=8`, `Where=2`, `Cast=3`, `ConstantOfShape=2`,
-  `Equal=2`, `Gather=1`, `Shape=1`, `Flatten=1`.
-- **OWLv2 — 24 types, 453 nodes:** `Conv=1`, `MatMul=202`,
-  `Transpose=97`, `LayerNormalization=53`, `Where=28`, `IsNaN=12`,
-  `Gather=11`, `Cast=8`, `Concat=5`, `Shape=5`, `ConstantOfShape=4`,
-  `Equal=4`, `Erf=4`, `Expand=3`, `ReduceL2=3`, `Slice=3`, `And=2`,
-  `Flatten=2`, `ArgMax=1`, `Einsum=1`, `Elu=1`, `Greater=1`,
-  `LessOrEqual=1`, `Unsqueeze=1`.
-- **RF-DETR seg-small — 33 types, 701 nodes:** OpenCL gap plus
-  `Conv=14`, `MatMul=158`, `Transpose=133`, `Slice=72`,
-  `LayerNormalization=56`, `Concat=38`, `Shape=32`, `Unsqueeze=23`,
-  `Expand=8`, `Where=6`, `Gather=4`, `Gemm=4`, `Cast=38`, `Erf=17`,
-  `ConstantOfShape=6`, `Equal=4`, `Greater=2`, `And=1`, `Einsum=1`.
-- **RAFT-large — 19 types, 501 nodes:** OpenCL gap plus `Conv=190`,
-  `Concat=135`, `Transpose=27`, `Gather=7`, `Unsqueeze=7`, `Shape=5`,
-  `Slice=4`, `AveragePool=3`, `Expand=3`, `Cast=2`,
-  `ConstantOfShape=1`, `MatMul=1`.
+- **ResNet-18 — 5 types, 24 nodes:** `Conv=20`, `Flatten=1`, `Gemm=1`, `GlobalAveragePool=1`, `MaxPool=1`.
+- **YOLO26n — 21 types, 197 nodes:** `Conv=102`, `Concat=28`, `Split=12`, `Unsqueeze=11`, `Expand=8`, `Transpose=6`, `MatMul=4`, `Cast=3`, `GatherElements=3`, `MaxPool=3`, `ConstantOfShape=2`, `Equal=2`, `Resize=2`, `Slice=2`, `TopK=2`, `Where=2`, `Flatten=1`, `Gather=1`, `Mod=1`, `ReduceMax=1`, `Shape=1`.
+- **OWLv2 — 24 types, 453 nodes:** `MatMul=202`, `Transpose=97`, `LayerNormalization=53`, `Where=28`, `IsNaN=12`, `Gather=11`, `Cast=8`, `Concat=5`, `Shape=5`, `ConstantOfShape=4`, `Equal=4`, `Erf=4`, `Expand=3`, `ReduceL2=3`, `Slice=3`, `And=2`, `Flatten=2`, `ArgMax=1`, `Conv=1`, `Einsum=1`, `Elu=1`, `Greater=1`, `LessOrEqual=1`, `Unsqueeze=1`.
+- **RF-DETR seg-small — 33 types, 701 nodes:** `MatMul=158`, `Transpose=133`, `Slice=72`, `LayerNormalization=56`, `Sqrt=48`, `Cast=38`, `Concat=38`, `Shape=32`, `Unsqueeze=23`, `Erf=17`, `Conv=14`, `Expand=8`, `ConstantOfShape=6`, `Where=6`, `ReduceSum=5`, `Split=5`, `Cos=4`, `Equal=4`, `Gather=4`, `Gemm=4`, `GridSample=4`, `Sin=4`, `Exp=3`, `Not=3`, `Tile=3`, `Greater=2`, `And=1`, `Einsum=1`, `GatherElements=1`, `Less=1`, `ReduceMax=1`, `Resize=1`, `TopK=1`.
+- **RAFT-large — 19 types, 501 nodes:** `Conv=190`, `Concat=135`, `GridSample=48`, `Split=48`, `Transpose=27`, `InstanceNormalization=15`, `Gather=7`, `Unsqueeze=7`, `Shape=5`, `Slice=4`, `AveragePool=3`, `Expand=3`, `Cast=2`, `Range=2`, `ConstantOfShape=1`, `MatMul=1`, `Pad=1`, `ReduceSum=1`, `Tile=1`.
+
+No HIP full-model gate is claimed; the ROCm toolchain and AMD hardware
+are unavailable, so HIP remains unsupported for this release.
 
 ## Converted exports now loadable (opset-18 conversion, 2026-10-18)
 
@@ -150,19 +136,19 @@ Grounding DINO clips int64 token ids (`/model/model/Clip`); the int64
 2026-10-19, unblocking its reference gate (re-run pending). The other
 variants have no reference gate yet — they are OPS, not PASS. OpenCL/HIP
 gaps are ONNX op-type counts (Constant excluded). The OpenCL column was
-recomputed 2026-10-19 against the current 55-row OpenCL table after the
-P0 batch; the HIP column still reflects the 2026-10-18 census.
+recomputed 2026-10-19 against the current 68-row OpenCL table after the
+catalog-completion batch; the HIP column still reflects the 2026-10-18 census.
 
 | Model | Source opset | NERT nodes | OpenCL gap | HIP gap |
 | --- | ---: | ---: | --- | --- |
-| Grounding DINO | 17 | 19,224 | 10 / 1,217 | 45 / 15,336 |
-| RF-DETR keypoint-preview | 17 | 2,355 | 2 / 20 | 33 / 1,486 |
+| Grounding DINO | 17 | 19,224 | 0 | 45 / 15,336 |
+| RF-DETR keypoint-preview | 17 | 2,355 | 0 | 33 / 1,486 |
 | RF-DETR seg-nano-576 | 17 | 1,216 | 0 | 33 / 675 |
 | RF-DETR nano-1101 | 17 | 1,002 | 0 | 31 / 567 |
-| FoundationPose scorer | 17 | 145 | 2 / 2 | 10 / 98 |
+| FoundationPose scorer | 17 | 145 | 0 | 10 / 98 |
 | YOLO26s | 20 | 391 | 0 | 17 / 176 |
 | YOLO26x | 19 | 606 | 0 | 17 / 247 |
-| YOLO26n-depth | 20 | 328 | 3 / 3 | 11 / 139 |
+| YOLO26n-depth | 20 | 328 | 0 | 11 / 139 |
 | YOLOv8n-pose | 20 | 267 | 0 | 7 / 110 |
 | YOLO11s | 12 | 321 | 0 | 8 / 132 |
 | YOLO26s-pose | 12 | 401 | 0 | 8 / 164 |

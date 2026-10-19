@@ -326,6 +326,30 @@ if(NERT_ENABLE_OPENCL)
         GTest::gtest
         GTest::gtest_main)
     add_test(NAME nert_opencl_norm_range_pad COMMAND nert_opencl_norm_range_pad_test)
+    add_executable(nert_opencl_math_extra2_test opencl_math_extra2_test.cpp)
+    target_compile_features(nert_opencl_math_extra2_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_math_extra2_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_math_extra2_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_math_extra2 COMMAND nert_opencl_math_extra2_test)
+    add_executable(nert_opencl_index_extra_test opencl_index_extra_test.cpp)
+    target_compile_features(nert_opencl_index_extra_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_index_extra_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_index_extra_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_index_extra COMMAND nert_opencl_index_extra_test)
+    add_executable(nert_opencl_conv_transpose_test opencl_conv_transpose_test.cpp)
+    target_compile_features(nert_opencl_conv_transpose_test PRIVATE cxx_std_17)
+    target_compile_options(nert_opencl_conv_transpose_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(nert_opencl_conv_transpose_test PRIVATE
+        nert
+        GTest::gtest
+        GTest::gtest_main)
+    add_test(NAME nert_opencl_conv_transpose COMMAND nert_opencl_conv_transpose_test)
 endif()
 
 # HIP device scaffold test (N1c-M1 on NVIDIA). Built only when the HIP device
