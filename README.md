@@ -23,20 +23,29 @@ with the same plan and must match the CPU oracle within tolerance.
 
 ## Status
 
-Version 0.2.0 (unreleased, breaking): namespace `engine` → `nert`, public
-headers `include/engine/` → `include/nert/`, all C++ filenames lowercase
-`snake_case`, CTest suites `engine_*` → `nert_*`. No behavior change; see
-[CHANGELOG](CHANGELOG.md).
+Version 0.2.0 is unreleased; the breaking namespace, header, filename,
+and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
 
-CPU coverage has been validated against ONNX Runtime through
-[Neuriplo](https://github.com/olibartfast/neuriplo) on the YOLO families,
-ViT, ViTPose, Depth Anything V2, VideoMAE, ViViT, TimeSformer, the DETR
-family (RT-DETR v4, D-FINE/DEIM, DEIMv2, RF-DETR, RF-DETR-Seg), RAFT
-(`InstanceNormalization`, Tier 4), and the Tier-5 open-vocabulary kernel
-set. Open-vocabulary end-to-end parity is the open integration gate.
+CPU and CUDA tables are complete at 72 op rows each. OpenCL has 68
+rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`)
+are unused by the catalog entries that currently load. HIP is
+unsupported for 0.2.0: nine rows, and the reference host has no ROCm
+toolchain or AMD device.
+
+Full-model gates, not op-table presence, define coverage. As of
+2026-10-19, 13 of the 30 in-scope ONNX catalog entries pass on CPU,
+CUDA, and OpenCL; two gates are pending, one failed, and 14 entries
+need an ONNX export. Image understanding (GGUF/llama.cpp) and Gaussian
+Splatting (LGM/GRM) are out of scope for this ONNX runtime. The catalog
+is incomplete and 0.2.0 is not release-ready; see the
+[coverage matrix](specs/2026-10-17-task-models/coverage.md).
 
 ## Documentation
 
+- [Model and device coverage](specs/2026-10-17-task-models/coverage.md)
+  — full-model gates, kernel-table baseline, and release scoreboard.
+- [Catalog program](specs/2026-10-19-catalog-program/inventory.md) —
+  32-entry Neuriplo task catalog, export feasibility, and open work.
 - [Memory footprint profiling](docs/memory-footprint-profiling.md) —
   planned model fit/sizing report (API + CLI), the accounting model, and
   a current plan-level workaround.
@@ -44,9 +53,14 @@ set. Open-vocabulary end-to-end parity is the open integration gate.
 ## Devices
 
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
-`HipDevice()` exist only when the matching build flag is on, and device
-kernel coverage is partial: each layer implements a subset of the CPU
-table, checked against the CPU oracle within tolerance. Pick devices via
+`HipDevice()` exist only when the matching build flag is on. CPU and
+CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
+require cuDNN. OpenCL implements 68 rows as the portable backend. HIP is
+unsupported for 0.2.0 and remains a nine-row scaffold.
+
+A device can load only graphs whose op types all have a row. Op-table
+presence is a coverage statement, not a correctness claim; full-model
+gate status is recorded in the coverage matrix. Pick devices via
 `nert::CpuDevice()` / `nert::CudaDevice()` / `nert::OpenCLDevice()` /
 `nert::HipDevice()` in `include/nert/device.hpp`.
 
