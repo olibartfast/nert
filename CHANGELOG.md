@@ -213,6 +213,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9. Scoreboard moved 15 → 19 and the
   release is still blocked by 1 open entry (Grounding DINO) and 10 missing
   exports. No release was cut.
+- Wave-A tranche (boundary 4): ViTPose-base-simple (entry 26) exported at
+  opset 18 by the Neuriplo ViTPose exporter (536 nodes on disk / 422
+  dispatched — the 114 `Constant` nodes are folded at load) and gated on CPU,
+  CUDA and OpenCL. Every leg exited 0 with 422 dispatched, and 0 elements
+  were over the `--tol 1e-3` scaled tolerance on `heatmaps [1,17,64,48]`;
+  export sha256 `b72b99e52da700dbbef81c7dd5e677b40002338724dd7ec7430cb4ba84fee5c8`.
+  Export note: torch 2.12's `torch.onnx.export` defaults to `dynamo=True` and
+  the stock run produced a non-self-contained artifact, so the exporter was
+  copied to `/tmp` and `dynamo=False` added at the call site only; the system
+  `transformers` 4.35.0 does not implement ViTPose, so 4.57.1 was installed
+  in an isolated venv under the export directory — the system site-packages
+  were not modified. No kernel row was added (tables unchanged at
+  CPU 72 / CUDA 72 / OpenCL 68 / HIP 9) and no engine source file changed.
+  Scoreboard moved 19 → 20 and the missing-export count 10 → 9. No release
+  was cut.
 
 ### Fixed
 

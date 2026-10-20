@@ -27,18 +27,18 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 | CPU / CUDA kernel tables | 72 / 72 rows |
 | OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
 | HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 19 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
+| Recorded full-model PASS | 20 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
 | Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap) |
-| Missing ONNX export | 10 entries |
+| Missing ONNX export | 9 entries |
 | Out of scope | 2 entries |
 | Release | **not ready**; 0.2.0 is unreleased |
 
-The 19 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
+The 20 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
 seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
 nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
-RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT and
-ResNet-50** (the tranche-1 export-first batch, recorded below). The one open
-entry is:
+RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT,
+ResNet-50 and ViTPose-base-simple** (the export-first batches, recorded
+below). The one open entry is:
 
 - **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
   check closed 2026-10-20: pred_boxes 0/3600 canonicalized, per-box IoU min
@@ -120,10 +120,11 @@ session create + run path.
    topology owner.
 4. ~~Provision the 14 missing ONNX exports export-first, then probe, gate and
    review each model.~~ **Tranche 1 closed 4 of them** — YOLOv8n (entry 17),
-   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Ten remain:**
+   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Nine remain:**
    EdgeCrafter detection / segmentation / pose, RF-DETR detection /
-   segmentation / keypoint at other sizes, ViTPose-base-simple,
-   Depth-Anything-V2, VideoMAE/ViViT/TimeSformer, RAFT-small. No release
+   segmentation / keypoint at other sizes,
+   Depth-Anything-V2, VideoMAE/ViViT/TimeSformer, RAFT-small (ViTPose-base-simple
+   closed at boundary 4). No release
    until the in-scope scoreboard is clean.
 
 ### State of the in-flight packets (2026-10-19, boundary 1 session)
@@ -1155,3 +1156,66 @@ re-provision cycle lands at the end of the queue; (4) **INT-2** alone.
 **PASS 19 / Open 1 (Grounding DINO, OpenCL backend gap) / Missing export 10 /
 Out of scope 2** — 19 + 1 + 10 = 30 in scope. The release gate is **zero open
 entries and zero missing exports** among the 30; **no release was cut**.
+
+## Boundary 4 — Wave A tranche (2026-10-20)
+
+Opened from the boundary-3 handoff. **ViTPose-base-simple (entry 26) is
+gated** — the first of the nine remaining missing-export groups to close.
+
+| Status | Count |
+| --- | ---: |
+| PASS | 20 |
+| Open | 1 |
+| Missing export | 9 |
+| Out of scope | 2 |
+
+20 + 1 + 9 = 30 in-scope entries. The one open entry is still Grounding DINO
+(OpenCL backend gap). Tables unchanged at CPU 72 / CUDA 72 / OpenCL 68 /
+HIP 9; **no engine source file changed and no kernel row was added.**
+
+**Packet sequence:** RELINK-GATE (relinked the three `nert_gate_*` harnesses
+against the current archives), VIT-PROV, VIT-PROBE, VIT-GATE, DA2-PROV,
+RAFT-PROV, plus the correction packets.
+
+**ViTPose gate.** Opset 18 pinned at export; 536 nodes on disk / 422
+dispatched on every device (114 `Constant` folded at load); `pixel_values
+[1,3,256,192]` -> `heatmaps [1,17,64,48]`; export sha256
+`b72b99e52da700dbbef81c7dd5e677b40002338724dd7ec7430cb4ba84fee5c8`. Three
+legs exit 0: CPU run_ms 106,612 / total_ms 106,616 (harness spans, not process
+wall time), CUDA 565.503 / 839.577, OpenCL 156.388 / 248.700. `--tol 1e-3`
+scaled: over_tol 0 on all three devices; host-side keypoint argmax 17/17 on
+every device, outside the ONNX gate.
+
+**One fact a future session cannot get from the matrix:** the system `transformers`
+4.35.0 does not implement ViTPose; 4.57.1 was installed in an isolated venv under
+the export directory, leaving system site-packages untouched. The other trap —
+torch 2.12's `torch.onnx.export` defaulting to `dynamo=True`, so the stock run
+produced a **non-self-contained** artifact — is recorded in the matrix's ViTPose
+row; the exporter was copied to `/tmp` with `dynamo=False` added at the call site only.
+
+**Grounding DINO OpenCL remedy — assessed, not implemented.** Option A
+(per-tensor plain-buffer liveness) is bounded and needs **no public-ABI
+change** (`src/executor.cpp`, `test/executor_test.cpp`) but requires a
+**driver-level trace** of the allocation primitive before acceptance. Option
+B (kernel-offset arena) needs a public-ABI change (`TensorView.data` is an
+opaque `cl_mem` with no offset channel) and is **not authorised**, so it was
+not proposed. The OpenCL cell stays `GAP`.
+
+**Provisioned but NOT gated:** Depth-Anything-V2-Small (opset 18, 553 nodes
+on disk, export sha256 `497acfffe67bffb5a00cc2aeaa11c91f033266385134ab12ebb26c36b9748492`)
+and RAFT-small (opset 18 by conversion from an opset-16 export, 1,630 nodes
+on disk, sha256 `8be6b770acab2da0093891eb568397b98bb82bb4c54d91298e2a8842f2d7f950`).
+Both still need PROBE and GATE; neither counts as PASS.
+
+**Reviewer findings corrected:** the false `FoldConstants` attribution for
+the 114 folded `Constant` nodes (it is the loader's read loop,
+`src/model_loader.cpp:1804-1812`); the timing mislabel (the harness spans are
+not process wall time); and the Depth-Anything-V2 hash/derivation
+corrections.
+
+**Intended edit recorded:** the stale `## Open work` item-4 count (ten remained) was corrected to nine in the same integration, because ViTPose-base-simple closed.
+
+**Open items:** Grounding DINO's OpenCL cell (maintainer decision); the nine
+missing exports, of which Depth-Anything-V2-Small and RAFT-small are ready
+for probe+gate; the `## Definitions` GAP-definition conflict; the
+one-representative-per-entry assumption.
