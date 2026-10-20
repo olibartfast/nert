@@ -115,9 +115,8 @@ std::vector<float> RunLinearHalfPixel(nert::Device& ocl, const nert::Node& node,
     UploadInts(ocl, dsizes, sizes);
     std::vector<float> gout(16, 0.0F);
     void* dy = Upload(ocl, gout);
-    nert::opencl_kernels::Resize(node,
-        {DeviceFloat(dx, {1, 1, 2, 2}), Omitted(), Omitted(), DeviceInts(dsizes, {4})},
-        {DeviceFloat(dy, {1, 1, 4, 4})});
+    nert::opencl_kernels::Resize(node, {DeviceFloat(dx, {1, 1, 2, 2}), Omitted(), Omitted(), DeviceInts(dsizes, {4})},
+                                 {DeviceFloat(dy, {1, 1, 4, 4})});
     gout = Download(ocl, dy, 16);
     ocl.allocator().release(dx);
     ocl.allocator().release(dsizes);
