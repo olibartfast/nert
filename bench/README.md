@@ -76,10 +76,58 @@ Reference numbers (RTX 3060, 2026-10-17/18, one line per device leg):
 | OpenCL | Reshape | [2,3,4] -> [6,4] | 0.00 | 0.09 | 0.0x | 0 |
 | HIP | Reshape | [2,3,4] -> [6,4] | 0.00 | 0.02 | 0.1x | 0 |
 
+### R6 / Tier-5 coverage (2026-10-20, RTX 3060)
+
+Fixtures for the 31 R6 + Tier-5 CUDA rows and the norm corridor. These
+are coverage rows, not tuning claims: `maxdiff` is absolute for float32
+and 0/1 (exact) for int64/bool rows. OpenCL carries most of these rows
+now; HIP still has only the original pilot set.
+
+| op | case | CUDA ms / maxdiff | OpenCL ms / maxdiff |
+|---|---|---|---|
+| Sin | [1048576] | 0.92 / 5.96e-08 | 0.95 / 5.96e-08 |
+| Cos | [1048576] | 0.91 / 5.96e-08 | 0.98 / 5.96e-08 |
+| Exp | [1048576] | 0.91 / 1.91e-06 | 0.98 / 1.91e-06 |
+| Elu | [1048576] | 0.92 / 9.69e-08 | 0.95 / 9.69e-08 |
+| Log | [1048576] | 0.93 / 2.38e-07 | 0.93 / 2.38e-07 |
+| Floor | [1048576] | 0.90 / 0.00e+00 | SKIP (no row) |
+| Abs | [1048576] | 0.92 / 0.00e+00 | SKIP (no row) |
+| Neg | [1048576] | 0.93 / 0.00e+00 | SKIP (no row) |
+| Sqrt | [1048576] | 0.91 / 0.00e+00 | 0.94 / 2.38e-07 |
+| Erf | [1048576] | 0.90 / 5.96e-08 | 0.97 / 5.96e-08 |
+| IsNaN | [1048576] | 0.31 / 0.00e+00 | 0.33 / 0.00e+00 |
+| Greater | [1024x1024] vs [1024] | 1.75 / 0.00e+00 | 0.34 / 0.00e+00 |
+| Less | [1024x1024] vs [1024] | 1.75 / 0.00e+00 | 0.33 / 0.00e+00 |
+| GreaterOrEqual | [1024x1024] vs [1024] | 1.74 / 0.00e+00 | SKIP (no row) |
+| LessOrEqual | [1024x1024] vs [1024] | 1.75 / 0.00e+00 | 0.34 / 0.00e+00 |
+| And | [1024x1024] bcast | 1.74 / 0.00e+00 | 0.34 / 0.00e+00 |
+| Or | [1024x1024] bcast | 1.74 / 0.00e+00 | 0.39 / 0.00e+00 |
+| Not | [1048576] | 0.30 / 0.00e+00 | 0.31 / 0.00e+00 |
+| Pow | [1024x1024]^[1024] | 2.35 / 2.38e-07 | 0.98 / 2.38e-07 |
+| Max | [1024x1024] fold3 | 3.84 / 0.00e+00 | 1.02 / 0.00e+00 |
+| Min | [1024x1024] fold3 | 3.84 / 0.00e+00 | 1.03 / 0.00e+00 |
+| Clip | [1048576] [0,1] | 0.92 / 0.00e+00 | 0.97 / 0.00e+00 |
+| Identity | [1048576] | 0.89 / 0.00e+00 | 0.93 / 0.00e+00 |
+| Squeeze | [1x1024x1] -> [1024] | 0.02 / 0.00e+00 | 0.03 / 0.00e+00 |
+| Tile | [1024x1] x{2,3} | 0.04 / 0.00e+00 | 0.05 / 0.00e+00 |
+| Range | 0..1M step 1 | 0.93 / 0.00e+00 | 0.97 / 0.00e+00 |
+| EyeLike | [1024x1024] | 0.95 / 0.00e+00 | 1.39 / 0.00e+00 |
+| Pad | [1024x1024] +1 | 2.93 / 0.00e+00 | 1.00 / 0.00e+00 |
+| ReduceSum | [1024x1024] axis1 | 0.74 / 0.00e+00 | 0.47 / 0.00e+00 |
+| ReduceMean | [1024x1024] axis1 | 0.75 / 0.00e+00 | 0.49 / 0.00e+00 |
+| ReduceL2 | [1024x1024] axis1 | 0.75 / 0.00e+00 | 0.39 / 4.58e-05 |
+| ArgMax | [1024x1024] axis1 | 0.21 / 0.00e+00 | 0.23 / 0.00e+00 |
+| CumSum | [1024x1024] axis1 | 1.38 / 0.00e+00 | 14.79 / 0.00e+00 |
+| ScatterND | [1024x1024] rows | 7.72 / 0.00e+00 | 7.37 / 0.00e+00 |
+| LayerNormalization | [1024x1024] axis1 | 2.13 / 0.00e+00 | 1.58 / 1.31e-06 |
+| GlobalAveragePool | [8x64x112x112] | 2.75 / 0.00e+00 | 2.01 / 0.00e+00 |
+
 Rows without a device kernel `SKIP` on that leg: CUDA has no cuDNN in
-the host container (Conv), OpenCL/HIP have no Gemm/pools/Conv yet.
-The Reshape fixture carries an int64 shape operand (the driver supports
-mixed int64 inputs); its CPU side is a memcpy, so ratios are noise.
+the host container (Conv), HIP has no Gemm/pools/Conv, and OpenCL has
+no Floor/Abs/Neg/GreaterOrEqual. The driver supports mixed dtypes: a
+fixture can carry float32, int64 (shape/axes/repeats) and bool tensors,
+and int64/bool outputs compare exactly (maxdiff 0 or 1). The Reshape
+fixture's CPU side is a memcpy, so its ratio is noise.
 Softmax is only ~3x on CUDA/HIP: one thread per row with double
 accumulation on both sides, honestly reported, not tuned.
 
@@ -94,3 +142,7 @@ the reason to keep them (bench legs with no runtime device) was gone.
 behind one fixture list and prints a `device` column; the legacy
 CUDA-only `gpu_ms` column became `dev_ms`. Building with no device
 flags produces no bench target.
+
+2026-10-20 (Slice 5b): typed fixtures (float32/int64/bool, mixed per
+case) cover the R6/Tier-5 CUDA rows and the norm corridor on every
+device that has them.
