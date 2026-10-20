@@ -92,6 +92,7 @@ on the maintainer host.
 | `346cb29` | FIX-1: ScatterND ordering, Or arity, ReduceMean noop, Identity/Squeeze rank cap; catalog gate evidence; HIP unsupported |
 | `14cbde8` | CUDA asymmetric-pad `Conv` support (explicit zero pre-pad in both CUDA Conv rows) + its device tests; RT-DETRv4-s's full-model CUDA gate |
 | `8a00aab` | The closing gates: Grounding DINO (CPU/CUDA task-equivalence, OpenCL backend gap), RF-DETR seg-nano-576 (SN-DEV deviation), RT-DETRv4-s CUDA; matrix, changelog, README, census and ledger |
+| `545855a` | Tranche-1 export-first batch: four catalog entries gated at opset 18 (YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50); the OWL-ViT exporter-only re-export and its bit-identity proof; matrix, census, README, changelog and ledger |
 
 ## Sessions and resets
 
