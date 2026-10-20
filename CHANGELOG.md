@@ -196,6 +196,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dets` 0/400, `labels` 0/9,100, top-1 100/100, and mask IoU min 0.999800
   at `raw>=0` (CUDA 0.984375 at `raw>=0.5`). No engine change was made or
   is authorised.
+- Tranche-1 export-first batch: four catalog entries newly gated on CPU,
+  CUDA and OpenCL at opset 18 — YOLOv8n detector (entry 17; 301 nodes on
+  disk / 260 dispatched), YOLO11m-seg (entry 18; 515 / 467, both outputs
+  clean), OWL-ViT (entry 25; 1,418 / 1,071, both outputs clean) and
+  ResNet-50 (entry 30; 122 / 122), every device exit 0 and 0 elements over
+  the scaled tolerance. YOLO11m-seg was exported from the local checkpoint;
+  YOLOv8n and OWL-ViT were exported at opset 18; ResNet-50 was converted
+  from an opset-20 raw export by `onnx.version_converter` — conversion does
+  not prove semantic equivalence — the full-model gate is the equivalence
+  evidence. OWL-ViT used a worker-authored exporter (the repository has
+  none) and was re-exported at two sites in the exporter only to remove a
+  DOUBLE `Cast` and a constant `Reciprocal` the loader rejects; the patched
+  artifact was proven bit-identical to the rejected one on both outputs
+  across five input sets. No kernel row was added: the tables are unchanged
+  at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9. Scoreboard moved 15 → 19 and the
+  release is still blocked by 1 open entry (Grounding DINO) and 10 missing
+  exports. No release was cut.
 
 ### Fixed
 

@@ -27,16 +27,18 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 | CPU / CUDA kernel tables | 72 / 72 rows |
 | OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
 | HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 15 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
+| Recorded full-model PASS | 19 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
 | Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap) |
-| Missing ONNX export | 14 entries |
+| Missing ONNX export | 10 entries |
 | Out of scope | 2 entries |
 | Release | **not ready**; 0.2.0 is unreleased |
 
-The 15 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
+The 19 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
 seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
 nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
-RT-DETRv4-s and RF-DETR seg-nano-576. The one open entry is:
+RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT and
+ResNet-50** (the tranche-1 export-first batch, recorded below). The one open
+entry is:
 
 - **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
   check closed 2026-10-20: pred_boxes 0/3600 canonicalized, per-box IoU min
@@ -51,6 +53,12 @@ TopK near-tie deviation, `SN-DEV`) and RT-DETRv4-s (PASS on all three devices
 after the accepted CUDA asymmetric-pad `Conv` remedy). **The census
 (`inventory.md`) carries the same 15/1/14/2 scoreboard and the same three
 entry rows, corrected by the orchestrator to match these closed gates.**
+
+**Boundary 3 closed four more entries** by the export-first method — YOLOv8n
+(entry 17), YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30) — taking the
+scoreboard to **19 / 1 / 10 / 2**. **The census and the coverage matrix now
+carry that scoreboard.** No release was cut: the gate still requires zero
+open entries and zero missing exports among the 30 in-scope entries.
 
 **Note for the next session:** the `## Definitions` block in `coverage.md`
 defines `GAP` as "at least one op type used by the model has no row on that
@@ -109,8 +117,13 @@ session create + run path.
    `[5, 0, 0, 0, 0, 26, 9, 11, 26, 26, 26]`.
 3. Resolve or reclassify RF-DETR seg-nano-576's TopK tie with the export/
    topology owner.
-4. Provision the 14 missing ONNX exports export-first, then probe, gate and
-   review each model. No release until the in-scope scoreboard is clean.
+4. ~~Provision the 14 missing ONNX exports export-first, then probe, gate and
+   review each model.~~ **Tranche 1 closed 4 of them** — YOLOv8n (entry 17),
+   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Ten remain:**
+   EdgeCrafter detection / segmentation / pose, RF-DETR detection /
+   segmentation / keypoint at other sizes, ViTPose-base-simple,
+   Depth-Anything-V2, VideoMAE/ViViT/TimeSformer, RAFT-small. No release
+   until the in-scope scoreboard is clean.
 
 ### State of the in-flight packets (2026-10-19, boundary 1 session)
 
@@ -978,3 +991,166 @@ rows are written into, so the integration cannot land without them. The
 boundary-2 handoff therefore uses the **same placeholder convention**, with a
 one-line legend so a reader can resolve `$NERT_REPO` and `$LOCAL_ARTIFACTS`
 without hunting for a key.
+
+## Boundary 3 — the export-first provisioning batch (session `ses_ea9a8c0e2ffesxGThz1IUdG8Qf`)
+
+Opened 2026-10-20 from `8215a43` (boundary-2 handoff), branch `main`, tree
+clean and in sync with `origin/main`. **The session id was already recorded
+in `## Sessions and resets`.**
+
+### Five maintainer decisions — still open, and still the maintainer's
+
+The `question` tool is unavailable in this non-interactive session, so the five
+decisions in the handoff could not be put interactively; they are put to the
+maintainer **here**. None is settled by this session. Where the batch could
+not proceed without one, the working assumption is named below **and is
+recorded as open in the published documents**, so a contrary ruling is visible
+rather than silent.
+
+| # | Decision | Working assumption used in this batch | What a contrary ruling changes |
+|---|---|---|---|
+| 1 | RF-DETR groups 22–24: `MISSING-EXPORT` with a reason, or `OUT-OF-SCOPE`? | `MISSING-EXPORT` with the reason (the plan-of-record's recommendation). Not yet written to the census — the three groups remain among the ten open. | The census rows 22–24 and the in-scope denominator. |
+| 2 | One tranche, or one group at a time? | One tranche, four groups, **at most two packets in flight**, the GPU single-owner. | Only the schedule. The four gates are done either way. |
+| 3 | Does one gated representative per entry close that entry? | **Yes** — the plan-of-record's working assumption, and the architect applied it to entry 25. **Recorded in both the matrix and the census**, so the scoreboard's dependence on it is visible. | The scoreboard denominator: the four closed groups would reopen and the denominator would need redefining. |
+| 4 | Does the release gate admit a documented GAP-with-deviation for Grounding DINO's OpenCL cell? | **Not assumed.** The cell stays `GAP`, Grounding DINO stays the one open entry, and **no release was cut**. | Whether 0.2.0 can close once the ten exports are done. |
+| 5 | The conversion evidence bar for converted exports. | The prepared GATE template: the **full-model gate against ORT is the equivalence evidence**, with the caveat recorded verbatim in the export's provenance. ResNet-50 (opset 20 → 18) carries it. | A stronger bar (an ORT-vs-ORT pre/post-conversion diff) would have to be added to the GATE template and applied to RAFT-small, and could be applied retroactively to ResNet-50. |
+
+### Tranche 1 — what ran
+
+Five steps per group: **PROVISION → PROBE → GATE → REVIEW → INTEGRATE**, with
+a fresh read-only reviewer after every implementer packet. **No kernel row was
+added**: the tables are unchanged at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9.
+
+| Packet | Group | Result |
+|---|---|---|
+| E2-PROV / E1-PROV | YOLO11m-seg / YOLOv8n | opset 18 pinned at export; 515 / 301 nodes on disk |
+| E2-PROBE / E1-PROBE | YOLO11m-seg / YOLOv8n | **GO**; 467 / 260 dispatched; all three device diffs empty |
+| E2-GATE / E1-GATE | YOLO11m-seg / YOLOv8n | **PASS** on CPU/CUDA/OpenCL; exit 0 on every leg; over_tol 0 on every output |
+| E3-PROV | OWL-ViT | opset 18 pinned at export by a **worker-authored** exporter (the Neuriplo repo has none) |
+| E3-PROBE | OWL-ViT | **BLOCKED** — the graph did not load; see the architect's ruling below |
+| P2 / P2-ACCEPT | OWL-ViT re-export | **12/12** acceptance conditions; E1–E7 evidence met |
+| P3 | OWL-ViT re-probe | **GO**; 1,071 dispatched; all three device diffs empty |
+| G3 | OWL-ViT gate | **PASS**; exit 0 on every leg; over_tol 0; the ORT-reference byte-identity precondition re-confirmed at gate time |
+| E4-PROV / E4-PROBE / E4-GATE | ResNet-50 | opset 18 **converted** from an opset-20 raw export; 122 dispatched; **PASS**, over_tol 0, top-1 1/1 (n = 1) |
+| EVID-FIX-1 | — | corrected three factual defects the reviewers found in the evidence/provenance files |
+| INT-1 | — | the matrix, census, README and CHANGELOG now carry **PASS 19 / Open 1 / Missing 10 / Out of scope 2** |
+
+### The architect's ruling on the OWL-ViT blocker (E3)
+
+The first OWL-ViT export was **valid but unloadable**: NERT's loader rejected
+`/model/class_head/Cast` (`to=11`, DOUBLE — `include/nert/graph.hpp:42` has no
+`Float64`) and `/model/Reciprocal` (outside the loader's accepted-op map).
+**Both are loader rejections, before any kernel lookup, so kernel rows alone
+could not have fixed it.** The architect ruled **re-export, do not touch the
+engine**: both blockers are compile-time artifacts of the export, not model
+semantics (the DOUBLE is an exact identity round trip; the `Reciprocal` is a
+division by a compile-time constant whose whole chain is foldable). A
+two-site **exporter-only** patch produced an artifact proven **bit-identical**
+to the rejected one on both outputs across five input sets, with the structural
+diff confined to the two patched constructs (1,439 → 1,418 nodes, 21 removed,
+0 added, 0 violations). The rejected artifact is preserved beside it. **The
+engine was not touched**: the loader, executor, shape inference, constant
+folding and all three tables are byte-identical to HEAD.
+
+**Four amendments to the program's rules, from that ruling:**
+
+1. **The kernel-row rule.** A missing-row diff taken from a graph the loader
+   rejected is **not** a missing-row diff: the graph never reached dispatch.
+   `missing_rows.txt` must label each op `loader_rejected` / `loader_folded` /
+   `dispatchable_missing`, and **only `dispatchable_missing` can justify a
+   kernel packet**.
+2. **The tranche-1 budget.** The one conditional kernel packet covers a
+   *loaded* graph only; a group whose first provision produced an unloadable
+   artifact may be re-provisioned without consuming it (two re-provisions per
+   group). E3's kernel budget was returned unspent.
+3. **Standing rule 5 — a de-blocking re-export is a transcription, not a
+   reinterpretation.** It must be proven to compute the same function as the
+   rejected artifact (bit-identical outputs on a fixture set exercising every
+   conditional branch the patch touches, an unchanged model revision and
+   environment, a structural diff confined to the blocking construct). **The
+   ORT reference is computed from the same artifact, so the GATE cannot detect
+   a weakened re-export; only the comparison against the rejected artifact
+   can.**
+4. **The PROBE method.** Where the zero fill makes a declared output constant
+   by construction (OWL-ViT's `input_ids == 0` mask fill), the probe records
+   that fact and does not treat the degenerate output as evidence about the
+   model; branch liveness is proved separately.
+
+### Residuals for the next boundary
+
+- **The ten missing-export groups** are the next tranche: EdgeCrafter
+  detection / segmentation / pose (heaviest — upstream clone, new environment,
+  checkpoint downloads), RF-DETR detection / segmentation / keypoint at other
+  sizes (**not executable here** — `import rfdetr` fails under transformers
+  4.35 and the weights auto-download, so these depend on maintainer decision
+  1), ViTPose-base-simple, Depth-Anything-V2, VideoMAE/ViViT/TimeSformer
+  (static 5D fixtures), RAFT-small (**exported at opset 16 by
+  `raft_exporter.py`, so it is converted** — and that exporter also hardcodes
+  `dynamic_axes`, so the packet must pin static shapes, not just the opset).
+- **The CUDA 72 rows assume a cuDNN-enabled build** (`Conv`/`ConvTranspose`
+  sit behind `#ifdef NERT_HAS_CUDNN`). This is now recorded in the matrix.
+- **`nert_gate_cuda` was relinked once** (it predated `build-cudnn/libnert.a`).
+  Every harness binary statically links `libnert.a` and must be relinked after
+  any rebuild; the GPU leg must not run against a stale binary.
+- **`onnxslim` is absent and cannot be installed** (no write access to the
+  system site-packages), so Ultralytics exports are unsimplified. That is
+  recorded in the provenance; it is not a defect.
+- **Reviewer findings of the kind that recur**, now recorded for the next
+  packets: an acceptance script that greps for a self-attested `EXIT=0`
+  string rather than the run's own captured status; a script that counts
+  delimiters without saying whether it counts escaped occurrences; and an
+  evidence file whose `verdict` regex also accepts `BLOCKED`. All three were
+  found this boundary; all three are avoidable.
+
+### Tranche 2 — planned at this boundary, not executed
+
+The tranche-2 decomposition was prepared at this boundary and is summarised
+here because `/tmp` does not survive. **Seven of the ten groups are
+executable on this host** (entries 19, 20, 21, 26, 27, 29, 31); the three
+RF-DETR groups (22–24) are **not** — `import rfdetr` fails under transformers
+4.35 and the weights auto-download from `storage.googleapis.com`, so they are
+blocked on maintainer decision 1 and **nothing in the RF track should be
+attempted without an explicit ruling**. The RF track is fully decoupled, so
+decision 1 can never block the other seven groups.
+
+**Recommended order** (at most two packets in flight, disjoint writable
+paths, the GPU single-owner): (0) an **RF-DOC** packet that *proves* the
+non-executability from verbatim transcripts — the three exporters' `--help`
+showing the `--opset_version 17` default, the exact `import rfdetr` failure,
+the installed transformers version, the non-hermetic weight evidence, and the
+keypoint exporter's preview-fallback lines — plus **RAFT-PROV**; then
+(1) ViTPose-PROV + Depth-Anything-PROV; (2) the three video exports
+(one packet) alongside **EdgeCrafter-PROV** (the long pole: upstream clone,
+a new environment, three checkpoint downloads); (3) the gates, **serialized
+on the GPU**, shortest CPU leg first (RAFT-small, ViTPose, Depth), then the
+three video models, then the three EdgeCrafter models last, so that any
+re-provision cycle lands at the end of the queue; (4) **INT-2** alone.
+
+**Method changes tranche 2 must carry** (all from tranche-1 findings):
+- **Static 5D fixture discipline** for the video group — one fixture file,
+  frozen in the provision packet's provenance, reused byte-identically for
+  the ORT reference and all three legs, with **zero `dim_param`** on any
+  gated artifact.
+- **Image-pair fixture** for RAFT-small — a deterministic fixed shift of the
+  first frame, both bound by declared name, with **static** H/W. The RAFT
+  exporter hardcodes **both** opset 16 **and** `dynamic_axes`, so that
+  packet pins shapes as well as the opset.
+- **Multi-input binding including int64 payloads** — EdgeCrafter's
+  `orig_target_sizes [1,2]` must be constructed and bound, not omitted.
+- **External-data / self-containment check** asserted explicitly in every
+  converted or externally-stored export's `verify_export.py`.
+- **Acceptance hygiene** — assert per-leg exit statuses captured from the
+  run, never a self-attested `EXIT=0` string; count **unescaped** pipes
+  explicitly; make every evidence-verdict regex **exclude BLOCKED**; scope
+  repo-cleanliness checks with `git -C`.
+- **RAFT-small hedges decision 5** by recording the verbatim conversion
+  caveat **and** an ORT-vs-ORT pre/post-conversion diff, so either ruling
+  is satisfiable without re-running the gate.
+- If all seven close, the scoreboard becomes **PASS 26 / Open 1 / Missing 3
+  / Out of scope 2** (26+1+3 = 30).
+
+### Scoreboard after this boundary
+
+**PASS 19 / Open 1 (Grounding DINO, OpenCL backend gap) / Missing export 10 /
+Out of scope 2** — 19 + 1 + 10 = 30 in scope. The release gate is **zero open
+entries and zero missing exports** among the 30; **no release was cut**.
