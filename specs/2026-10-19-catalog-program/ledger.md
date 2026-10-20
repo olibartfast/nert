@@ -27,18 +27,19 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 | CPU / CUDA kernel tables | 72 / 72 rows |
 | OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
 | HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 22 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
-| Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap) |
-| Missing ONNX export | 7 entries |
+| Recorded full-model PASS | 23 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation; the three video models are clean on all nine legs) |
+| Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap; untouched by boundary 7) |
+| Missing ONNX export | 6 entries |
 | Out of scope | 2 entries |
 | Release | **not ready**; 0.2.0 is unreleased |
 
-The 22 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
+The 23 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
 seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
 nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
 RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT,
-ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small and RAFT-small** (the
-export-first batches, recorded below). The one open entry is:
+ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small and
+entry 29 (VideoMAE/ViViT/TimeSformer)** (the export-first batches and
+boundary 7, recorded below). The one open entry is:
 
 - **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
   check closed 2026-10-20: pred_boxes 0/3600 canonicalized, per-box IoU min
@@ -102,6 +103,7 @@ on the maintainer host.
 | Rows 31+ (boundary 1) | `ses_eab2639b3ffeP9kkTjzb3bVpvB` |
 | Export-first batch (boundary 3) | `ses_ea9a8c0e2ffesxGThz1IUdG8Qf` |
 | Catalog program, boundary 5 (DA2-Small) | `ses_ea71d3e43ffe9xmq0IktztCASr` |
+| Catalog program, boundary 7b (video) | `ses_ea57088a6ffeiju9apmez1FxlW` |
 
 Boundary handoff: [handoff-boundary-1.md](handoff-boundary-1.md). The fresh
 session reads only the handoff, this ledger, the inventory and the coverage
@@ -121,11 +123,12 @@ session create + run path.
    topology owner.
 4. ~~Provision the 14 missing ONNX exports export-first, then probe, gate and
    review each model.~~ **Tranche 1 closed 4 of them** — YOLOv8n (entry 17),
-   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Seven remain:**
-   EdgeCrafter detection / segmentation / pose, RF-DETR detection /
-   segmentation / keypoint at other sizes,
-   VideoMAE/ViViT/TimeSformer (Depth-Anything-V2-Small closed at boundary 5,
-   RAFT-small at boundary 6). No release
+   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Six remain:**
+   EdgeCrafter detection, EdgeCrafter segmentation, EdgeCrafter pose,
+   RF-DETR detection other sizes, RF-DETR segmentation other sizes and
+   RF-DETR keypoint other sizes. Depth-Anything-V2-Small
+   closed at boundary 5, RAFT-small at boundary 6, and
+   VideoMAE/ViViT/TimeSformer (entry 29, one entry) at boundary 7. No release
    until the in-scope scoreboard is clean.
 
 ### State of the in-flight packets (2026-10-19, boundary 1 session)
@@ -1286,4 +1289,68 @@ mean cosmetic.
 
 **Scoreboard: 21 / 1 / 8 / 2 → 22 / 1 / 7 / 2** (22 + 1 + 7 = 30 in scope).
 Tables unchanged at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9; no engine change.
+Commit: this integration commit.
+
+## Boundary 7 — video (VideoMAE, ViViT, TimeSformer)
+
+Entry 29 closes once, with its three gated models recorded as evidence.
+Scoreboard **22 / 1 / 7 / 2 → 23 / 1 / 6 / 2** (23 + 1 + 6 = 30 in scope of
+32; the missing six are EdgeCrafter detection, EdgeCrafter segmentation,
+EdgeCrafter pose, RF-DETR detection other sizes, RF-DETR segmentation other
+sizes and RF-DETR keypoint other sizes). Grounding DINO's OpenCL **GAP is
+untouched and was not closed as PASS** — Open stays 1.
+
+**Branch decision.** `git branch -a | grep -i develop` returned nothing
+(exit 1): no `develop` branch exists locally or on any remote, matching the
+catalog precedent. Integration branched `wip/nert-b7-video` from the
+then-current `origin/main` (`47bfe8f`, `bench: typed fixtures for R6/Tier-5
+rows (Slice 5b)`), never from a nonexistent `develop`. One integration
+commit; **no push, no merge to `main`, no tag, no release**. Orchestrator
+`ses_ea57088a6ffeiju9apmez1FxlW`; reviewer sessions: VideoMAE
+`ses_ea51f4c3cffeiJ8JfMwkHheTHx`, ViViT
+`ses_ea51f4c27ffen77q2lg0kFKGlS`, TimeSformer
+`ses_ea4fdff42ffeNIjiWGQPc5mTyJ` (all three returned **REVIEW-PASS**).
+
+**Exports and probe.** All three opset 18 pinned at export (`ai.onnx` only),
+with no converter step. The legacy TorchScript exporter path was forced
+(`dynamo=False`) because torch 2.12's dynamo converter fails on these
+checkpoints; the legacy container is not byte-deterministic, so the recorded
+sha256 values identify the frozen artifacts. Nodes on disk / dispatched:
+VideoMAE 521 / 407, ViViT 1,152 / 797, TimeSformer 1,289 / 904 (`Constant`
+folded at load). Probe missing-row diff 0/0/0 across CPU/CUDA/OpenCL; single
+`pixel_values` 5D float32 input → `logits [1,400]` float32. ViViT's exporter
+`If` artifact was folded: raw export `6300d277…550b38d1` preserved, final
+`24d5690a…42d39`, `If` 2→0 / `Identity` 1→3, raw-vs-folded logits
+bit-identical (`max_abs` 0.0).
+
+**Fixtures and references.** One frozen canonical `(1,32,3,224,224)` buffer
+from seed `20261020`, frame prefixes F=16/32/8. Fixtures: VideoMAE
+`537c5e90…2e0fc`, ViViT `78157408…67536`, TimeSformer `2d10ec9b…4eb564`.
+References from ORT 1.27.0 CPUExecutionProvider: `20efdf6c…95e2`,
+`9fd575da…03f4b` (argmax 382), `150a1393…1e078` (argmax 304). Tolerance
+`--tol 1e-3` scaled `tol*(1+|ref|)`.
+
+| model | export sha256 | nodes disk / dispatched | input | over_tol CPU/CUDA/OpenCL | max_abs CPU / CUDA / OpenCL |
+| --- | --- | --- | --- | --- | --- |
+| VideoMAE | `14fe0ace…05cb586` | 521 / 407 | `[1,16,3,224,224]` | 0/400 · 0/400 · 0/400 | 1.31e-06 / 1.25e-06 / 1.97e-06 |
+| ViViT | `24d5690a…42d39` | 1,152 / 797 | `[1,32,3,224,224]` | 0/400 · 0/400 · 0/400 | 7.39e-06 / 8.34e-06 / 3.86e-05 |
+| TimeSformer | `f0256c37…035a` | 1,289 / 904 | `[1,8,3,224,224]` | 0/400 · 0/400 · 0/400 | 3.34e-06 / 3.81e-06 / 6.68e-06 |
+
+All nine legs exit 0.
+
+**Harness provenance caveat.** The prebuilt gate binaries predate HEAD
+`47bfe8f`; that commit is bench-only (`bench/README.md`,
+`bench/runtime/main.cpp`, `specs/2026-10-17-bench-dedup/validation.md`) and
+does not touch the engine. TimeSformer's dispatched op set contains no
+`Resize`, so the bench-slice changes cannot alter its numerics, and
+CPU/CUDA/OpenCL agree with each other and the ORT reference.
+
+**Acceptance.** `acceptance.sh` runs once post-commit and asserts three
+`gate_result.json` with `over_tol == 0`, the three reviewer sign-off files,
+only the five allowed paths in the integration commit, and `git log -1` at
+that commit. Evidence remains under
+`/tmp/opencode/specs/video-integration/`.
+
+**No engine change.** Tables unchanged at CPU 72 / CUDA 72 / OpenCL 68 /
+HIP 9; no kernel row and no engine source file changed. No release was cut.
 Commit: this integration commit.

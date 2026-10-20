@@ -9,9 +9,9 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS on CPU/CUDA/OpenCL | 22 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small |
+| PASS on CPU/CUDA/OpenCL | 23 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small, entry 29 (VideoMAE/ViViT/TimeSformer) |
 | Open | 1 | Grounding DINO (OpenCL backend gap) |
-| Missing ONNX export | 7 | See export plan below |
+| Missing ONNX export | 6 | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
 | **Total** | **32** | |
 
@@ -19,14 +19,17 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 sub-0.001 confidence tail; confident detections are identical. RF-DETR
 seg-nano-576 carries the documented rank-99 TopK near-tie deviation (`SN-DEV`).
 
-22 + 1 + 7 = 30 in-scope entries. The PASS count assumes one gated
+23 + 1 + 6 = 30 in-scope entries. The PASS count assumes one gated
 representative per entry closes it (YOLOv8n for entry 17, YOLO11m-seg for
 entry 18, OWL-ViT for entry 25, ResNet-50 for entry 30, RAFT-small for entry
 31); other sizes are not gated and do not move the scoreboard — an open
-maintainer decision.
+maintainer decision. Entry 29 is a single entry and is counted once.
 
-Entry 31 is closed by the gated RAFT-small representative; the remaining
-seven missing-export groups have no provisioned artifact.
+Entry 29 is closed by its gated video models, with all three recorded
+(VideoMAE, ViViT, TimeSformer); the remaining six missing-export entries
+(EdgeCrafter detection, EdgeCrafter segmentation, EdgeCrafter pose, RF-DETR
+detection other sizes, RF-DETR segmentation other sizes and RF-DETR keypoint
+other sizes) have no provisioned artifact.
 
 ## Entry status
 
@@ -60,7 +63,7 @@ seven missing-export groups have no provisioned artifact.
 | 26 | ViTPose-base-simple | PASS | Gate 2026-10-20: opset 18 pinned at export; 536 nodes on disk / 422 dispatched; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on all three. |
 | 27 | Depth-Anything-V2 | PASS | Gate 2026-10-20: opset 18 pinned at export; 553 nodes on disk / 553 dispatched; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on predicted_depth (max_abs ≤ 1.09e-04). OpenCL leg after the architect-authorized Resize no-op-attribute fix. |
 | 28 | LGM/LGM-mini/GRM | Out of scope | Gaussian rendering/rasterisation outside ONNX; no viable ONNX gate. |
-| 29 | VideoMAE/ViViT/TimeSformer | Missing export | Exporters exist; HF downloads. |
+| 29 | VideoMAE/ViViT/TimeSformer | PASS | Gate 2026-10-20; opset 18 pinned at export for all three (HF checkpoints; legacy TorchScript exporter path recorded in provenance). VideoMAE export `14fe0ace…05cb586`, 521 nodes on disk / 407 dispatched, fixture `537c5e90…2e0fc` `[1,16,3,224,224]`, ORT ref `20efdf6c…95e2`; ViViT final export `24d5690a…42d39`, 1,152 / 797 (`If`=0, `Identity`=3; raw export `6300d277…550b38d1` preserved, raw-vs-folded logits bit-identical, max_abs 0.0), fixture `78157408…67536` `[1,32,3,224,224]`, ref `9fd575da…03f4b`; TimeSformer `f0256c37…035a`, 1,289 / 904, fixture `2d10ec9b…4eb564` `[1,8,3,224,224]`, ref `150a1393…1e078`. Nine legs exit 0, over_tol 0/400 on CPU/CUDA/OpenCL for every model. |
 | 30 | Classification ViT/TF/other torchvision | PASS | Closed by the gated representative ResNet-50 (opset 18, converted from an opset-20 raw export; 122 nodes on disk / 122 dispatched; CPU/CUDA/OpenCL gate, 0 over tolerance). Other families and sizes are not gated. |
 | 31 | RAFT-small | PASS | Gate 2026-10-20; opset 18 converted from an opset-16 raw export (conversion does not prove equivalence; the full-model gate is the evidence); 1,630 nodes on disk / 1,115 dispatched on every device; export sha256 `8be6b770acab2da0093891eb568397b98bb82bb4c54d91298e2a8842f2d7f950`; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on all three (max_abs 6.10352e-05 CPU / 6.10352e-05 CUDA / 6.19888e-05 OpenCL, 393,216 elements); reviewer PASS-WITH-FINDINGS (non-blocking). |
 | 32 | Image understanding (Gemma 4/Llama) | Out of scope | GGUF + llama.cpp; no ONNX runtime contract. |
@@ -72,11 +75,13 @@ seven missing-export groups have no provisioned artifact.
 | YOLO detector variants | Entry 17 closed by the gated YOLOv8n representative at opset 18 (`export/detection/yolo/export.py --opset 18`); offline for yolo26s/x/11s/26n; download for v5/v6/v7/v8 (other sizes)/v9/v10/v12 | `ultralytics`, checkpoints, opset 18 pin |
 | YOLO segmentation variants | Entry 18 closed by the gated YOLO11m-seg representative at opset 18 from the local checkpoint; download for other sizes | Ultralytics CLI, `-seg.pt` checkpoints |
 | EdgeCrafter detection/seg/pose | Download + new environment | Upstream repo, checkpoints, `onnxsim`/`onnxscript` |
-| RF-DETR other sizes | Download + dependency fix | `rfdetr`, transformers upgrade, weights |
+| RF-DETR detection other sizes | Download + dependency fix | `rfdetr`, transformers upgrade, weights |
+| RF-DETR segmentation other sizes | Download + dependency fix | Same |
+| RF-DETR keypoint other sizes | Download + dependency fix | Same; exporter may fall back to keypoint-preview |
 | OWL-ViT | Entry 25 closed by the gated OWL-ViT base patch32: worker-authored exporter under `/tmp` pinned at opset 18, re-exported at two sites only to remove a DOUBLE `Cast` and a constant `Reciprocal` (bit-identity proof) | HF `google/owlvit-*` checkpoint |
 | ViTPose | Entry 26 closed by the gated ViTPose-base-simple representative at opset 18 (`export/pose_estimation/vitpose/export_vitpose_to_onnx.py --opset 18`, static batch, 256x192) | HF `usyd-community/vitpose-base-simple`, transformers |
 | Depth-Anything-V2 | Download | HF `depth-anything/Depth-Anything-V2-*` |
-| VideoMAE / ViViT / TimeSformer | Download | HF checkpoints; 5D input fixtures |
+| VideoMAE / ViViT / TimeSformer | Entry 29 closed by all three gated at opset 18 (legacy TorchScript exporter path recorded in provenance; HF checkpoints) | Frozen shared 5D fixtures |
 | Classification non-ResNet | Entry 30 closed by the gated ResNet-50 representative at opset 18 (converted from opset 20); ViT/timm/TensorFlow families not gated | Torchvision/timm or TensorFlow weights |
 | RAFT-small | Entry 31 closed by the gated RAFT-small representative at opset 18 (converted from the opset-16 raw export) | Torchvision weights; 16→18 conversion |
 
