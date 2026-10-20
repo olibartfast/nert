@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Defined in src/opencl/resize.cpp. Declared here (not wired into the OpenCL
@@ -83,6 +84,64 @@ void SetAttr(nert::Node& node, const std::string& name, const std::string& value
     attr.name = name;
     attr.value = value;
     node.attributes.push_back(attr);
+}
+
+void SetIntAttr(nert::Node& node, const std::string& name, int64_t value) {
+    nert::Attribute attr;
+    attr.name = name;
+    attr.value = value;
+    node.attributes.push_back(attr);
+}
+
+nert::Node LinearHalfPixelNode(const std::string& name) {
+    nert::Node node = MakeNode(name, "Resize");
+    node.inputs = {"x", "", "sizes"};
+    node.outputs = {"y"};
+    SetAttr(node, "mode", "linear");
+    SetAttr(node, "coordinate_transformation_mode", "half_pixel");
+    return node;
+}
+
+// Runs the 2x2 -> 4x4 linear half_pixel upsample for `node`; returns the
+// OpenCL output and fills `ref` with the CPU oracle's output for `node`.
+std::vector<float> RunLinearHalfPixel(nert::Device& ocl, const nert::Node& node, std::vector<float>& ref) {
+    std::vector<float> x = {0.0F, 1.0F, 2.0F, 3.0F};
+    std::vector<int64_t> sizes = {1, 1, 4, 4};
+    ref.assign(16, 0.0F);
+    nert::CpuDevice().kernels().find("Resize")(
+        node, {HostFloat(x, {1, 1, 2, 2}), Omitted(), Omitted(), HostInts(sizes, {4})}, {HostFloat(ref, {1, 1, 4, 4})});
+    void* dx = Upload(ocl, x);
+    void* dsizes = nullptr;
+    UploadInts(ocl, dsizes, sizes);
+    std::vector<float> gout(16, 0.0F);
+    void* dy = Upload(ocl, gout);
+    nert::opencl_kernels::Resize(node,
+        {DeviceFloat(dx, {1, 1, 2, 2}), Omitted(), Omitted(), DeviceInts(dsizes, {4})},
+        {DeviceFloat(dy, {1, 1, 4, 4})});
+    gout = Download(ocl, dy, 16);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dsizes);
+    ocl.allocator().release(dy);
+    return gout;
+}
+
+// Runs the attribute-absent control and one attribute-bearing variant on the
+// same geometry. The variant must be an exact no-op (bit-identical to the
+// control) and must still match the CPU oracle.
+void ExpectNoOpAttributes(const std::string& label, const std::vector<std::pair<std::string, int64_t>>& attrs) {
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> control_ref;
+    std::vector<float> control_out;
+    ASSERT_NO_THROW(control_out = RunLinearHalfPixel(ocl, LinearHalfPixelNode(label + "_control"), control_ref));
+    nert::Node variant = LinearHalfPixelNode(label);
+    for (const auto& [name, value] : attrs) {
+        SetIntAttr(variant, name, value);
+    }
+    std::vector<float> ref;
+    std::vector<float> out;
+    ASSERT_NO_THROW(out = RunLinearHalfPixel(ocl, variant, ref));
+    EXPECT_EQ(out, control_out) << "no-op attribute changed the OpenCL output";
+    ExpectNear(out, ref, 1e-5F);
 }
 
 // Nearest with the asymmetric transform and floor rounding, driven by the
@@ -163,6 +222,82 @@ TEST(NertOpenCLResize, LinearHalfPixelUpsample) {
     ocl.allocator().release(dx);
     ocl.allocator().release(dsizes);
     ocl.allocator().release(dy);
+}
+
+// ONNX's no-op defaults, one attribute at a time. `antialias=0` must be
+// accepted and change nothing: the output is bit-identical to the
+// attribute-absent control and still matches the CPU oracle.
+TEST(NertOpenCLResize, AcceptAntialiasZero) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    ExpectNoOpAttributes("resize_aa0", {{"antialias", 0}});
+}
+
+// `exclude_outside=0` alone is the same no-op.
+TEST(NertOpenCLResize, AcceptExcludeOutsideZero) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    ExpectNoOpAttributes("resize_eo0", {{"exclude_outside", 0}});
+}
+
+// Both ONNX no-op defaults present together (the Depth-Anything-V2 shape).
+TEST(NertOpenCLResize, AcceptBothNoOps) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    ExpectNoOpAttributes("resize_both0", {{"antialias", 0}, {"exclude_outside", 0}});
+}
+
+// Non-no-op values and non-int values reject with node + op + attribute,
+// independently of `mode` (checked here on nearest as well as linear).
+TEST(NertOpenCLResize, RejectsNonNoOpAttributes) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    auto expect_throw = [](const nert::Node& node, const std::string& fragment) {
+        nert::TensorView in;
+        in.dtype = nert::DataType::Float32;
+        in.dims = {1, 1, 2, 2};
+        nert::TensorView out;
+        out.dtype = nert::DataType::Float32;
+        out.dims = {1, 1, 2, 2};
+        try {
+            nert::opencl_kernels::Resize(node, {in}, {out});
+            FAIL() << "expected InferenceException for " << node.name;
+        } catch (const nert::InferenceException& e) {
+            const std::string message = e.what();
+            EXPECT_NE(message.find(node.name), std::string::npos) << message;
+            EXPECT_NE(message.find(node.op_type), std::string::npos) << message;
+            EXPECT_NE(message.find(fragment), std::string::npos) << message;
+        }
+    };
+
+    // Nonzero ints (positive and negative) reject.
+    for (const char* name : {"antialias", "exclude_outside"}) {
+        nert::Node one = LinearHalfPixelNode(std::string("resize_") + name + "_one");
+        SetIntAttr(one, name, 1);
+        expect_throw(one, name);
+        nert::Node negative = LinearHalfPixelNode(std::string("resize_") + name + "_negative");
+        SetIntAttr(negative, name, -1);
+        expect_throw(negative, name);
+    }
+
+    // A string value is not an int and rejects for each name.
+    for (const char* name : {"antialias", "exclude_outside"}) {
+        nert::Node wrong_type = LinearHalfPixelNode(std::string("resize_") + name + "_string");
+        SetAttr(wrong_type, name, "0");
+        expect_throw(wrong_type, name);
+    }
+
+    // Mode-independent: antialias=1 on the nearest path still rejects.
+    nert::Node nearest = MakeNode("resize_aa1_nearest", "Resize");
+    nearest.inputs = {"x", "", "sizes"};
+    nearest.outputs = {"y"};
+    SetAttr(nearest, "mode", "nearest");
+    SetIntAttr(nearest, "antialias", 1);
+    expect_throw(nearest, "antialias");
 }
 
 // The same geometry as NearestAsymmetricFloor with int64 data (nearest only);

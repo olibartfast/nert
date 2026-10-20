@@ -841,6 +841,48 @@ TEST_F(EngineLoader, HermeticSoftmaxResizeLoads)
     ASSERT_EQ(graph.nodes[1].attributes.size(), 4U);
 }
 
+// Hermetic positive: the ONNX no-op defaults antialias=0 and
+// exclude_outside=0 are admitted and preserved as ints. The loader is the
+// single admission point, so the OpenCL row can independently re-check the
+// same values without changing the admitted graph surface.
+TEST_F(EngineLoader, HermeticResizeNoOpAttributesLoad)
+{
+    std::string body;
+    put_sub(body, 5,
+        encode_initializer("scales", {4}, {1.0F, 1.0F, 2.0F, 2.0F}));
+    put_sub(body, 1, encode_node("rs_noop", "Resize", {"x", "", "scales"}, {"y"},
+                      {encode_attribute_string("mode", "linear"),
+                          encode_attribute_string(
+                              "coordinate_transformation_mode", "half_pixel"),
+                          encode_attribute_int("antialias", 0),
+                          encode_attribute_int("exclude_outside", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 4, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 8, 8}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("rs_noop.onnx", encode_model(body)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    const nert::Node& node = graph.nodes[0];
+    ASSERT_EQ(node.op_type, "Resize");
+    bool saw_antialias = false;
+    bool saw_exclude_outside = false;
+    for (const nert::Attribute& attr : node.attributes) {
+        if (attr.name == "antialias") {
+            saw_antialias = true;
+            const std::int64_t* value = std::get_if<std::int64_t>(&attr.value);
+            ASSERT_NE(value, nullptr);
+            EXPECT_EQ(*value, 0);
+        } else if (attr.name == "exclude_outside") {
+            saw_exclude_outside = true;
+            const std::int64_t* value = std::get_if<std::int64_t>(&attr.value);
+            ASSERT_NE(value, nullptr);
+            EXPECT_EQ(*value, 0);
+        }
+    }
+    EXPECT_TRUE(saw_antialias);
+    EXPECT_TRUE(saw_exclude_outside);
+}
+
 // Hermetic positive: Slice takes no attributes (starts/ends/axes as inputs);
 // TopK takes axis/largest/sorted with K as an Int64 constant input.
 TEST_F(EngineLoader, HermeticSliceTopKLoads)

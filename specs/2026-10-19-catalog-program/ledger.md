@@ -27,18 +27,18 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 | CPU / CUDA kernel tables | 72 / 72 rows |
 | OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
 | HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 20 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
+| Recorded full-model PASS | 21 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
 | Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap) |
-| Missing ONNX export | 9 entries |
+| Missing ONNX export | 8 entries |
 | Out of scope | 2 entries |
 | Release | **not ready**; 0.2.0 is unreleased |
 
-The 20 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
+The 21 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
 seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
 nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
 RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT,
-ResNet-50 and ViTPose-base-simple** (the export-first batches, recorded
-below). The one open entry is:
+ResNet-50, ViTPose-base-simple and Depth-Anything-V2-Small** (the
+export-first batches, recorded below). The one open entry is:
 
 - **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
   check closed 2026-10-20: pred_boxes 0/3600 canonicalized, per-box IoU min
@@ -1220,3 +1220,42 @@ corrections.
 missing exports, of which Depth-Anything-V2-Small and RAFT-small are ready
 for probe+gate; the `## Definitions` GAP-definition conflict; the
 one-representative-per-entry assumption.
+
+## Boundary 5 — Depth-Anything-V2-Small (session ses_ea71d3e43ffe9xmq0IktztCASr)
+
+Entry 27 closes — the sixth missing-export group gated; eight remain. Scoreboard
+**21 / 1 / 8 / 2** (21 + 1 + 8 = 30 in scope of 32).
+
+| Status | Count |
+| --- | ---: |
+| PASS | 21 |
+| Open | 1 |
+| Missing export | 8 |
+| Out of scope | 2 |
+
+**Probe GO.** 553 nodes on disk / **553** dispatched, zero `Constant` nodes;
+missing-row diff 0/0/0 across CPU/CUDA/OpenCL.
+
+**Gate.** CPU and CUDA PASS; OpenCL exit 1:
+`nert_gate: Resize (node 'node_upsample_bilinear2d'): attribute 'antialias' is not supported here`.
+The row rejected no-op `antialias=0`/`exclude_outside=0` on mere presence
+while the loader admits absent-or-0; CPU/CUDA enforce nothing.
+
+**Architect ruling: AUTHORIZED-WITH-CONDITIONS.** Fix confined to
+`src/opencl/resize.cpp` — presence→value check mirroring the loader (absent
+accept, non-int reject, int 0 accept, int nonzero incl. negative reject,
+mode-independent); no ABI or table change, OpenCL stays 68 rows; discriminating
+tests plus a loader positive; re-run the 14 Resize-model OpenCL legs and prove
+them byte-identical.
+
+**Fix.** +204 / −6 across `src/opencl/resize.cpp`, `test/opencl_resize_test.cpp`
+and `test/loader_test.cpp`; red pre-fix (3/3 accept tests fail) → green
+(4/4, suite 10/10, loader positive 33/33); 14/14 gated OpenCL legs
+byte-identical; fresh reviewer **PASS**; only `nert_gate_opencl` relinked.
+
+**Re-gate.** OpenCL exit 0, 553 dispatched, 0 of 268,324 over tolerance,
+max_abs **1.08480e-04**; CPU/CUDA legs stand on the C7 hash proof. Gate
+reviewer **PASS-WITH-FINDINGS**; F1–F3 (evidence-diff scope, stale
+task-analysis OpenCL block, "prebuilt, unmodified" header) carried as
+non-blocking evidence-cleanup residuals. Tables unchanged at CPU 72 / CUDA 72 /
+OpenCL 68 / HIP 9; no release was cut.

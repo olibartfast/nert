@@ -228,6 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CPU 72 / CUDA 72 / OpenCL 68 / HIP 9) and no engine source file changed.
   Scoreboard moved 19 → 20 and the missing-export count 10 → 9. No release
   was cut.
+- Depth-Anything-V2-Small (entry 27) exported at opset 18 by the Neuriplo Depth-Anything-V2 exporter (553 nodes on disk / 553 dispatched — zero Constant nodes) and gated on CPU, CUDA and OpenCL. Every leg exited 0 with 553 dispatched, and 0 elements were over the `--tol 1e-3` scaled tolerance on `predicted_depth [1,518,518]` (max_abs 9.61e-05 CPU / 9.63e-05 CUDA / 1.08e-04 OpenCL); export sha256 `497acfff…`. Host-side depth agreement (nearest/farthest pixel, rank correlation), outside the ONNX gate. The gate exposed an OpenCL `Resize` defect (see Fixed). Scoreboard moved 20 → 21 and the missing-export count 9 → 8. No release was cut.
 
 ### Fixed
 
@@ -249,6 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   axes input is supplied (shape inference aligned with the CPU
   kernel), and the rank cap was removed from the `Identity` and
   `Squeeze` copy rows.
+- OpenCL `Resize` no-op-attribute admission, found by the Depth-Anything-V2-Small gate: the row rejected `antialias`/`exclude_outside` on mere presence while the loader admits absent-or-0 and CPU/CUDA enforce nothing, so the loader-admitted graph exited 1 at OpenCL dispatch. Architect-authorized fix confined to `src/opencl/resize.cpp` (presence→value check mirroring the loader: absent accept, non-int reject, int 0 accept, int nonzero incl. negative reject, mode-independent; no ABI or table change, OpenCL stays 68 rows) plus discriminating tests in `test/opencl_resize_test.cpp` and a loader positive in `test/loader_test.cpp` (red pre-fix, green post-fix; full OpenCL-resize suite 10/10). 14 Resize-model OpenCL legs re-ran byte-identical; only `nert_gate_opencl` relinked.
 
 ## [0.1.0] - Unreleased
 

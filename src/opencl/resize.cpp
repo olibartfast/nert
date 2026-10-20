@@ -7,9 +7,11 @@
 // (half_pixel, pytorch_half_pixel, align_corners, asymmetric) with nearest
 // rounding per nearest_mode (round_prefer_floor, round_prefer_ceil, floor,
 // ceil) or per-axis linear blending between the two neighbours. Antialiasing
-// and cubic mode are rejected at load; exclude_outside and antialias are
-// named and rejected if they reach this row. Data is float32, or int64 for
-// nearest.
+// and cubic mode are rejected at load; this row independently re-checks the
+// ONNX no-op defaults: an absent antialias/exclude_outside or an int 0 is
+// accepted, while a non-int value or any non-zero int (including negative)
+// rejects with the node, op and attribute named. Data is float32, or int64
+// for nearest.
 //
 // The roi, scales, and sizes inputs live in device memory on this seam: the
 // scales and sizes values are read back with a blocking clEnqueueReadBuffer
@@ -254,9 +256,28 @@ void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::
     }
     const TensorView& in = inputs[0];
     const TensorView& out = outputs[0];
-    for (const Attribute& attr : node.attributes) {
-        if (attr.name == "antialias" || attr.name == "exclude_outside") {
-            throw InferenceException(context + ": attribute '" + attr.name + "' is not supported here");
+    // The loader admits these names only as int 0 (its need_int + != 0
+    // policy); re-check the same contract here so a direct call is
+    // independently safe. Absent and int 0 are ONNX's no-op defaults and must
+    // not change the result; a non-int value or any non-zero int (including
+    // negative) rejects. This is independent of `mode`.
+    for (const char* name : {"antialias", "exclude_outside"}) {
+        const Attribute* attr = nullptr;
+        for (const Attribute& candidate : node.attributes) {
+            if (candidate.name == name) {
+                attr = &candidate;
+                break;
+            }
+        }
+        if (attr == nullptr) {
+            continue;
+        }
+        const int64_t* value = std::get_if<int64_t>(&attr->value);
+        if (value == nullptr) {
+            throw InferenceException(context + ": attribute '" + name + "' is not an int here");
+        }
+        if (*value != 0) {
+            throw InferenceException(context + ": attribute '" + name + "' must be 0 here");
         }
     }
     const std::string mode = StringAttribute(node, "mode", "nearest");
