@@ -15,7 +15,7 @@ inventory and ledger; `${HOME}` = the user home.
 
 - Repo: `$NERT_REPO`, branch `main`. The working tree is **clean** at this
   handoff and in sync with `origin/main`. This boundary's commits:
-  `545855a` (the tranche-1 gates and the published record), `7227c64` (the
+  `6f21f50` (the tranche-1 gates and the published record), `ddba59f` (the
   ledger's commit-table row), and the commit carrying this handoff.
 - **Scoreboard: PASS 19 / Open 1 / Missing export 10 / Out of scope 2**
   (19 + 1 + 10 = 30 in-scope entries of 32). The one open entry is Grounding

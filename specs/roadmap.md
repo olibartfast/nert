@@ -1,7 +1,7 @@
 # NERT Roadmap
 
 > Status: living roadmap. Created on 2026-10-10 when NERT moved out of
-> Neuriplo (`olibartfast/nert@81b6b1f`). Detailed history remains in the
+> Neuriplo (`olibartfast/nert@f9981db`). Detailed history remains in the
 > Neuriplo packets `2026-09-17-native-engine-cpu-spine`,
 > `2026-10-01-yolo26-native`, and `2026-10-10-native-tasks-op-coverage`.
 

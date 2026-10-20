@@ -6,17 +6,17 @@ rows its export actually uses.
 
 ## Pre-closed (do not re-open)
 
-- **P0 zero-extent Concat** on CPU/CUDA/OpenCL: closed in `329c2e7`
+- **P0 zero-extent Concat** on CPU/CUDA/OpenCL: closed in `2a3fd5e`
   with `[2,0,4] + [2,3,4]` regression tests on all three families.
 - **bool Concat** (OpenCL): same commit.
 - **GlobalAveragePool fp64**: explicit `CL_DEVICE_DOUBLE_FP_CONFIG`
   gate with a named error (the directive's fp64-only option), same
   commit.
-- **Conv / Flatten / Gemm** on OpenCL: `3be01a6`, `9bfab64`. ResNet-18
+- **Conv / Flatten / Gemm** on OpenCL: `f0a0252`, `3b15816`. ResNet-18
   is op-complete on OpenCL (OPS, gate pending).
-- **opset-18 conversions**: `7434da0`. 13 new loadable exports; CPU and
+- **opset-18 conversions**: `2b370c3`. 13 new loadable exports; CPU and
   CUDA op-complete. Grounding DINO loads at 19,224 folded nodes.
-- **RF-DETR CUDA full-model gate**: PASS (`f678940`), boxes 9.938e-04,
+- **RF-DETR CUDA full-model gate**: PASS (`4881b4a`), boxes 9.938e-04,
   labels 3.080e-04, top-1 100%, mask IoU 0.999528.
 
 ## In scope

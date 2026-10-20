@@ -23,4 +23,4 @@ Defined before implementation. Evidence after execution.
 | V-1 | `grep -rn 'namespace engine\|engine::\|include/engine/' src include test bench tools CMakeLists.txt test/CMakeLists.txt scripts/format.sh` | empty (code) | 2026-10-16 | prose/history in specs/ + CHANGELOG exempt. |
 | V-2 | `find src include test \( -name '*.cpp' -o -name '*.hpp' \) \| grep -E '[A-Z]'` | empty | 2026-10-16 | all `snake_case` (`mat_mul.cpp`, `gather_elements.cpp`, `top_k.cpp`, `is_nan.cpp`, `scatter_nd.cpp`, …). |
 | V-3 | non-fixture ctest 8/8 (`nert_*`) + `scripts/format.sh --check` | pass | 2026-10-16 | fixture suites unrun (no fixture on box); EXCLUDE paths remapped. |
-| V-4 | `git diff -w --stat` scope review | identifiers/paths only | 2026-10-16 | M1 pure moves (`5b9fe18`, 97 files, +0/-0); no kernel/loader/shape/executor semantic diffs. |
+| V-4 | `git diff -w --stat` scope review | identifiers/paths only | 2026-10-16 | M1 pure moves (`70a388d`, 97 files, +0/-0); no kernel/loader/shape/executor semantic diffs. |

@@ -72,7 +72,7 @@ definition and the cell disagree; the packet was forbidden to change
 | Phase | Rows | Outcome |
 | --- | ---: | --- |
 | P0 OpenCL rows and primary gates | 1–23 | Table 37 → 55 → 68; YOLO26n, RF-DETR seg-small, RAFT-large pass OpenCL; int64 `Clip` added |
-| Review and FIX-1 | 24–30 | Reviewer rejected the 13-row slice; ScatterND/Or/ReduceMean/Identity/Squeeze defects fixed; `346cb29` |
+| Review and FIX-1 | 24–30 | Reviewer rejected the 13-row slice; ScatterND/Or/ReduceMean/Identity/Squeeze defects fixed; `16e8260` |
 | Grounding DINO family | 31–45 | Vision-encoder bisect; OpenCL allocation diagnosis; GD-2c arena-view experiment; reviewer found the seg-nano/OWLv2 regressions |
 | GD-2c revert and RTV4 remedy | 46–53 | Arena-view path reverted; eight drifted legs restored; OWLv2 PASS restored; RTV4 CUDA remedy accepted; tree back to HEAD + ledger |
 
@@ -87,12 +87,12 @@ on the maintainer host.
 
 | Commit | Content |
 | --- | --- |
-| `6d99da9` | 18 OpenCL rows (37 → 55); YOLO26n / RF-DETR seg-small / RAFT-large OpenCL gates; int64 Clip CPU/CUDA |
-| `b905792` | 13 more OpenCL rows (55 → 68); coverage, ledger and changelog |
-| `346cb29` | FIX-1: ScatterND ordering, Or arity, ReduceMean noop, Identity/Squeeze rank cap; catalog gate evidence; HIP unsupported |
-| `14cbde8` | CUDA asymmetric-pad `Conv` support (explicit zero pre-pad in both CUDA Conv rows) + its device tests; RT-DETRv4-s's full-model CUDA gate |
-| `8a00aab` | The closing gates: Grounding DINO (CPU/CUDA task-equivalence, OpenCL backend gap), RF-DETR seg-nano-576 (SN-DEV deviation), RT-DETRv4-s CUDA; matrix, changelog, README, census and ledger |
-| `545855a` | Tranche-1 export-first batch: four catalog entries gated at opset 18 (YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50); the OWL-ViT exporter-only re-export and its bit-identity proof; matrix, census, README, changelog and ledger |
+| `53ba5fb` | 18 OpenCL rows (37 → 55); YOLO26n / RF-DETR seg-small / RAFT-large OpenCL gates; int64 Clip CPU/CUDA |
+| `6924949` | 13 more OpenCL rows (55 → 68); coverage, ledger and changelog |
+| `16e8260` | FIX-1: ScatterND ordering, Or arity, ReduceMean noop, Identity/Squeeze rank cap; catalog gate evidence; HIP unsupported |
+| `a4df628` | CUDA asymmetric-pad `Conv` support (explicit zero pre-pad in both CUDA Conv rows) + its device tests; RT-DETRv4-s's full-model CUDA gate |
+| `db2f937` | The closing gates: Grounding DINO (CPU/CUDA task-equivalence, OpenCL backend gap), RF-DETR seg-nano-576 (SN-DEV deviation), RT-DETRv4-s CUDA; matrix, changelog, README, census and ledger |
+| `6f21f50` | Tranche-1 export-first batch: four catalog entries gated at opset 18 (YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50); the OWL-ViT exporter-only re-export and its bit-identity proof; matrix, census, README, changelog and ledger |
 
 ## Sessions and resets
 
@@ -264,7 +264,7 @@ fresh session needs, not a transcript.
   change needs a **driver-level trace** of the primitive it depends on, not a
   modelled footprint; and a gate's acceptance must assert each leg's **exit
   status**, not only output identity.
-- **The maintainer edited the specs and committed mid-session.** `f2f12c9`
+- **The maintainer edited the specs and committed mid-session.** `bce116e`
   ("docs(readme): update release and device coverage status") landed at 21:09;
   the slimming of `coverage.md`, `inventory.md` and this ledger is still
   uncommitted in the working tree, and `README.md` was edited again after it.
@@ -296,7 +296,7 @@ fresh session needs, not a transcript.
   RT-DETRv4 gate follows). Its acceptance asserts the leg's **exit status and
   node count (996)**, not only the compared values.
 
-- **SN-DEV ruling (2026-10-19, architect): GRANTED WITH CONDITION.** RF-DETR seg-nano-576 is recorded `PASS | PASS (SN deviation) | PASS (SN deviation)`. Basis: SN-1/SN-2 at `f2f12c9` — one rank-99 TopK near-tie (ORT 182, both GPUs 1503; ORT gap 1.43051e-06 vs max ORT−device deviation 4.81606e-05 CUDA / 1.24216e-04 OpenCL; CPU is not quieter at 9.39369e-05 and keeps 182 only because its own margin is +2.38419e-06, 1.67× the reference's). NERT's selection rule already reproduces ORT's indices on ORT scores and the GPU's on GPU scores, so **no engine change is required or authorised**; a TopK tie-break change is not permitted under this deviation. The ORT-neutral pin (single `TopK`→2×`Constant` substitution, sha256 `db20d63b…`, max_abs 0 on `dets`/`labels`/`masks`) gives dets 0/400, labels 0/9,100, top-1 100/100 on all three, masks 2/36/17 of 2,073,600, IoU min 0.999800 at `raw>=0`. Condition: the coverage row must carry the pinned basis, the unpinned query-99 flip and over-tolerance counts, and the CUDA `IoU@raw>=0.5` min **0.984375** (query 36, 63/64); a bare PASS or any implication of unpinned output equality voids the grant. Revisit on any change to the export (`300900e3…`), the reference (ORT 1.27.0 CPU), the tolerance/bar, or the TopK selection/tie-break. Scoreboard after integration: **PASS 15 / Open 1 (Grounding DINO) / Missing export 14 / Out of scope 2**, provided the already-measured RT-DETRv4-s CUDA cell and the asymmetric-pad remedy it rests on are committed in the same integration; a seg-nano-only integration is 14 / 2 / 14 / 2. This closes Open Work #3.
+- **SN-DEV ruling (2026-10-19, architect): GRANTED WITH CONDITION.** RF-DETR seg-nano-576 is recorded `PASS | PASS (SN deviation) | PASS (SN deviation)`. Basis: SN-1/SN-2 at `bce116e` — one rank-99 TopK near-tie (ORT 182, both GPUs 1503; ORT gap 1.43051e-06 vs max ORT−device deviation 4.81606e-05 CUDA / 1.24216e-04 OpenCL; CPU is not quieter at 9.39369e-05 and keeps 182 only because its own margin is +2.38419e-06, 1.67× the reference's). NERT's selection rule already reproduces ORT's indices on ORT scores and the GPU's on GPU scores, so **no engine change is required or authorised**; a TopK tie-break change is not permitted under this deviation. The ORT-neutral pin (single `TopK`→2×`Constant` substitution, sha256 `db20d63b…`, max_abs 0 on `dets`/`labels`/`masks`) gives dets 0/400, labels 0/9,100, top-1 100/100 on all three, masks 2/36/17 of 2,073,600, IoU min 0.999800 at `raw>=0`. Condition: the coverage row must carry the pinned basis, the unpinned query-99 flip and over-tolerance counts, and the CUDA `IoU@raw>=0.5` min **0.984375** (query 36, 63/64); a bare PASS or any implication of unpinned output equality voids the grant. Revisit on any change to the export (`300900e3…`), the reference (ORT 1.27.0 CPU), the tolerance/bar, or the TopK selection/tie-break. Scoreboard after integration: **PASS 15 / Open 1 (Grounding DINO) / Missing export 14 / Out of scope 2**, provided the already-measured RT-DETRv4-s CUDA cell and the asymmetric-pad remedy it rests on are committed in the same integration; a seg-nano-only integration is 14 / 2 / 14 / 2. This closes Open Work #3.
 
 ### The SN-DEV ruling, in the maintainer's compact terms
 
@@ -953,13 +953,13 @@ and runs the whole binary (14 tests).
 ### Reconciliation with `origin/main` (2026-10-20)
 
 The push of this boundary's first commit was **rejected**: the maintainer had
-pushed `604ee3e` ("docs: remove local home paths from specs") at 00:18 from a
+pushed `fc029ad` ("docs: remove local home paths from specs") at 00:18 from a
 **stale** copy of `inventory.md` — the 354-line pre-slim census — while the
 slimmed 105-line census (21:19, carrying the `$HERMES_CACHE` pointer to the
 pre-slim archive) had only ever been in their working tree. Reconciled by
 rebasing onto `origin/main` and resolving `inventory.md` in favour of the
 **slimmed** form: it is the maintainer's working-tree state, it already contains
-**no** local home paths (so it satisfies the intent of `604ee3e`), it carries
+**no** local home paths (so it satisfies the intent of `fc029ad`), it carries
 the archive pointer, and it holds the corrected 15/1/14/2 scoreboard. The
 ledger and this boundary's handoff were also stripped of their last local home
 paths, and the handoff's legend now defines `$HERMES_CACHE` alongside
@@ -997,7 +997,7 @@ without hunting for a key.
 
 ## Boundary 3 — the export-first provisioning batch (session `ses_ea9a8c0e2ffesxGThz1IUdG8Qf`)
 
-Opened 2026-10-20 from `8215a43` (boundary-2 handoff), branch `main`, tree
+Opened 2026-10-20 from `e192a9f` (boundary-2 handoff), branch `main`, tree
 clean and in sync with `origin/main`. **The session id was already recorded
 in `## Sessions and resets`.**
 

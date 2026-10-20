@@ -9,7 +9,7 @@ root (`tritonic/`); `$HERMES_CACHE` = pre-slim archive root; `${HOME}` = home.
 
 ## Where the program stands
 
-- Repo: `$NERT_REPO`, branch `main`, commit `0a54c26`, pushed to `origin/main`,
+- Repo: `$NERT_REPO`, branch `main`, commit `9332908`, pushed to `origin/main`,
   tree clean. **Scoreboard: PASS 22 / Open 1 / Missing export 7 / Out of scope
   2** (22 + 1 + 7 = 30 in-scope of 32). Open entry: Grounding DINO (OpenCL
   backend GAP; GAP-vs-fix decision with maintainer — do not implement).

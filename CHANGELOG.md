@@ -244,7 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Grounding DINO's reference gate at `/model/model/Clip`; the gate
   re-run has since passed on CPU and CUDA under the task-equivalence bar, with
   the OpenCL leg a backend gap).
-- Review-driven OpenCL corrections landed after `b905792`: `ScatterND`
+- Review-driven OpenCL corrections landed after `6924949`: `ScatterND`
   now applies duplicate update slices in order (last duplicate wins,
   matching the CPU oracle), `Or` enforces the oracle's two-input
   arity, `ReduceMean`'s `noop_with_empty_axes` now applies only when an

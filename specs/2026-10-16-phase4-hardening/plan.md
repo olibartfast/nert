@@ -14,6 +14,6 @@ Single phase (docs only), then close-out.
 
 ## P2 — Close-out
 
-- CHANGELOG already carries Tier-5 (see `ff3eba1`); verify entry renders.
+- CHANGELOG already carries Tier-5 (see `858f33a`); verify entry renders.
 - `scripts/format.sh --check` clean (docs edits must not touch sources);
   `git status`/`diff --stat` scope review.

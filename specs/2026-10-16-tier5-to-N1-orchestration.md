@@ -1,6 +1,6 @@
 # Orchestration — Tier-5 → Phase 4 → Phase 5 (incl. filenames) → N1
 
-Date: 2026-10-16. Base: `main@649a300` (bench gemm+matmul merged, Tier-4 RAFT done).
+Date: 2026-10-16. Base: `main@bf8aa68` (bench gemm+matmul merged, Tier-4 RAFT done).
 Constitution: `specs/mission.md`, `specs/tech-stack.md`, `specs/roadmap.md`.
 Base packet for Phase B: `specs/2026-10-10-raft-open-vocab/` (R-2/R-4, T-4/T-5, V-1/V-4/V-5 open).
 
@@ -51,9 +51,9 @@ After each slice: `rm -rf build build-* /tmp/opencode/*scratch*` in worktree + m
 | Attempt | Packet slice | Worktree/branch | Acceptance (first pass) | Integration gate | Notes |
 |---|---|---|---|---|---|
 | 1 | B1 6-op (Elu/LE/GE/Or/Max/Min) | `../nert-w-b1` / `wip/nert-b1` | not run (recon budget, 0 writes) | — | fail: slice too wide; split to B1a/B1b |
-| 2 | B1a Elu/Max/Min | `../nert-w-b1` / `wip/nert-b1` | 8/8 non-fixture pass; 4 fixture suites fail missing-fixture by design; format clean | merged 249681b | done 2026-10-16: planner-implemented after 2 worker recon stalls; scope 9 files, +577/-3 |
-| 3 | B1b LessOrEqual/GreaterOrEqual/Or | `../nert-w-b1b` / `wip/nert-b1b` | 8/8 non-fixture pass; format clean | merged a9b232d | done 2026-10-16: direct, +553/-6 |
-| 4 | B2a ReduceL2 | `../nert-w-b2` / `wip/nert-b2` | 8/8 non-fixture pass; format clean | merged f4b5cf2 | done 2026-10-16: direct, incl. double-accum proof |
+| 2 | B1a Elu/Max/Min | `../nert-w-b1` / `wip/nert-b1` | 8/8 non-fixture pass; 4 fixture suites fail missing-fixture by design; format clean | merged 627a741 | done 2026-10-16: planner-implemented after 2 worker recon stalls; scope 9 files, +577/-3 |
+| 3 | B1b LessOrEqual/GreaterOrEqual/Or | `../nert-w-b1b` / `wip/nert-b1b` | 8/8 non-fixture pass; format clean | merged 24e5fd2 | done 2026-10-16: direct, +553/-6 |
+| 4 | B2a ReduceL2 | `../nert-w-b2` / `wip/nert-b2` | 8/8 non-fixture pass; format clean | merged 6d1fb3a | done 2026-10-16: direct, incl. double-accum proof |
 | 5 | B2b ArgMax/CumSum/EyeLike | `../nert-w-b2b` / `wip/nert-b2b` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: direct, 2 commits |
 | 6 | B3 ScatterND | `../nert-w-b3` / `wip/nert-b3` | 8/8 non-fixture pass; format clean | merged | done 2026-10-16: Tier-5 11/11 kernels landed; OWLv2/DINO parity = integration gate (Neuriplo) |
 | — | B3 ScatterND+e2e | `../nert-w-b3` / `wip/nert-b3` | — | — | queued |

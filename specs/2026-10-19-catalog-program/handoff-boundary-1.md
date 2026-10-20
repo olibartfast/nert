@@ -6,8 +6,8 @@ the coverage matrix; nothing else is needed to continue.
 
 ## Where the program stands
 
-- Repo: `$NERT_REPO`, branch `main`, pushed commits `6d99da9`,
-  `b905792` (maintainer-committed), `346cb29`. Working tree clean.
+- Repo: `$NERT_REPO`, branch `main`, pushed commits `53ba5fb`,
+  `6924949` (maintainer-committed), `16e8260`. Working tree clean.
 - OpenCL operator table: **68 rows** (was 37). CPU 72, CUDA 72 unchanged.
 - In-scope catalog target: **30 ONNX entries** of 32 (image understanding and
   Gaussian Splatting are maintainer-approved OUT OF SCOPE with rationale).

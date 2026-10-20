@@ -2,7 +2,7 @@
 
 Spec: `specs/2026-10-10-raft-open-vocab/requirements.md` · Roadmap: Phase 3
 (Next) · Provenance: neuriplo `specs/2026-10-10-native-tasks-op-coverage/`
-tiers 4–5 (tiers 1–3 landed in `olibartfast/nert@81b6b1f`).
+tiers 4–5 (tiers 1–3 landed in `olibartfast/nert@f9981db`).
 
 ## Goal
 

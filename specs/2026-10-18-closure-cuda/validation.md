@@ -74,7 +74,7 @@ were verified with 24 of 24 tests passing.
 - The implementer dispatch was unavailable in the harness, so the planner
   implemented the work directly.
 - **Cross-session repair 1.** `src/cuda/table.cu` had carried a broken guard
-  since commit `4b4a962`: the declaration for the first-party `Einsum` row sat
+  since commit `295b3c3`: the declaration for the first-party `Einsum` row sat
   inside `#ifdef NERT_HAS_CUDNN`, while its table entry and unconditional
   compilation sat outside. This broke every non-cuDNN CUDA build. The
   declaration was moved out. First-party rows must never sit inside toolkit

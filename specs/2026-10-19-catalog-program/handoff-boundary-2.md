@@ -15,8 +15,8 @@ inventory and ledger; `${HOME}` = the user home.
 
 - Repo: `$NERT_REPO`, branch `main`. The Grounding DINO, RT-DETRv4-s and
   RF-DETR seg-nano-576 families are gated, reviewed and recorded. This boundary's
-  commits: `14cbde8` (CUDA asymmetric-pad `Conv` support and its device
-  tests), `8a00aab` (the recorded closing gates — the matrix, changelog, README,
+  commits: `a4df628` (CUDA asymmetric-pad `Conv` support and its device
+  tests), `db2f937` (the recorded closing gates — the matrix, changelog, README,
   census and ledger), and the commit carrying this handoff. The working tree is
   **clean** at this handoff.
 - **Scoreboard: PASS 15 / Open 1 / Missing export 14 / Out of scope 2**

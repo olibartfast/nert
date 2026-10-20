@@ -19,7 +19,7 @@ seg-small and RAFT had complete CUDA op coverage but no full-model gate.
 
 - **RF-DETR exposed two blockers.** (1) `Concat` rejected zero-extent
   operands; the transformer concatenates a zero-length slice. Fixed in
-  `329c2e7` across CPU/CUDA/OpenCL with regression tests. (2)
+  `2a3fd5e` across CPU/CUDA/OpenCL with regression tests. (2)
   `CUBLAS_DEFAULT_MATH`/`CUDNN_DEFAULT_MATH` still permit TF32 on
   Ampere+, contrary to the code comments; TF32 noise flipped 12
   near-tie TopK selections, which changed decoder slot assignment and
