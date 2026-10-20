@@ -101,6 +101,7 @@ on the maintainer host.
 | Rows 1–26 | `ses_eaca1c986ffeFJdfdPOFfK3mDh` |
 | Rows 31+ (boundary 1) | `ses_eab2639b3ffeP9kkTjzb3bVpvB` |
 | Export-first batch (boundary 3) | `ses_ea9a8c0e2ffesxGThz1IUdG8Qf` |
+| Catalog program, boundary 5 (DA2-Small) | `ses_ea71d3e43ffe9xmq0IktztCASr` |
 
 Boundary handoff: [handoff-boundary-1.md](handoff-boundary-1.md). The fresh
 session reads only the handoff, this ledger, the inventory and the coverage
