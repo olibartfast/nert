@@ -33,9 +33,9 @@ unsupported for 0.2.0: nine rows, and the reference host has no ROCm
 toolchain or AMD device.
 
 Full-model gates, not op-table presence, define coverage. As of 2026-10-20,
-21 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; one
+22 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; one
 entry remains open (Grounding DINO: CPU/CUDA task-equivalence pass, OpenCL
-backend gap), and 8 entries need an ONNX export.
+backend gap), and 7 entries need an ONNX export.
 Image understanding (GGUF/llama.cpp) and Gaussian
 Splatting (LGM/GRM) are out of scope for this ONNX runtime. The catalog
 is incomplete and 0.2.0 is not release-ready; see the

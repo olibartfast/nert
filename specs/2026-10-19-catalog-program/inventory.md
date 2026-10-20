@@ -9,9 +9,9 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS on CPU/CUDA/OpenCL | 21 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small |
+| PASS on CPU/CUDA/OpenCL | 22 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small |
 | Open | 1 | Grounding DINO (OpenCL backend gap) |
-| Missing ONNX export | 8 | See export plan below |
+| Missing ONNX export | 7 | See export plan below |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
 | **Total** | **32** | |
 
@@ -19,13 +19,14 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 sub-0.001 confidence tail; confident detections are identical. RF-DETR
 seg-nano-576 carries the documented rank-99 TopK near-tie deviation (`SN-DEV`).
 
-21 + 1 + 8 = 30 in-scope entries. The PASS count assumes one gated
+22 + 1 + 7 = 30 in-scope entries. The PASS count assumes one gated
 representative per entry closes it (YOLOv8n for entry 17, YOLO11m-seg for
-entry 18, OWL-ViT for entry 25, ResNet-50 for entry 30); other sizes are not
-gated and do not move the scoreboard — an open maintainer decision.
+entry 18, OWL-ViT for entry 25, ResNet-50 for entry 30, RAFT-small for entry
+31); other sizes are not gated and do not move the scoreboard — an open
+maintainer decision.
 
-Of the eight missing-export entries, one (RAFT-small) now has an opset-18
-artifact awaiting probe and gate.
+Entry 31 is closed by the gated RAFT-small representative; the remaining
+seven missing-export groups have no provisioned artifact.
 
 ## Entry status
 
@@ -61,7 +62,7 @@ artifact awaiting probe and gate.
 | 28 | LGM/LGM-mini/GRM | Out of scope | Gaussian rendering/rasterisation outside ONNX; no viable ONNX gate. |
 | 29 | VideoMAE/ViViT/TimeSformer | Missing export | Exporters exist; HF downloads. |
 | 30 | Classification ViT/TF/other torchvision | PASS | Closed by the gated representative ResNet-50 (opset 18, converted from an opset-20 raw export; 122 nodes on disk / 122 dispatched; CPU/CUDA/OpenCL gate, 0 over tolerance). Other families and sizes are not gated. |
-| 31 | RAFT-small | Missing export | Export PROVISIONED 2026-10-20 (opset 18 by conversion from an opset-16 export; 1,630 nodes on disk) but not yet probed or gated; the entry closes only on a full CPU/CUDA/OpenCL gate. |
+| 31 | RAFT-small | PASS | Gate 2026-10-20; opset 18 converted from an opset-16 raw export (conversion does not prove equivalence; the full-model gate is the evidence); 1,630 nodes on disk / 1,115 dispatched on every device; export sha256 `8be6b770acab2da0093891eb568397b98bb82bb4c54d91298e2a8842f2d7f950`; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on all three (max_abs 6.10352e-05 CPU / 6.10352e-05 CUDA / 6.19888e-05 OpenCL, 393,216 elements); reviewer PASS-WITH-FINDINGS (non-blocking). |
 | 32 | Image understanding (Gemma 4/Llama) | Out of scope | GGUF + llama.cpp; no ONNX runtime contract. |
 
 ## Export plan
@@ -77,7 +78,7 @@ artifact awaiting probe and gate.
 | Depth-Anything-V2 | Download | HF `depth-anything/Depth-Anything-V2-*` |
 | VideoMAE / ViViT / TimeSformer | Download | HF checkpoints; 5D input fixtures |
 | Classification non-ResNet | Entry 30 closed by the gated ResNet-50 representative at opset 18 (converted from opset 20); ViT/timm/TensorFlow families not gated | Torchvision/timm or TensorFlow weights |
-| RAFT-small | Download + conversion | Torchvision weights; 16→18 conversion |
+| RAFT-small | Entry 31 closed by the gated RAFT-small representative at opset 18 (converted from the opset-16 raw export) | Torchvision weights; 16→18 conversion |
 
 Every new export needs an explicit opset-18 result and a load/probe before
 kernel work. Exporter defaults are older: YOLO 12, RF-DETR/OWLv2/Grounding

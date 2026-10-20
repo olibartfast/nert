@@ -27,17 +27,17 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 | CPU / CUDA kernel tables | 72 / 72 rows |
 | OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
 | HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 21 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
+| Recorded full-model PASS | 22 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation) |
 | Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap) |
-| Missing ONNX export | 8 entries |
+| Missing ONNX export | 7 entries |
 | Out of scope | 2 entries |
 | Release | **not ready**; 0.2.0 is unreleased |
 
-The 21 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
+The 22 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
 seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
 nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
 RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT,
-ResNet-50, ViTPose-base-simple and Depth-Anything-V2-Small** (the
+ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small and RAFT-small** (the
 export-first batches, recorded below). The one open entry is:
 
 - **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
@@ -121,11 +121,11 @@ session create + run path.
    topology owner.
 4. ~~Provision the 14 missing ONNX exports export-first, then probe, gate and
    review each model.~~ **Tranche 1 closed 4 of them** — YOLOv8n (entry 17),
-   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Nine remain:**
+   YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30). **Seven remain:**
    EdgeCrafter detection / segmentation / pose, RF-DETR detection /
    segmentation / keypoint at other sizes,
-   Depth-Anything-V2, VideoMAE/ViViT/TimeSformer, RAFT-small (ViTPose-base-simple
-   closed at boundary 4). No release
+   VideoMAE/ViViT/TimeSformer (Depth-Anything-V2-Small closed at boundary 5,
+   RAFT-small at boundary 6). No release
    until the in-scope scoreboard is clean.
 
 ### State of the in-flight packets (2026-10-19, boundary 1 session)
@@ -1259,3 +1259,31 @@ reviewer **PASS-WITH-FINDINGS**; F1–F3 (evidence-diff scope, stale
 task-analysis OpenCL block, "prebuilt, unmodified" header) carried as
 non-blocking evidence-cleanup residuals. Tables unchanged at CPU 72 / CUDA 72 /
 OpenCL 68 / HIP 9; no release was cut.
+
+## Boundary 6 — RAFT-small (entry 31)
+
+**Probe GO.** Opset 18 converted from the opset-16 raw export (conversion does
+not prove equivalence; the gate is the evidence). 1,630 nodes on disk / **1,115**
+dispatched on every leg (515 `Constant` folded); missing-row diff empty on all
+three devices. Export sha256 `8be6b770acab2da0093891eb568397b98bb82bb4c54d91298e2a8842f2d7f950`;
+`input1`/`input2` [1,3,384,512] float32 → `flow_prediction` [1,2,384,512]
+(393,216 elements).
+
+**Gate.** Fixtures `frame1.bin` sha256
+`95c3b7f01a346c8306b7c96437b3e8d02deebc1497003e116c83fd1bf80a1e38`,
+`frame2.bin` sha256
+`870533ce8bfac4508b9d2cc2fc35335a7abd798ed4c79c9bc4da29382debf548`; ORT 1.27.0
+CPUExecutionProvider reference sha256
+`a622b211ac522e5a040df357065c227e1dae0f768a04937e1f18f96547aaf3e5`.
+`--tol 1e-3` scaled: over_tol **0** on all three legs; max_abs / mean /
+max_ratio CPU 6.10352e-05 / 4.84344e-06 / 0.01218946, CUDA 6.10352e-05 /
+4.85096e-06 / 0.01224228, OpenCL 6.19888e-05 / 1.08869e-05 / 0.01226346. All
+legs exit 0.
+
+**Reviewer: PASS-WITH-FINDINGS** — non-blocking: docs-scoped subject carrying
+the prior engine fix (hygiene hazard), missing ORT stdout log, float32-vs-float64
+mean cosmetic.
+
+**Scoreboard: 21 / 1 / 8 / 2 → 22 / 1 / 7 / 2** (22 + 1 + 7 = 30 in scope).
+Tables unchanged at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9; no engine change.
+Commit: this integration commit.
