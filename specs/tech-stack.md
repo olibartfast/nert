@@ -108,7 +108,11 @@ These decisions were made on 2026-10-16 during the Phase 4 hardening pass.
 - **`Q-1` — Opset policy.** Require opset-18 exports and document the
   conversion step. The loader accepts opset 18 only; `README.md` shows the
   `onnx.version_converter` command. Native opset 12–17 loading is not
-  supported.
+  supported today. **Revision in progress:** the linked packets
+  `specs/2026-10-21-opset-range/` (native 13–18, then 11–12) and
+  `specs/2026-10-21-opset-newer-than-18/` (verified declarations above 18)
+  replace this rule when their validation lands; until then exact 18 remains
+  in force.
 - **`Q-3` — RAFT symbolic spatial dimensions.** Resolve them statically per
   load from the supplied input shapes, with no plan cache. Tier-4 RAFT parity
   (`max_scaled_diff=6.10e-05` on 2026-10-10) confirmed the choice.

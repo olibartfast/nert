@@ -147,6 +147,25 @@ versus device comparisons with timings, starting with `gemm` on CUDA and
 OpenCL C/C++. It is measurement tooling only; the runtime remains
 standard-library-only.
 
+## Opset Range and Versioned Loading (Planned)
+
+Two linked packets replace the exact-opset-18 gate with a verified policy.
+The exact-18 rule stays in force until the first phase lands.
+
+- **≤18 path** — `specs/2026-10-21-opset-range/`. Phase A accepts declared
+  opsets 13–18 by canonicalizing old node forms to the opset-18 IR (the only
+  13→18 rewrite is the `axes` attribute-to-input move on `ReduceMean`,
+  `ReduceL2`, and `ReduceMax`); Phase B extends the floor to 11–12. Opset 10
+  and below stay deferred with the conversion note.
+- **>18 path** — `specs/2026-10-21-opset-newer-than-18/`. Adopts OpenCV 5's
+  “declared opset is data” acceptance model, but replaces its silent
+  fallbacks with a generated per-operator compatibility table and explicit
+  guards (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`). It depends on the
+  ≤18 packet's opset plumbing.
+
+Status: planned. `specs/tech-stack.md` `Q-1` records the current exact-18
+rule and is revised when the ≤18 Phase A validation lands.
+
 ## Tooling — Memory Footprint Report (Planned)
 
 The planned model fit/sizing report adds `MemoryFootprint` to `Model` and an
