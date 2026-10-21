@@ -12,7 +12,7 @@
 | Library | C++17 static library `nert`, alias `nert::nert`, compatibility alias `neuriplo_engine` | Do not raise the language standard without an explicit decision. Public headers live under `include/nert/` in namespace `nert`. C++ filenames use lowercase `snake_case`. |
 | Build | CMake 3.16 or newer | A top-level build enables tests by default through `NERT_BUILD_TESTS`; a consumed build disables them unless requested. `BUILD_INFERENCE_ENGINE_TESTS` is still accepted for Neuriplo compatibility. |
 | Runtime dependencies | C++ standard library only | No new runtime dependency without explicit approval. GoogleTest is test-only; PyTorch and torchvision 0.27.0 are fixture tooling and are never linked into the runtime. |
-| ONNX input | Opsets 13–18, ONNX domain only; canonicalized to the opset-18 form; hand-written protobuf wire reader | The loader accepts declared opsets 13–18 and rewrites the known pre-18 forms before inference. Models below 13 are converted with `onnx.version_converter`, as recorded in decision `Q-1`. |
+| ONNX input | Opsets 11–18, ONNX domain only; canonicalized to the opset-18 form; hand-written protobuf wire reader | The loader accepts declared opsets 11–18 and rewrites the known old forms before inference. Models below 11 are converted with `onnx.version_converter`, as recorded in decision `Q-1`. |
 | Compute | Float32 compute; int64 and bool for shape data and graph inputs/outputs | Reductions accumulate in double and round once per output. DOUBLE constants and value-info narrow to float32; BOOL constants and initializers load as bool. |
 | Tests | GoogleTest with CTest; suites named `nert_*` | The standard fixture is an opset-18 ResNet-18 model provisioned by `tools/provision_resnet18.py` and selected with `NERT_FIXTURE`. |
 | Quality | clang-format via `scripts/format.sh --check` | Keep the checked-in script's scope. CI pins clang-format 18. |
@@ -105,15 +105,18 @@ that evidence, but NERT never gates on exports it cannot provision itself.
 
 These decisions were made on 2026-10-16 during the Phase 4 hardening pass.
 
-- **`Q-1` — Opset policy.** Load declared ONNX-domain opsets 13–18 and
-  canonicalize pre-18 node forms to the opset-18 IR at load. Phase A of
-  `specs/2026-10-21-opset-range/` covers the reduce `axes` attribute and
-  `ScatterND.reduction="none"`; opsets 11–12 (Phase B) remain planned.
-  Models below 13 are converted with `onnx.version_converter` as documented
-  in `README.md`. Declarations above 18 remain rejected until the
+- **`Q-1` — Opset policy.** Load declared ONNX-domain opsets 11–18 and
+  canonicalize the supported old node forms to the opset-18 IR at load. The
+  rules cover pre-18 reduce `axes` attributes, pre-13 `ReduceSum` /
+  `Squeeze` / `Unsqueeze` axes and `Split` split, legacy `Softmax` 2-D
+  coercion, and `ScatterND.reduction="none"`. Legacy `Softmax` requires the
+  input rank in the model's shape metadata; missing metadata is rejected
+  rather than guessed. Models below 11 are converted with
+  `onnx.version_converter` as
+  documented in `README.md`. Declarations above 18 remain rejected until the
   verified-compatibility work in
-  `specs/2026-10-21-opset-newer-than-18/` lands. Revised 2026-10-21 after
-  Phase A validation.
+  `specs/2026-10-21-opset-newer-than-18/` lands. Revised 2026-10-22 after
+  Phase B validation.
 - **`Q-3` — RAFT symbolic spatial dimensions.** Resolve them statically per
   load from the supplied input shapes, with no plan cache. Tier-4 RAFT parity
   (`max_scaled_diff=6.10e-05` on 2026-10-10) confirmed the choice.

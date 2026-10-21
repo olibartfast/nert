@@ -17,7 +17,7 @@ namespace nert {
 // Rewrites the node forms whose syntax changed between `declared_opset` and
 // opset 18. Rejects forms that are illegal for the declared version or that
 // would need semantics the kernels do not implement. `declared_opset` must be
-// in the range the loader accepts (13..18 in the current phase).
+// in the range the loader accepts (11..18).
 void NormalizeGraphForOpset(Graph& graph, int64_t declared_opset);
 
 } // namespace nert

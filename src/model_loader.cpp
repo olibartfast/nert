@@ -109,7 +109,7 @@ constexpr int64_t kElemType_OnnxDouble = 11;
 
 // Declared opsets the loader accepts. The graph is canonicalized to the
 // opset-18 form at load, so kernels and shape inference stay single-form.
-constexpr int64_t kMinSupportedOpsetVersion = 13;
+constexpr int64_t kMinSupportedOpsetVersion = 11;
 constexpr int64_t kMaxSupportedOpsetVersion = 18;
 constexpr const char* kOnnxDomain = "ai.onnx";
 
@@ -627,13 +627,15 @@ const std::unordered_map<std::string, AttrSlot>& reducemean_attrs()
     return k;
 }
 
-// ReduceSum has taken axes as an input since opset 13; only the pre-18
-// ReduceMean/ReduceL2 form uses the attribute.
+// ReduceSum took axes as an input at opset 13; the pre-13 form uses the
+// attribute. The normalizer rejects whichever form the declared version does
+// not allow.
 const std::unordered_map<std::string, AttrSlot>& reducesum_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
         { "noop_with_empty_axes", AttrSlot::Int },
+        { "axes", AttrSlot::IntList },
     };
     return k;
 }
@@ -754,10 +756,30 @@ const std::unordered_map<std::string, AttrSlot>& softmax_attrs()
     return k;
 }
 
+const std::unordered_map<std::string, AttrSlot>& squeeze_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        // Pre-13 form, consumed by the loader's opset normalizer.
+        { "axes", AttrSlot::IntList },
+    };
+    return k;
+}
+
+const std::unordered_map<std::string, AttrSlot>& unsqueeze_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        // Pre-13 form, consumed by the loader's opset normalizer.
+        { "axes", AttrSlot::IntList },
+    };
+    return k;
+}
+
 const std::unordered_map<std::string, AttrSlot>& split_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "axis", AttrSlot::Int },
+        // Pre-13 form, consumed by the loader's opset normalizer.
+        { "split", AttrSlot::IntList },
     };
     return k;
 }
@@ -932,7 +954,7 @@ allowed_attributes()
             { "Not", &kNoAttrs },
             { "Where", &kNoAttrs },
             { "Slice", &kNoAttrs },
-            { "Unsqueeze", &kNoAttrs },
+            { "Unsqueeze", &unsqueeze_attrs() },
             { "Expand", &kNoAttrs },
             { "Cast", &cast_attrs() },
             { "Concat", &concat_attrs() },
@@ -964,7 +986,7 @@ allowed_attributes()
             { "Sqrt", &kNoAttrs },
             { "Tanh", &kNoAttrs },
             { "IsNaN", &kNoAttrs },
-            { "Squeeze", &kNoAttrs },
+            { "Squeeze", &squeeze_attrs() },
             { "LayerNormalization", &layernorm_attrs() },
             { "InstanceNormalization", &instancenorm_attrs() },
             { "GridSample", &gridsample_attrs() },

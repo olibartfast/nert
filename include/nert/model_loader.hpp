@@ -15,7 +15,7 @@ namespace nert {
 
 // Parse the ONNX model at `path` into the Graph IR.
 //
-// Accepts declared ONNX-domain opsets 13..18 and canonicalizes the supported
+// Accepts declared ONNX-domain opsets 11..18 and canonicalizes the supported
 // pre-18 node forms to the opset-18 representation before returning.
 //
 // Throws ModelLoadException when the file cannot be read, the wire format is

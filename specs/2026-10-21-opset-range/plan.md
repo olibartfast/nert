@@ -73,13 +73,15 @@ check; the model gate is the integration checkpoint.
 - [T-14] Run the full existing suite: OFF, CUDA with cuDNN, OpenCL, HIP
   where available, plus `scripts/format.sh --check`.
 - [T-15] Update `README.md` “Opset policy”, `CHANGELOG.md`, and the roadmap
-  status. This is the point at which `Q-1` moves from exact-18 to 13–18.
+  status. `Q-1` moves from exact-18 to 13–18 after Phase A, then to 11–18
+  after Phase B.
 
 ## Group 4 — Phase B (11–12)
 
-- [T-16] Implement the `Softmax` rewrite from [R-5]: Flatten with the
-  default/axis value, Softmax on axis 1, Reshape back to the original shape.
-  The shape initializer uses the same injection helper as [T-9].
+- [T-16] Implement the `Softmax` rewrite from [R-5]: `Shape` for the
+  original dims, Flatten with the default/axis value, Softmax on axis 1,
+  Reshape back. `Shape` avoids needing a static shape constant for an
+  intermediate input; the input rank must be known from `value_info`.
 - [T-17] Implement the other Phase B rewrites: `ReduceSum` axes attribute,
   `Squeeze`/`Unsqueeze` axes attribute, `Split` split attribute. Extend the
   allowlist only for the consumed attributes.

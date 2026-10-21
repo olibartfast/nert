@@ -59,8 +59,10 @@ supported range.
   opset-18 `ReduceMean`).
 - [R-5] **Phase B rules (11–12).**
   - `Softmax` below 13: preserve the old semantics by expanding to
-    `Flatten(axis)` → `Softmax(axis=1)` → `Reshape(original shape)`, and use
-    the old default `axis = 1` when the attribute is absent.
+    `Shape` → `Flatten(axis)` → `Softmax(axis=1)` → `Reshape(original
+    shape)`, and use the old default `axis = 1` when the attribute is
+    absent. The input rank must be available from `value_info`; otherwise
+    the loader fails fast instead of guessing.
   - `ReduceSum` with an `axes` attribute: convert to an int64 input.
   - `Squeeze` / `Unsqueeze` with an `axes` attribute: convert to an int64
     input.
@@ -168,9 +170,9 @@ supported range.
 
 ## Definition of Done (requirements level)
 
-- [ ] Every [R-n] is implemented or explicitly deferred with a tracked
+- [x] Every [R-n] is implemented or explicitly deferred with a tracked
       location.
-- [ ] No in-scope behavior is silently dropped; no out-of-scope work is
+- [x] No in-scope behavior is silently dropped; no out-of-scope work is
       smuggled in.
-- [ ] The supported range is stated in code, tests, README, and the
+- [x] The supported range is stated in code, tests, README, and the
       constitution.

@@ -1,7 +1,7 @@
 # NERT (Neuriplo Engine Runtime)
 
 NERT is a first-party ONNX inference runtime: an interpreter for ONNX
-opsets 13–18, canonicalized to the opset-18 form at load. It computes in
+opsets 11–18, canonicalized to the opset-18 form at load. It computes in
 float32, with int64/bool shape data and I/O, and is standard-library-only by
 default (tests use GoogleTest; opt-in device layers add their own toolkit
 dependency, linked PRIVATE).
@@ -134,25 +134,35 @@ Check formatting with `scripts/format.sh --check` (or `--fix`).
 
 ## Opset policy
 
-NERT loads ONNX-domain opsets 13–18. The loader canonicalizes the pre-18
-node forms it supports — the `axes` attribute on `ReduceMean`, `ReduceL2`,
-and `ReduceMax`, and an explicit `ScatterND.reduction="none"` — to the
-opset-18 IR before shape inference. Models outside this range are rejected at
-load.
+NERT loads ONNX-domain opsets 11–18. The loader canonicalizes the older
+node forms it supports to the opset-18 IR before shape inference:
 
-Models below opset 13 must be converted first (opset 11–12 support is
-planned):
+- `ReduceMean`, `ReduceL2`, `ReduceMax`: pre-18 `axes` attribute → int64 input.
+- `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute → int64 input.
+- `Split`: pre-13 `split` attribute → int64 input.
+- `Softmax`: pre-13 2-D coercion semantics → `Shape` → `Flatten` →
+  `Softmax(axis=1)` → `Reshape`, with the old default axis of 1 preserved.
+- `ScatterND`: an explicit `reduction="none"` is accepted and dropped; other
+  reductions are rejected because the kernel implements only the overwrite
+  form.
+
+Models outside this range are rejected at load. Models below opset 11 must be
+converted first:
 
 ```python
 import onnx
 from onnx import version_converter
-model = onnx.load("model_op12.onnx")
+model = onnx.load("model_op10.onnx")
 model = version_converter.convert_version(model, 18)
 onnx.save(model, "model_op18.onnx")
 ```
 
-Declarations above opset 18 remain rejected until the verified-compatibility
-work in `specs/2026-10-21-opset-newer-than-18/` lands.
+Legacy `Softmax` (opset < 13) needs the input rank from the model's shape
+metadata (`value_info` for intermediates) so the loader can validate `axis`;
+a model that omits that information is rejected with a message asking for
+`value_info` or a conversion. Declarations above
+opset 18 remain rejected until the verified-compatibility work in
+`specs/2026-10-21-opset-newer-than-18/` lands.
 
 ## Install and use
 
