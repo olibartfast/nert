@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include "opset_compat.hpp" // private src-local newer-opset gate
 #include "opset_normalize.hpp" // private src-local canonicalizer
 #include "wire_reader.hpp" // private src-local reader
 
@@ -107,10 +108,9 @@ constexpr int64_t kElemType_OnnxInt64 = 7;
 constexpr int64_t kElemType_OnnxBool = 9;
 constexpr int64_t kElemType_OnnxDouble = 11;
 
-// Declared opsets the loader accepts. The graph is canonicalized to the
-// opset-18 form at load, so kernels and shape inference stay single-form.
+// Declared opsets below this floor are rejected. Above 18 there is no
+// numeric ceiling: each node is checked against the committed schema table.
 constexpr int64_t kMinSupportedOpsetVersion = 11;
-constexpr int64_t kMaxSupportedOpsetVersion = 18;
 constexpr const char* kOnnxDomain = "ai.onnx";
 
 const char* elem_type_name(int64_t dtype)
@@ -1441,7 +1441,7 @@ void validate_attr_policy(Node& node)
     // tensor-scalar decode already pinned it to INT64, FLOAT, or BOOL.
 }
 
-Node decode_node(const uint8_t* data, size_t size)
+Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
 {
     const NodeRaw raw = read_node_raw(data, size);
 
@@ -1475,6 +1475,11 @@ Node decode_node(const uint8_t* data, size_t size)
     node.inputs = raw.inputs;
     node.outputs = raw.outputs;
 
+    // Decode every attribute name/value first. The newer-opset gate must see
+    // attributes that the strict allowlist is about to reject (for example
+    // Cast.saturate), so it can name the effective schema and capability.
+    std::vector<AttrPatch> patches;
+    patches.reserve(raw.attr_bytes.size());
     for (const std::string& bytes : raw.attr_bytes) {
         AttrPatch a = decode_attr(bytes);
         if (a.name.empty()) {
@@ -1488,6 +1493,26 @@ Node decode_node(const uint8_t* data, size_t size)
                 quote(a.name));
         }
         seen.insert(a.name);
+        patches.push_back(std::move(a));
+    }
+
+    if (declared_opset > 18) {
+        std::vector<OpsetAttributeView> views;
+        views.reserve(patches.size());
+        for (const AttrPatch& patch : patches) {
+            OpsetAttributeView view;
+            view.name = patch.name;
+            if (patch.type == kAttrType_String) {
+                view.is_string = true;
+                view.string_value = patch.s;
+            }
+            views.push_back(std::move(view));
+        }
+        CheckNodeCompatibility(
+            node.name, node.op_type, views, declared_opset);
+    }
+
+    for (const AttrPatch& a : patches) {
         const auto slot_it = allowed.find(a.name);
         if (slot_it == allowed.end()) {
             // Empty-allowlist ops (Add/Relu/MatMul) take no attributes at all.
@@ -1833,13 +1858,13 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         throw ModelLoadException(
             "model does not declare an ONNX-domain opset version");
     }
-    if (declared_opset < kMinSupportedOpsetVersion ||
-        declared_opset > kMaxSupportedOpsetVersion) {
+    if (declared_opset < kMinSupportedOpsetVersion) {
         throw ModelLoadException(
             "model requires ONNX-domain opset " +
-            std::to_string(declared_opset) + "; supported opsets are " +
-            std::to_string(kMinSupportedOpsetVersion) + ".." +
-            std::to_string(kMaxSupportedOpsetVersion));
+            std::to_string(declared_opset) +
+            "; supported opsets start at " +
+            std::to_string(kMinSupportedOpsetVersion) +
+            " (declarations above 18 are checked per node)");
     }
 
     Graph graph;
@@ -1865,8 +1890,8 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
                     folded_node_names.push_back(raw.name);
                     folded_constants.push_back(std::move(folded));
                 } else {
-                    graph.nodes.push_back(
-                        decode_node(payload.first, payload.second));
+                    graph.nodes.push_back(decode_node(
+                        payload.first, payload.second, declared_opset));
                 }
             }
             break;

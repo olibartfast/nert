@@ -1585,6 +1585,157 @@ TEST_F(EngineLoader, HermeticOpset11ResizeWithSizesLoads)
     EXPECT_EQ(result.outputs.at("y")[static_cast<size_t>((0 * 8 + 2) * 8 + 1)], values[4]);
 }
 
+// Declarations above 18 are accepted when each resolved schema version is
+// executable by the opset-18 kernels. Conv/Relu/Flatten/MatMul/Add all have
+// stable or type-only schemas after 18.
+TEST_F(EngineLoader, HermeticNewerStableOperators)
+{
+    auto load = [](int64_t opset) {
+        std::string body;
+        std::vector<float> conv_w(4 * 3 * 3 * 3);
+        for (size_t i = 0; i < conv_w.size(); ++i) {
+            conv_w[i] = 0.01F * static_cast<float>(static_cast<int>(i % 7) - 3);
+        }
+        std::vector<float> conv_b(4);
+        for (size_t i = 0; i < conv_b.size(); ++i) {
+            conv_b[i] = 0.1F * static_cast<float>(i);
+        }
+        std::vector<float> mm_w(256 * 2);
+        for (size_t i = 0; i < mm_w.size(); ++i) {
+            mm_w[i] = 0.01F * static_cast<float>(static_cast<int>(i % 5) - 2);
+        }
+        const std::vector<float> mm_b = {0.5F, -0.5F};
+
+        put_sub(body, 5, encode_initializer("w", {4, 3, 3, 3}, conv_w));
+        put_sub(body, 5, encode_initializer("b", {4}, conv_b));
+        put_sub(body, 5, encode_initializer("w2", {256, 2}, mm_w));
+        put_sub(body, 5, encode_initializer("b2", {2}, mm_b));
+        put_sub(body, 1, encode_node("conv0", "Conv", {"x", "w", "b"}, {"c"},
+                          {encode_attribute_ints("pads", {1, 1, 1, 1}),
+                              encode_attribute_ints("strides", {1, 1})}));
+        put_sub(body, 1, encode_node("relu0", "Relu", {"c"}, {"r"}, {}));
+        put_sub(body, 1, encode_node("flat0", "Flatten", {"r"}, {"f"}, {}));
+        put_sub(body, 1, encode_node("mm0", "MatMul", {"f", "w2"}, {"m"}, {}));
+        put_sub(body, 1, encode_node("add0", "Add", {"m", "b2"}, {"y"}, {}));
+        put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
+        put_sub(body, 12, encode_value_info("y", 1, {1, 2}));
+        return nert::LoadGraphFromFile(write_model_bytes(
+            "newer_stable_" + std::to_string(opset) + ".onnx",
+            encode_model(body, opset)));
+    };
+
+    std::vector<float> input;
+    for (int i = 0; i < 192; ++i) {
+        input.push_back(0.01F * static_cast<float>(static_cast<int>(i % 19) - 9));
+    }
+
+    const nert::Graph baseline = load(18);
+    nert::Model baseline_model(baseline, { { "x", { 1, 3, 8, 8 } } }, nert::CpuDevice());
+    const std::vector<float> expected =
+        baseline_model.Run({ { "x", input } }).outputs.at("y");
+
+    for (const int64_t opset : { int64_t{19}, int64_t{21}, int64_t{27} }) {
+        const nert::Graph graph = load(opset);
+        nert::Model model(graph, { { "x", { 1, 3, 8, 8 } } }, nert::CpuDevice());
+        const std::vector<float> actual = model.Run({ { "x", input } }).outputs.at("y");
+        ASSERT_EQ(actual.size(), expected.size()) << "opset " << opset;
+        for (size_t i = 0; i < expected.size(); ++i) {
+            EXPECT_NEAR(actual[i], expected[i], 1e-6F)
+                << "opset " << opset << " element " << i;
+        }
+    }
+}
+
+// A plain Cast carries only `to`; newer schema versions added optional
+// attributes but the captured behavior is unchanged.
+TEST_F(EngineLoader, HermeticNewerPlainCastAccepted)
+{
+    for (const int64_t opset : { int64_t{19}, int64_t{27} }) {
+        std::string body;
+        put_sub(body, 1, encode_node("cast0", "Cast", {"x"}, {"y"},
+                          {encode_attribute_int("to", 7)}));
+        put_sub(body, 11, encode_value_info("x", 1, {2}));
+        put_sub(body, 12, encode_value_info("y", 7, {2}));
+
+        const nert::Graph graph = nert::LoadGraphFromFile(
+            write_model_bytes("newer_cast_" + std::to_string(opset) + ".onnx",
+                encode_model(body, opset)));
+        ASSERT_EQ(graph.nodes.size(), 1U) << "opset " << opset;
+        EXPECT_EQ(graph.nodes.front().op_type, "Cast");
+        ASSERT_EQ(graph.nodes.front().attributes.size(), 1U);
+        EXPECT_EQ(graph.nodes.front().attributes.front().name, "to");
+    }
+}
+
+// Pad's pre-19 modes remain executable after the schema adds `wrap`.
+TEST_F(EngineLoader, HermeticNewerPadModesAccepted)
+{
+    for (const std::string& mode : { std::string("constant"),
+             std::string("reflect"), std::string("edge") }) {
+        std::string body;
+        put_sub(body, 5, encode_initializer_int64("pads", {4}, {0, 1, 0, 1}));
+        put_sub(body, 1, encode_node("pad0", "Pad", {"x", "pads"}, {"y"},
+                          {encode_attribute_string("mode", mode)}));
+        put_sub(body, 11, encode_value_info("x", 1, {1, 2}));
+        put_sub(body, 12, encode_value_info("y", 1, {1, 4}));
+
+        const nert::Graph graph = nert::LoadGraphFromFile(
+            write_model_bytes("newer_pad_" + mode + ".onnx",
+                encode_model(body, 19)));
+        ASSERT_EQ(graph.nodes.size(), 1U) << mode;
+        EXPECT_EQ(graph.nodes.front().op_type, "Pad");
+    }
+}
+
+// AveragePool's pre-19 form has no `dilations`; that additive attribute is
+// guarded, so the baseline form still loads.
+TEST_F(EngineLoader, HermeticNewerAveragePoolWithoutDilationsAccepted)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("pool0", "AveragePool", {"x"}, {"y"},
+                      {encode_attribute_ints("kernel_shape", {2, 2})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 4, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 2, 2}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("newer_averagepool.onnx", encode_model(body, 19)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "AveragePool");
+}
+
+// A plain Range at 27 resolves to schema 27 with the additive `stash_type`
+// absent; it is executable.
+TEST_F(EngineLoader, HermeticNewerPlainRangeAccepted)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("start", {}, {0.0F}));
+    put_sub(body, 5, encode_initializer("limit", {}, {3.0F}));
+    put_sub(body, 5, encode_initializer("delta", {}, {1.0F}));
+    put_sub(body, 1, encode_node("range0", "Range", {"start", "limit", "delta"},
+                      {"y"}, {}));
+    put_sub(body, 12, encode_value_info("y", 1, {3}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("newer_range.onnx", encode_model(body, 27)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Range");
+}
+
+// GridSample at declared 19 resolves to schema 16, before the mode change.
+TEST_F(EngineLoader, HermeticGridSampleAt19Accepted)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("grid0", "GridSample", {"x", "grid"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 2, 2}));
+    put_sub(body, 11, encode_value_info("grid", 1, {1, 2, 2, 2}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 2, 2}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("gridsample_19.onnx", encode_model(body, 19)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "GridSample");
+}
+
 // ===========================================================================
 // EngineLoaderNegative.* — rejections whose messages must name the node and
 // op type.
@@ -2113,24 +2264,21 @@ TEST_F(EngineLoaderNegative, ValueInfoNegativeDimensionRejected)
         << "message: " << message;
 }
 
-// Declared opsets outside 11..18 reject at the model level and name both the
-// declared version and the supported range.
-TEST_F(EngineLoaderNegative, OpsetOutsideSupportedRangeRejected)
+// Declared opsets below the floor reject at the model level. There is no
+// upper ceiling; newer declarations are checked per node instead.
+TEST_F(EngineLoaderNegative, OpsetBelowFloorRejected)
 {
-    for (const int64_t opset : { int64_t{10}, int64_t{19} }) {
-        std::string body;
-        put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
-        put_sub(body, 11, encode_value_info("x", 1, {2}));
-        put_sub(body, 12, encode_value_info("y", 1, {2}));
+    std::string body;
+    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
 
-        const std::string message = load_error_message(
-            encode_model(body, opset),
-            "opset_" + std::to_string(opset) + ".onnx");
-        EXPECT_NE(message.find(std::to_string(opset)), std::string::npos)
-            << "message: " << message;
-        EXPECT_NE(message.find("11..18"), std::string::npos)
-            << "message: " << message;
-    }
+    const std::string message =
+        load_error_message(encode_model(body, 10), "opset_10.onnx");
+    EXPECT_NE(message.find("10"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("start at 11"), std::string::npos)
+        << "message: " << message;
 }
 
 // A model without an ONNX-domain opset import still fails.
@@ -2444,5 +2592,167 @@ TEST_F(EngineLoaderNegative, LegacySoftmaxAxisOutOfRangeRejected)
     EXPECT_NE(message.find("out of range"), std::string::npos)
         << "message: " << message;
     EXPECT_NE(message.find("opset 11"), std::string::npos)
+        << "message: " << message;
+}
+
+// Cast's post-18 attributes change rounding/saturation semantics. A plain
+// Cast is accepted (see the positive row); using either attribute fails with
+// the effective schema version.
+TEST_F(EngineLoaderNegative, NewerCastSaturateRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("cast0", "Cast", {"x"}, {"y"},
+                      {encode_attribute_int("to", 7),
+                          encode_attribute_int("saturate", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 7, {2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 19), "cast_saturate_19.onnx");
+    EXPECT_NE(message.find("cast0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("Cast"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("saturate"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 19"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 19"), std::string::npos)
+        << "message: " << message;
+}
+
+TEST_F(EngineLoaderNegative, NewerCastRoundModeRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("cast0", "Cast", {"x"}, {"y"},
+                      {encode_attribute_int("to", 7),
+                          encode_attribute_string("round_mode", "up")}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 7, {2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 24), "cast_round_24.onnx");
+    EXPECT_NE(message.find("cast0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("round_mode"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 24"), std::string::npos)
+        << "message: " << message;
+}
+
+TEST_F(EngineLoaderNegative, NewerPadWrapRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("pads", {4}, {0, 1, 0, 1}));
+    put_sub(body, 1, encode_node("pad0", "Pad", {"x", "pads"}, {"y"},
+                      {encode_attribute_string("mode", "wrap")}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 2}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 19), "pad_wrap_19.onnx");
+    EXPECT_NE(message.find("pad0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("wrap"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 19"), std::string::npos)
+        << "message: " << message;
+}
+
+// AveragePool's dilations attribute only appears at schema 19; the kernel
+// implements the undilated form.
+TEST_F(EngineLoaderNegative, NewerAveragePoolDilationsRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("pool0", "AveragePool", {"x"}, {"y"},
+                      {encode_attribute_ints("kernel_shape", {2, 2}),
+                          encode_attribute_ints("dilations", {1, 1})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 4, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 2, 2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 19), "averagepool_dil_19.onnx");
+    EXPECT_NE(message.find("pool0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("dilations"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 19"), std::string::npos)
+        << "message: " << message;
+}
+
+// Range's stash_type only appears at schema 27.
+TEST_F(EngineLoaderNegative, NewerRangeStashTypeRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("start", {}, {0.0F}));
+    put_sub(body, 5, encode_initializer("limit", {}, {3.0F}));
+    put_sub(body, 5, encode_initializer("delta", {}, {1.0F}));
+    put_sub(body, 1, encode_node("range0", "Range", {"start", "limit", "delta"},
+                      {"y"}, {encode_attribute_int("stash_type", 1)}));
+    put_sub(body, 12, encode_value_info("y", 1, {3}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 27), "range_stash_27.onnx");
+    EXPECT_NE(message.find("range0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("stash_type"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 27"), std::string::npos)
+        << "message: " << message;
+}
+
+// GridSample's schema-20 mode default/value change is a behavior change, so
+// every GridSample node at effective 20+ is rejected until implemented.
+TEST_F(EngineLoaderNegative, NewerGridSampleBehaviorChangeRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("grid0", "GridSample", {"x", "grid"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 2, 2}));
+    put_sub(body, 11, encode_value_info("grid", 1, {1, 2, 2, 2}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 2, 2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 20), "gridsample_20.onnx");
+    EXPECT_NE(message.find("grid0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("mode default"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 20"), std::string::npos)
+        << "message: " << message;
+}
+
+// Operators introduced after the implemented set keep the existing explicit
+// unknown-operator failure even when the declaration is newer.
+TEST_F(EngineLoaderNegative, NewerUnknownOperatorRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("mish0", "Mish", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 19), "mish_19.onnx");
+    EXPECT_NE(message.find("mish0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("Mish"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("unsupported op_type"), std::string::npos)
+        << "message: " << message;
+}
+
+// A post-18 dtype is rejected by the existing element-type gate, not by a
+// kernel or a compatibility fallback.
+TEST_F(EngineLoaderNegative, NewerUnsupportedDtypeRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 17, {2})); // FLOAT8E4M3FN
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 19), "float8_19.onnx");
+    EXPECT_NE(message.find("x"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("unsupported element type"), std::string::npos)
         << "message: " << message;
 }

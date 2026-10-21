@@ -58,8 +58,14 @@ effective version, and the missing capability.
     `Cast` with only `to` remains accepted because its behavior is unchanged.
   - `Pad` at 19+: reject `mode="wrap"`; accept `constant`, `reflect`, and
     `edge`.
-  - Any further value-domain change discovered by the table generator gets a
-    guard in the same change; no new value reaches a kernel by accident.
+  - `AveragePool` at 19+: reject `dilations`; accept the undilated form.
+  - `Range` at 27+: reject `stash_type`; accept the form without it.
+  - `GridSample` at 20+: reject every node. Schema 20 changed the `mode`
+    default and its accepted value domain; the kernel still implements the
+    opset-16 names/default.
+  - Any further value-domain or behavior change discovered by the table
+    generator gets a guard in the same change; no new value reaches a kernel
+    by accident.
 - [R-5] **Unsupported dtypes and operators stay rejected.** New element
   types (for example float8/int4) and operators introduced after the
   implemented set fail at load with the existing explicit messages.
@@ -72,9 +78,10 @@ effective version, and the missing capability.
   schema is executable by that implementation.
 - [R-8] **Tests and gates.** Synthetic models at declared 19, 21, and 27;
   positive cases using only stable operators; negative cases for
-  `Cast.saturate`, `Cast.round_mode`, `Pad.wrap`, a new operator, and an
-  unsupported dtype; one real newer-than-18 model compared with ONNX
-  Runtime.
+  `Cast.saturate`, `Cast.round_mode`, `Pad.wrap`,
+  `AveragePool.dilations`, `Range.stash_type`, `GridSample` 20+, a new
+  operator, and an unsupported dtype; one real newer-than-18 model compared
+  with ONNX Runtime.
 - [R-9] **Docs and roadmap.** `README.md`, `specs/tech-stack.md` (`Q-1`),
   `specs/2026-10-17-task-models/coverage.md`, `CHANGELOG.md`, and
   `specs/roadmap.md` describe the verified-compatibility policy.
@@ -146,19 +153,25 @@ effective version, and the missing capability.
   `coordinate_transformation_mode` from the opset; `Cast2` reads `to` but
   not the opset-19 `saturate` attribute. This is the behavior the packet
   deliberately improves on.
-- Audit of the 72 implemented operators (onnx 1.22.0, 2026-10-21): after
-  opset 18 the only attribute/input/default changes are `Cast` (`saturate`
-  at 19, `round_mode` at 24) and the `Pad` `mode` value `wrap` at 19.
-  `Resize` 19 and `ReduceMax` 20 entries are type/documentation changes;
-  `ScatterND` and `Split` have no later schema. That makes the first
-  compatibility table small.
+- Audit of the 72 implemented operators (onnx 1.22.0, re-derived by the
+  generator on 2026-10-22): after opset 18 the attribute/default changes are
+  `Cast` (`saturate` at 19, `round_mode` at 24), `Pad` (`mode="wrap"` at
+  19), `AveragePool` (`dilations` at 19), `Range` (`stash_type` at 27), and
+  `GridSample` (the `mode` default and value domain changed at 20). The last
+  one is a behavior change and is rejected until a kernel slice implements
+  it. `Resize` 19, `ReduceMax` 20, and the remaining post-18 schema bumps
+  are type/documentation-only and resolve as equivalent for the implemented
+  attribute surface.
 - The model zoo currently pins opset 18, so this packet adds compatibility
   without changing a shipped gate.
 
 ## Assumptions & Open Questions
 
 - [A-1] The post-18 audit above is complete for the implemented operator
-  set; the generator will re-derive it and any mismatch blocks landing.
+  set. The original hand audit missed `AveragePool.dilations`,
+  `Range.stash_type`, and the `GridSample` mode change; the generator
+  re-derived the surface and those entries are now explicit. Future
+  mismatches block landing.
 - [A-2] Type-constraint additions after 18 do not matter while the loader
   rejects dtypes outside float32/int64/bool/int32-emulation.
 - [Q-1] Should a plain `Cast` in a declared-27 model be accepted (the node
@@ -178,8 +191,8 @@ effective version, and the missing capability.
 
 ## Definition of Done (requirements level)
 
-- [ ] Every [R-n] is implemented or explicitly deferred with a tracked
+- [x] Every [R-n] is implemented or explicitly deferred with a tracked
       location.
-- [ ] No newer attribute, value, dtype, or operator is silently accepted.
-- [ ] The compatibility table is generated, committed, reviewed, and
+- [x] No newer attribute, value, dtype, or operator is silently accepted.
+- [x] The compatibility table is generated, committed, reviewed, and
       reproducible.

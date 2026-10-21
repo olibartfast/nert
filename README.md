@@ -1,10 +1,12 @@
 # NERT (Neuriplo Engine Runtime)
 
 NERT is a first-party ONNX inference runtime: an interpreter for ONNX
-opsets 11–18, canonicalized to the opset-18 form at load. It computes in
-float32, with int64/bool shape data and I/O, and is standard-library-only by
-default (tests use GoogleTest; opt-in device layers add their own toolkit
-dependency, linked PRIVATE).
+opsets 11 and above. Opsets 11–18 are canonicalized to the opset-18 form at
+load; newer declarations are accepted only when every node resolves to a
+schema version the opset-18 kernels can execute. It computes in float32, with
+int64/bool shape data and I/O, and is standard-library-only by default (tests
+use GoogleTest; opt-in device layers add their own toolkit dependency, linked
+PRIVATE).
 
 It is an interpreter: each model load parses the ONNX graph, infers tensor
 shapes for the requested input, plans a single arena allocation, then executes
@@ -134,8 +136,9 @@ Check formatting with `scripts/format.sh --check` (or `--fix`).
 
 ## Opset policy
 
-NERT loads ONNX-domain opsets 11–18. The loader canonicalizes the older
-node forms it supports to the opset-18 IR before shape inference:
+NERT loads ONNX-domain opsets 11 and above. For 11–18, the loader
+canonicalizes the older node forms it supports to the opset-18 IR before
+shape inference:
 
 - `ReduceMean`, `ReduceL2`, `ReduceMax`: pre-18 `axes` attribute → int64 input.
 - `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute → int64 input.
@@ -146,8 +149,7 @@ node forms it supports to the opset-18 IR before shape inference:
   reductions are rejected because the kernel implements only the overwrite
   form.
 
-Models outside this range are rejected at load. Models below opset 11 must be
-converted first:
+Models below opset 11 are rejected at load; convert them first:
 
 ```python
 import onnx
@@ -160,9 +162,21 @@ onnx.save(model, "model_op18.onnx")
 Legacy `Softmax` (opset < 13) needs the input rank from the model's shape
 metadata (`value_info` for intermediates) so the loader can validate `axis`;
 a model that omits that information is rejected with a message asking for
-`value_info` or a conversion. Declarations above
-opset 18 remain rejected until the verified-compatibility work in
-`specs/2026-10-21-opset-newer-than-18/` lands.
+`value_info` or a conversion.
+
+There is no upper opset ceiling. For a declaration above 18, each node
+resolves its **effective schema version** (the latest ONNX schema at or
+before the declared opset) from a committed compatibility table. The node is
+accepted when that schema is equivalent to the opset-18 implementation, or
+when it only adds attributes that the node does not use. A newer attribute
+or value on an implemented operator fails at load with the node, operator,
+declared opset, effective version, and the missing capability. Operators and
+dtypes outside the implemented set keep their existing explicit rejections.
+Current guards include
+`Cast.saturate` (19+), `Cast.round_mode` (24+), `Pad.mode="wrap"` (19+),
+`AveragePool.dilations` (19+), and `Range.stash_type` (27+). `GridSample` at
+effective 20+ is rejected because its mode default and value domain changed;
+the opset-16 behavior is implemented. Nothing is silently ignored.
 
 ## Install and use
 

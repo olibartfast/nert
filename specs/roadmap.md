@@ -147,7 +147,7 @@ versus device comparisons with timings, starting with `gemm` on CUDA and
 OpenCL C/C++. It is measurement tooling only; the runtime remains
 standard-library-only.
 
-## Opset Range and Versioned Loading (≤18 implemented; >18 planned)
+## Opset Range and Versioned Loading (implemented: 11+)
 
 Two linked packets replace the exact-opset-18 gate with a verified policy.
 
@@ -159,13 +159,18 @@ Two linked packets replace the exact-opset-18 gate with a verified policy.
   `Split` split. Opset 10 and below stay deferred with the conversion note.
 - **>18 path** — `specs/2026-10-21-opset-newer-than-18/`. Adopts OpenCV 5's
   “declared opset is data” acceptance model, but replaces its silent
-  fallbacks with a generated per-operator compatibility table and explicit
-  guards (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`). It depends on the
-  ≤18 packet's opset plumbing.
+  fallbacks with a committed generated per-operator compatibility table and
+  explicit guards (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`,
+  `AveragePool.dilations`, `Range.stash_type`, `GridSample` 20+). It uses
+  the ≤18 packet's opset plumbing and has no numeric ceiling.
 
-Status: supported range **11–18**. Phase A validated 2026-10-21; Phase B
-validated 2026-10-22. The >18 path remains planned. `specs/tech-stack.md`
-`Q-1` records the revised policy.
+Status: supported declarations are **11 and above**. Phase A validated
+2026-10-21; Phase B and the newer-than-18 path validated 2026-10-22.
+`specs/tech-stack.md` `Q-1` records the revised policy.
+
+Follow-up capability slices (rejected explicitly today): `Cast.saturate`,
+`Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`, `Range.stash_type`,
+and `GridSample` opset-20 semantics.
 
 ## Tooling — Memory Footprint Report (Planned)
 

@@ -28,11 +28,14 @@ The table is generated and reviewed before the loader accepts anything new.
     comment.
   - Deliverable: the generator prints the table and fails loudly on an
     operator it cannot classify.
-- [T-4] Review the generated table by hand against the 2026-10-21 audit.
+- [T-4] Review the generated table by hand against the re-derived audit.
   Expected first result: all implemented operators `equivalent` except
-  `Cast` (`additive-attributes`: `saturate`, `round_mode`) and `Pad`
-  (`value-domain`: `wrap`); `Resize`/`ReduceMax` post-18 entries are
-  `equivalent` for the implemented attribute set.
+  `Cast` (`additive-attributes`: `saturate`, `round_mode`), `Pad`
+  (`value-domain`: `wrap`), `AveragePool`
+  (`additive-attributes`: `dilations`), `Range`
+  (`additive-attributes`: `stash_type`), and `GridSample`
+  (`behavior-change` at 20+). `Resize`/`ReduceMax` and the remaining
+  post-18 schema bumps are `equivalent` for the implemented attribute set.
   - Checks: the generated table matches the audit; unexplained differences
     stop the slice.
 - [T-5] Commit the table under `src/` (internal, not a public header) and
@@ -57,6 +60,10 @@ The table is generated and reviewed before the loader accepts anything new.
   - `Cast`: reject `saturate` and `round_mode` when present; plain `to`
     stays accepted;
   - `Pad`: reject `mode="wrap"`; accept `constant`, `reflect`, `edge`;
+  - `AveragePool`: reject `dilations`; accept the undilated form;
+  - `Range`: reject `stash_type`; accept the form without it;
+  - `GridSample`: reject effective schema 20+ outright because its mode
+    default/value domain changed;
   - structure the guard table so a future value-domain discovery is one
     entry, not a loader diff.
 - [T-9] Error messages include the declared opset, effective version, and
@@ -67,6 +74,9 @@ The table is generated and reviewed before the loader accepts anything new.
   - declared 19 with `Cast.saturate` rejected;
   - declared 24 with `Cast.round_mode` rejected;
   - declared 19 with `Pad.wrap` rejected, with the other modes accepted;
+  - declared 19 with `AveragePool.dilations` rejected, without accepted;
+  - declared 27 with `Range.stash_type` rejected, without accepted;
+  - declared 20 `GridSample` rejected as a behavior change;
   - a post-18 operator (for example `Mish` or `BitwiseAnd`) rejected as
     unknown;
   - an unsupported dtype still rejected;
@@ -93,8 +103,9 @@ The table is generated and reviewed before the loader accepts anything new.
 - [T-15] Execute every check in `validation.md` on the merged tree; record
   evidence and deviations.
 - [T-16] File follow-up slices for any rejected-but-wanted capability
-  (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`, new operators). Link them
-  from the roadmap; do not smuggle them into this packet.
+  (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`,
+  `Range.stash_type`, `GridSample` 20+, new operators). Link them from the
+  roadmap; do not smuggle them into this packet.
 
 ## Notes
 
