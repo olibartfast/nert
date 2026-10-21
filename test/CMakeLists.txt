@@ -352,6 +352,25 @@ if(NERT_ENABLE_OPENCL)
     add_test(NAME nert_opencl_conv_transpose COMMAND nert_opencl_conv_transpose_test)
 endif()
 
+# Generated opset compatibility table freshness. The generator is a
+# development-only Python tool; add the check only when Python and the pinned
+# ONNX package are available, so runtime-only builds do not acquire a Python
+# dependency.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import onnx"
+        RESULT_VARIABLE NERT_ONNX_IMPORT_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET)
+    if(NERT_ONNX_IMPORT_RESULT EQUAL 0)
+        add_test(NAME nert_opset_table
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/../tools/gen_opset_compat.py"
+                --check)
+    endif()
+endif()
+
 # HIP device scaffold test (N1c-M1 on NVIDIA). Built only when the HIP device
 # layer is enabled; SKIPs at run time without a HIP-usable GPU.
 if(NERT_ENABLE_HIP)

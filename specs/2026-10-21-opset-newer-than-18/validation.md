@@ -18,8 +18,9 @@ scripts/format.sh --check
 
 - [x] [V-1] Table reproducibility belongs to [D-2]/[T-3]:
   `python3 tools/gen_opset_compat.py --check` exits 0 and leaves the tree
-  unchanged. A deliberate edit fails the check until the generated file is
-  refreshed.
+  unchanged; the optional `nert_opset_table` CTest runs the same check when
+  Python and ONNX are present. A deliberate edit fails the check until the
+  generated file is refreshed.
 - [x] [V-2] Stable newer declarations belong to [R-1]/[R-2]/[R-3]:
   synthetic opset-19, -21, and -27 models using `Conv`/`Relu`/`Flatten`/
   `MatMul`/`Add` load and produce the same outputs as their opset-18
@@ -42,8 +43,9 @@ scripts/format.sh --check
   `src/opencl/`, `src/hip/`, `src/shape_inference.cpp`, or
   `src/executor.cpp`; the table and loader/gate are the runtime changes.
 - [x] [V-8] Opset-18 regression belongs to [R-7]:
-  OFF suite 12/12; CUDA + OpenCL suite 40/40 with the ResNet fixture;
-  format clean. HIP is unavailable on this host.
+  OFF suite 13/13 (including the table-freshness CTest); CUDA + OpenCL
+  suite 41/41 with the ResNet fixture; format clean. HIP is unavailable on
+  this host.
 - [x] [V-9] Real newer-than-18 model gate belongs to [R-8]:
   a native torchvision ResNet-18 export at declared 19 matches ONNX Runtime
   1.27.0 within `1e-3·(1+|ref|)` with zero elements over on CPU; OpenCL also
@@ -71,14 +73,14 @@ scripts/format.sh --check
 
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
-| V-1 | `python3 tools/gen_opset_compat.py --check`; deliberate appended edit then restore | pass | 2026-10-22 | 137 entries from onnx 1.22.0. The edited table failed the check; restoring the generated file passed. |
+| V-1 | `python3 tools/gen_opset_compat.py --check`; `ctest -R nert_opset_table`; deliberate appended edit then restore | pass | 2026-10-22 | 137 entries from onnx 1.22.0. The edited table failed the check; restoring the generated file passed; the CTest passed. |
 | V-2 | `HermeticNewerStableOperators` at declared 19/21/27 vs 18 | pass | 2026-10-22 | Same inputs, outputs within `1e-6`; all loader tests 96/96. |
 | V-3 | Table row `Add` since 14; declared-27 composite graph accepted | pass | 2026-10-22 | Effective schema is lower than the declaration, as required. |
 | V-4 | `HermeticNewerPlainCastAccepted`, `NewerCastSaturateRejected`, `NewerCastRoundModeRejected` | pass | 2026-10-22 | Errors name `declared opset 19/24` and `effective schema 19/24`. |
 | V-5 | `HermeticNewerPadModesAccepted`, `NewerPadWrapRejected` | pass | 2026-10-22 | `constant`/`reflect`/`edge` load; `wrap` names the value and effective schema. |
 | V-6 | `NewerUnknownOperatorRejected`, `NewerUnsupportedDtypeRejected` | pass | 2026-10-22 | `Mish` uses the existing unsupported-op message; FLOAT8 uses the element-type gate. |
 | V-7 | `git diff --stat` | pass | 2026-10-22 | Runtime changes: `src/model_loader.cpp`, `src/opset_compat.*`, generated `.inc`, CMake, tests, docs; no kernels/shape/executor. |
-| V-8 | OFF `ctest` 12/12; CUDA+OpenCL `ctest --test-dir build-gpu` 40/40; `scripts/format.sh --check` 238 files | pass | 2026-10-22 | Host CUDA 12.0, RTX 3060, no cuDNN; OpenCL on the same GPU. HIP unavailable. |
+| V-8 | OFF `ctest` 13/13; CUDA+OpenCL `ctest --test-dir build-gpu` 41/41; `scripts/format.sh --check` 238 files | pass | 2026-10-22 | Host CUDA 12.0, RTX 3060, no cuDNN; OpenCL on the same GPU. HIP unavailable. The table-freshness CTest is present in both builds. |
 | V-9 | Native torchvision ResNet-18 opset-19 export vs ORT 1.27.0: CPU max abs 2.86102294921875e-06, 0/1000; OpenCL max abs 5.7220458984375e-06, 0/1000; top-5 identical. Small native 19 graph: CPU max 4.47e-08, CUDA max 1.19e-07, OpenCL 0.0, 0/4 each | pass | 2026-10-22 | 49-node ResNet export, ops `Add/Conv/Gemm/MatMul/MaxPool/ReduceMean/Relu/Reshape`; external-data weights. CUDA ResNet leg skipped because the host build has no cuDNN Conv; the small graph covers the CUDA compatibility path. |
 | V-10 | README, tech-stack Q-1, coverage note, CHANGELOG, roadmap | pass | 2026-10-22 | Policy says 11+, no upper ceiling, per-node effective-schema verification, guards and follow-ups listed. |
 | V-11 | `NewerAveragePoolDilationsRejected`, `HermeticNewerAveragePoolWithoutDilationsAccepted`, `NewerRangeStashTypeRejected`, `HermeticNewerPlainRangeAccepted`, `NewerGridSampleBehaviorChangeRejected`, `HermeticGridSampleAt19Accepted` | pass | 2026-10-22 | Generator-discovered post-18 changes are guarded; absent additive attributes remain loadable. |
@@ -97,9 +99,10 @@ scripts/format.sh --check
 - The CUDA ResNet leg is a per-op gap on this host: the build has no cuDNN,
   so `Conv` has no CUDA row. OpenCL runs the full ResNet; a small native
   opset-19 graph covers CUDA.
-- The generator is development-only and requires the pinned `onnx` package;
-  validation ran `--check` locally with onnx 1.22.0. The generated table is
-  committed; adding a CI workflow hook is a separate workflow-only change.
+- The generator is development-only and requires the pinned `onnx` package.
+  When Python and ONNX are available, `test/CMakeLists.txt` registers the
+  `nert_opset_table` CTest, so CI and development `ctest` runs enforce table
+  freshness without adding a Python runtime dependency to NERT.
 
 ## Definition of Done (integration)
 
