@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include "opset_normalize.hpp" // private src-local canonicalizer
 #include "wire_reader.hpp" // private src-local reader
 
 #include "nert/einsum.hpp"
@@ -106,8 +107,10 @@ constexpr int64_t kElemType_OnnxInt64 = 7;
 constexpr int64_t kElemType_OnnxBool = 9;
 constexpr int64_t kElemType_OnnxDouble = 11;
 
-// The opset version this loader targets.
-constexpr int64_t kRequiredOpsetVersion = 18;
+// Declared opsets the loader accepts. The graph is canonicalized to the
+// opset-18 form at load, so kernels and shape inference stay single-form.
+constexpr int64_t kMinSupportedOpsetVersion = 13;
+constexpr int64_t kMaxSupportedOpsetVersion = 18;
 constexpr const char* kOnnxDomain = "ai.onnx";
 
 const char* elem_type_name(int64_t dtype)
@@ -618,6 +621,19 @@ const std::unordered_map<std::string, AttrSlot>& reducemean_attrs()
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
         { "noop_with_empty_axes", AttrSlot::Int },
+        // Pre-18 form, consumed by the loader's opset normalizer.
+        { "axes", AttrSlot::IntList },
+    };
+    return k;
+}
+
+// ReduceSum has taken axes as an input since opset 13; only the pre-18
+// ReduceMean/ReduceL2 form uses the attribute.
+const std::unordered_map<std::string, AttrSlot>& reducesum_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        { "keepdims", AttrSlot::Int },
+        { "noop_with_empty_axes", AttrSlot::Int },
     };
     return k;
 }
@@ -709,6 +725,8 @@ const std::unordered_map<std::string, AttrSlot>& reducemax_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
+        // Pre-18 form, consumed by the loader's opset normalizer.
+        { "axes", AttrSlot::IntList },
     };
     return k;
 }
@@ -789,6 +807,15 @@ const std::unordered_map<std::string, AttrSlot>& einsum_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "equation", AttrSlot::Str },
+    };
+    return k;
+}
+
+const std::unordered_map<std::string, AttrSlot>& scatternd_attrs()
+{
+    static const std::unordered_map<std::string, AttrSlot> k = {
+        // Added at opset 16; the normalizer accepts only the default "none".
+        { "reduction", AttrSlot::Str },
     };
     return k;
 }
@@ -884,7 +911,7 @@ allowed_attributes()
             { "Conv", &conv_attrs() },
             { "MaxPool", &maxpool_attrs() },
             { "ReduceMean", &reducemean_attrs() },
-            { "ReduceSum", &reducemean_attrs() },
+            { "ReduceSum", &reducesum_attrs() },
             { "Range", &kNoAttrs },
             { "Pad", &pad_attrs() },
             { "Reshape", &reshape_attrs() },
@@ -952,7 +979,7 @@ allowed_attributes()
             { "ArgMax", &argmax_attrs() },
             { "CumSum", &cumsum_attrs() },
             { "EyeLike", &eyelike_attrs() },
-            { "ScatterND", &kNoAttrs },
+            { "ScatterND", &scatternd_attrs() },
         };
     return kOps;
 }
@@ -1718,9 +1745,8 @@ namespace {
 Graph decode_model(const std::string& model_dir, const uint8_t* data,
     size_t size)
 {
-    bool has_required_opset = false;
+    int64_t declared_opset = -1;
     std::string graph_bytes;
-    std::string opset_bytes; // current repeated entry payload
 
     WireReader reader(data, size);
     while (!reader.at_end()) {
@@ -1757,14 +1783,17 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
                 }
             }
             if (domain.empty() || domain == kOnnxDomain) {
-                if (!has_version || version != kRequiredOpsetVersion) {
+                if (!has_version) {
                     throw ModelLoadException(
-                        "model requires ONNX-domain opset " +
-                        std::to_string(kRequiredOpsetVersion) +
-                        (has_version ? ", found " + std::to_string(version)
-                                     : " but declares none"));
+                        "model's ONNX-domain opset_import declares no version");
                 }
-                has_required_opset = true;
+                if (declared_opset >= 0 && declared_opset != version) {
+                    throw ModelLoadException(
+                        "model declares conflicting ONNX-domain opset versions " +
+                        std::to_string(declared_opset) + " and " +
+                        std::to_string(version));
+                }
+                declared_opset = version;
             }
             // Unknown domains (ai.onnx.training, etc.) are skipped.
             break;
@@ -1775,13 +1804,20 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         }
     }
 
-    (void)opset_bytes;
     if (graph_bytes.empty()) {
         throw ModelLoadException("model carries no graph");
     }
-    if (!has_required_opset) {
-        throw ModelLoadException("model does not declare ONNX-domain opset " +
-            std::to_string(kRequiredOpsetVersion));
+    if (declared_opset < 0) {
+        throw ModelLoadException(
+            "model does not declare an ONNX-domain opset version");
+    }
+    if (declared_opset < kMinSupportedOpsetVersion ||
+        declared_opset > kMaxSupportedOpsetVersion) {
+        throw ModelLoadException(
+            "model requires ONNX-domain opset " +
+            std::to_string(declared_opset) + "; supported opsets are " +
+            std::to_string(kMinSupportedOpsetVersion) + ".." +
+            std::to_string(kMaxSupportedOpsetVersion));
     }
 
     Graph graph;
@@ -1891,6 +1927,9 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         }
         graph.initializers[name] = std::move(folded_constants[i].second);
     }
+    // Canonicalize pre-18 node forms into the opset-18 IR before any consumer
+    // (TopK checks, shape inference, planning, kernels) sees the graph.
+    NormalizeGraphForOpset(graph, declared_opset);
     // TopK's K input is a shape constant: it must resolve to an Int64
     // initializer at load. A non-constant K is a load rejection here, never
     // a dynamic shape downstream.

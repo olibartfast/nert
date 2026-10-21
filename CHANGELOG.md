@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Native opset range 13–18: the loader accepts declared ONNX-domain opsets
+  13–18 and canonicalizes the supported pre-18 forms — `ReduceMean` /
+  `ReduceL2` / `ReduceMax` `axes` attributes and an explicit
+  `ScatterND.reduction="none"` — to the opset-18 IR before shape inference.
+  Models outside the range fail at load with the declared version and the
+  supported range. Opset-18 graphs are unchanged.
 - Opt-in CUDA device layer (`NERT_ENABLE_CUDA=OFF` by default): same model
   + same plan on CUDA — allocator, transfers, whole-graph staging, and an
   op-keyed table (cuBLAS `Gemm`, first-party `Relu`/`Add`, cuDNN `Conv`),

@@ -163,8 +163,9 @@ The exact-18 rule stays in force until the first phase lands.
   guards (`Cast.saturate`, `Cast.round_mode`, `Pad.wrap`). It depends on the
   ≤18 packet's opset plumbing.
 
-Status: planned. `specs/tech-stack.md` `Q-1` records the current exact-18
-rule and is revised when the ≤18 Phase A validation lands.
+Status: Phase A (declared 13–18) implemented and validated on 2026-10-21;
+Phase B (11–12) and the >18 path remain planned. `specs/tech-stack.md` `Q-1`
+records the revised policy.
 
 ## Tooling — Memory Footprint Report (Planned)
 

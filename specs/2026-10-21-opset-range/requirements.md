@@ -41,10 +41,10 @@ supported range.
   accepts 13–18; Phase B extends the floor to 11. Anything below the active
   floor and anything above 18 is rejected at load.
 - [R-2] **Canonicalization stage.** A single load-time pass runs after node
-  and attribute decoding and before constant folding and shape inference.
-  It receives the declared opset and rewrites only the node forms listed
-  below; node order and tensor names that are not part of a rewrite stay
-  unchanged. The output is the current opset-18 IR.
+  and attribute decoding and after the loader's Constant folding, and
+  before shape inference. It receives the declared opset and rewrites only
+  the node forms listed below; node order and tensor names that are not part
+  of a rewrite stay unchanged. The output is the current opset-18 IR.
 - [R-3] **Phase A rules (13–17).**
   - `ReduceMean` / `ReduceL2` / `ReduceMax` with an `axes` attribute:
     create a unique int64 initializer for the axes, append it as the second

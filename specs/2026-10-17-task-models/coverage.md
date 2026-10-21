@@ -105,12 +105,11 @@ RT-DETRv4-s full-model CUDA gate.
 
 ## Non-kernel limits
 
-- **Opset policy.** NERT loads exactly opset 18 today; every new export must
-  be pinned or converted, and conversion does not prove semantic equivalence.
-  Native 13–18, then 11–12, is specified in
-  `specs/2026-10-21-opset-range/`; declarations above 18 are specified in
-  `specs/2026-10-21-opset-newer-than-18/`. Exact 18 remains in force until
-  the first phase lands.
+- **Opset policy.** NERT loads declared opsets 13–18 and canonicalizes the
+  known pre-18 forms to the opset-18 IR. Models below 13 are still pinned or
+  converted, and conversion does not prove semantic equivalence. Phase B
+  (11–12) is specified in `specs/2026-10-21-opset-range/`; declarations above
+  18 are specified in `specs/2026-10-21-opset-newer-than-18/`.
 - **Postprocessing.** Tokenization, NMS, mask/flow resize and Gaussian
   rendering are host-side and outside the ONNX gate.
 - **Consumer adapter.** Neuriplo selects CPU or opt-in CUDA for NERT; there is

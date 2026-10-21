@@ -23,9 +23,9 @@ if(NOT NERT_FIXTURE AND EXISTS
 endif()
 
 add_test(NAME nert_loader
-    COMMAND nert_loader_test --gtest_filter=NertLoader.*)
+    COMMAND nert_loader_test --gtest_filter=EngineLoader.*)
 add_test(NAME nert_loader_negative
-    COMMAND nert_loader_test --gtest_filter=NertLoaderNegative.*)
+    COMMAND nert_loader_test --gtest_filter=EngineLoaderNegative.*)
 
 add_executable(nert_shapes_test shape_inference_test.cpp)
 target_compile_features(nert_shapes_test PRIVATE cxx_std_17)

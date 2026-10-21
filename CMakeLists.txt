@@ -32,6 +32,7 @@ add_library(nert STATIC
     src/engine.cpp
     src/wire_reader.cpp
     src/model_loader.cpp
+    src/opset_normalize.cpp
     src/shape_inference.cpp
     src/memory_planner.cpp
     src/cpu_device.cpp

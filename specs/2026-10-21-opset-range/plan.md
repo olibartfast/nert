@@ -28,8 +28,9 @@ check; the model gate is the integration checkpoint.
   `supported opsets 13..18`.
   - Checks: synthetic opset-13 and opset-18 models load; 12 and 19 fail
     with the new message.
-- [T-6] Add the canonicalization call between node decoding and constant
-  folding. Pass the declared opset and the parsed graph. No-op for 18.
+- [T-6] Add the canonicalization call after the graph body decode and
+  folded-constant materialization, before shape inference. Pass the declared
+  opset and the parsed graph. No-op for 18.
   - Checks: an opset-18 graph is byte-for-byte unchanged in node order,
     inputs, attributes, and initializers.
 - [T-7] Add tests for [R-1], [R-6], [R-7] in `test/loader_test.cpp`

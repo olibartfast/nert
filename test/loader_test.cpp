@@ -26,6 +26,8 @@
 
 #include <gtest/gtest.h>
 
+#include "nert/device.hpp"
+#include "nert/executor.hpp"
 #include "nert/graph.hpp"
 #include "nert/model_loader.hpp"
 
@@ -84,11 +86,11 @@ void put_fixed32_field(std::string& out, int field_number, uint32_t bits)
     }
 }
 
-std::string encode_opset18()
+std::string encode_opset(int64_t version)
 {
     // Empty domain string decodes as the default/"ai.onnx" domain.
     std::string leaving; // domain (field 1) omitted in the import entry
-    put_varint_field(leaving, 2, 18);
+    put_varint_field(leaving, 2, static_cast<uint64_t>(version));
     return leaving;
 }
 
@@ -285,10 +287,10 @@ std::string encode_constant_node(const std::string& name,
         {encode_attribute_tensor("value", tensor_bytes)});
 }
 
-std::string encode_model(const std::string& graph_body)
+std::string encode_model(const std::string& graph_body, int64_t opset = 18)
 {
     std::string model;
-    put_sub(model, 8, encode_opset18());
+    put_sub(model, 8, encode_opset(opset));
     put_sub(model, 7, graph_body);
     return model;
 }
@@ -1037,6 +1039,178 @@ TEST_F(EngineLoader, HermeticConvKernelShapeAdmitted)
     EXPECT_EQ(graph.nodes.front().op_type, "Conv");
 }
 
+// Declared opsets 13..18 load directly. The graph stays in the opset-18 form,
+// so a model that only uses stable operators needs no rewrite.
+TEST_F(EngineLoader, HermeticOpsetRangeThirteenToEighteen)
+{
+    for (const int64_t opset : { int64_t{13}, int64_t{14}, int64_t{16},
+             int64_t{17}, int64_t{18} }) {
+        std::string body;
+        put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+        put_sub(body, 11, encode_value_info("x", 1, {2, 2}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 2}));
+
+        const nert::Graph graph = nert::LoadGraphFromFile(write_model_bytes(
+            "opset_" + std::to_string(opset) + ".onnx",
+            encode_model(body, opset)));
+        ASSERT_EQ(graph.nodes.size(), 1U) << "opset " << opset;
+        EXPECT_EQ(graph.nodes.front().op_type, "Relu");
+    }
+}
+
+// Opset-13 ReduceMean/ReduceL2/ReduceMax keep axes in an attribute. The loader
+// synthesizes an Int64 initializer and appends it as the second input.
+TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
+{
+    for (const std::string& op :
+        { std::string("ReduceMean"), std::string("ReduceL2"),
+            std::string("ReduceMax") }) {
+        std::string body;
+        put_sub(body, 1, encode_node("reduce0", op, {"x"}, {"y"},
+                          {encode_attribute_ints("axes", {1})}));
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+        const nert::Graph graph = nert::LoadGraphFromFile(write_model_bytes(
+            op + "_opset13.onnx", encode_model(body, 13)));
+        ASSERT_EQ(graph.nodes.size(), 1U) << op;
+        const nert::Node& node = graph.nodes.front();
+        EXPECT_EQ(node.op_type, op);
+        EXPECT_TRUE(node.attributes.empty()) << op;
+        ASSERT_EQ(node.inputs.size(), 2U) << op;
+        EXPECT_EQ(node.inputs[0], "x");
+        EXPECT_EQ(node.inputs[1], "reduce0/axes") << op;
+
+        const auto init_it = graph.initializers.find(node.inputs[1]);
+        ASSERT_NE(init_it, graph.initializers.end()) << op;
+        EXPECT_EQ(init_it->second.dtype, nert::DataType::Int64) << op;
+        EXPECT_EQ(init_it->second.dims, (std::vector<int64_t>{1})) << op;
+        EXPECT_EQ(std::get<std::vector<int64_t>>(init_it->second.values),
+            (std::vector<int64_t>{1}))
+            << op;
+
+        const auto tensor_it = graph.tensors.find(node.inputs[1]);
+        ASSERT_NE(tensor_it, graph.tensors.end()) << op;
+        EXPECT_EQ(tensor_it->second.dtype, nert::DataType::Int64) << op;
+        EXPECT_EQ(tensor_it->second.dims, (std::vector<int64_t>{1})) << op;
+    }
+}
+
+// The synthesized axes name is stable and avoids every existing tensor name.
+TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("reduce0/axes", {1}, {0}));
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                      {encode_attribute_ints("axes", {1})}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const nert::Graph first = nert::LoadGraphFromFile(
+        write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
+    ASSERT_EQ(first.nodes.front().inputs.size(), 2U);
+    EXPECT_EQ(first.nodes.front().inputs[1], "reduce0/axes_1");
+
+    const nert::Graph second = nert::LoadGraphFromFile(
+        write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
+    EXPECT_EQ(second.nodes.front().inputs[1], "reduce0/axes_1");
+}
+
+// An empty axes list and invalid axes keep their normal reduce semantics:
+// empty means every axis; duplicates and out-of-range values are rejected by
+// shape inference after the attribute has become an input.
+TEST_F(EngineLoader, HermeticReduceAxesEmptyAndInvalid)
+{
+    auto load = [](const std::vector<int64_t>& axes, const std::vector<int64_t>& out_dims) {
+        std::string body;
+        put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                          {encode_attribute_ints("axes", axes)}));
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+        put_sub(body, 12, encode_value_info("y", 1, out_dims));
+        return nert::LoadGraphFromFile(write_model_bytes("reduce_axes_edge.onnx", encode_model(body, 13)));
+    };
+
+    const nert::Graph empty = load({}, {1, 1, 1});
+    nert::Model empty_model(empty, {{"x", {2, 3, 4}}}, nert::CpuDevice());
+    std::vector<float> values;
+    for (int i = 0; i < 24; ++i) {
+        values.push_back(static_cast<float>(i));
+    }
+    const nert::InferenceResult result = empty_model.Run({{"x", values}});
+    ASSERT_EQ(result.outputs.at("y").size(), 1U);
+    EXPECT_NEAR(result.outputs.at("y").front(), 11.5F, 1e-6F);
+
+    const nert::Graph duplicate = load({1, 1}, {2, 1, 4});
+    EXPECT_THROW(nert::Model(duplicate, {{"x", {2, 3, 4}}}, nert::CpuDevice()), nert::ModelLoadException);
+
+    const nert::Graph out_of_range = load({3}, {2, 1, 4});
+    EXPECT_THROW(nert::Model(out_of_range, {{"x", {2, 3, 4}}}, nert::CpuDevice()), nert::ModelLoadException);
+}
+
+// The canonicalized opset-13 graph executes exactly like the opset-18 form.
+TEST_F(EngineLoader, HermeticOpset13ReduceMeanMatchesOpset18)
+{
+    std::vector<float> values;
+    for (int i = 0; i < 24; ++i) {
+        values.push_back(static_cast<float>(i));
+    }
+
+    auto load = [](int64_t opset) {
+        std::string body;
+        if (opset < 18) {
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                              {encode_attribute_ints("axes", {1})}));
+        } else {
+            put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", "axes"},
+                              {"y"}, {}));
+        }
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+        return nert::LoadGraphFromFile(write_model_bytes(
+            "reduce_run_" + std::to_string(opset) + ".onnx",
+            encode_model(body, opset)));
+    };
+
+    const nert::Graph graph13 = load(13);
+    const nert::Graph graph18 = load(18);
+    nert::Model model13(graph13, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
+    nert::Model model18(graph18, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
+
+    const nert::InferenceResult result13 = model13.Run({ { "x", values } });
+    const nert::InferenceResult result18 = model18.Run({ { "x", values } });
+    const std::vector<float>& out13 = result13.outputs.at("y");
+    const std::vector<float>& out18 = result18.outputs.at("y");
+    ASSERT_EQ(out13.size(), 8U);
+    ASSERT_EQ(out18.size(), out13.size());
+    for (size_t i = 0; i < out13.size(); ++i) {
+        EXPECT_NEAR(out13[i], out18[i], 1e-6F) << "element " << i;
+    }
+}
+
+// ScatterND's explicit default reduction ("none") is legal from opset 16 and
+// is dropped so the kernel sees the canonical no-reduction form.
+TEST_F(EngineLoader, HermeticScatterNDReductionNoneCanonicalized)
+{
+    for (const int64_t opset : { int64_t{16}, int64_t{18} }) {
+        std::string body;
+        put_sub(body, 5, encode_initializer_int64("idx", {1, 1}, {0}));
+        put_sub(body, 5, encode_initializer("upd", {1, 3}, {1.0F, 2.0F, 3.0F}));
+        put_sub(body, 1, encode_node("scatter0", "ScatterND",
+                          {"x", "idx", "upd"}, {"y"},
+                          {encode_attribute_string("reduction", "none")}));
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+        const nert::Graph graph = nert::LoadGraphFromFile(write_model_bytes(
+            "scatter_none_" + std::to_string(opset) + ".onnx",
+            encode_model(body, opset)));
+        ASSERT_EQ(graph.nodes.size(), 1U) << "opset " << opset;
+        EXPECT_TRUE(graph.nodes.front().attributes.empty()) << "opset " << opset;
+        EXPECT_EQ(graph.nodes.front().inputs.size(), 3U) << "opset " << opset;
+    }
+}
+
 // ===========================================================================
 // EngineLoaderNegative.* — rejections whose messages must name the node and
 // op type.
@@ -1150,16 +1324,18 @@ TEST_F(EngineLoaderNegative, UnsupportedGraphIoTypeRejected)
     }
 }
 
-// A Constant of any dtype outside FLOAT/INT64 is a load rejection naming the
-// node, the op type, and the element type.
+// A Constant of a dtype outside FLOAT/DOUBLE/INT32/INT64/BOOL is a load
+// rejection naming the node, the op type, and the element type.
 TEST_F(EngineLoaderNegative, ConstantOtherDtypeRejected)
 {
     for (const auto& [file, elem, tag] :
         {std::tuple<std::string, int64_t, std::string>{
-                 "const_i32.onnx", 6, "INT32"},
+                 "const_u8.onnx", 2, "UINT8"},
             std::tuple<std::string, int64_t, std::string>{
-                "const_u8.onnx", 2, "UINT8"}}) {
-        const std::string raw(4, '\x01');
+                "const_f16.onnx", 10, "FLOAT16"}}) {
+        // UINT8 is one raw byte per element; FLOAT16 is two. The test's point
+        // is the dtype rejection, so the payload must have the right length.
+        const std::string raw(static_cast<size_t>(elem == 10 ? 8 : 4), '\x01');
         std::string body;
         put_sub(body, 1,
             encode_constant_node("const_bad", "c_bad",
@@ -1560,5 +1736,139 @@ TEST_F(EngineLoaderNegative, ValueInfoNegativeDimensionRejected)
         load_error_message(encode_model(body), "vi_neg_dim.onnx");
     EXPECT_NE(message.find("neg"), std::string::npos) << "message: " << message;
     EXPECT_NE(message.find("non-fixed"), std::string::npos)
+        << "message: " << message;
+}
+
+// Declared opsets outside 13..18 reject at the model level and name both the
+// declared version and the supported range.
+TEST_F(EngineLoaderNegative, OpsetOutsideSupportedRangeRejected)
+{
+    for (const int64_t opset : { int64_t{12}, int64_t{19} }) {
+        std::string body;
+        put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+        put_sub(body, 11, encode_value_info("x", 1, {2}));
+        put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+        const std::string message = load_error_message(
+            encode_model(body, opset),
+            "opset_" + std::to_string(opset) + ".onnx");
+        EXPECT_NE(message.find(std::to_string(opset)), std::string::npos)
+            << "message: " << message;
+        EXPECT_NE(message.find("13..18"), std::string::npos)
+            << "message: " << message;
+    }
+}
+
+// A model without an ONNX-domain opset import still fails.
+TEST_F(EngineLoaderNegative, MissingOpsetDeclarationRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+    std::string model;
+    put_sub(model, 7, body);
+    const std::string message =
+        load_error_message(model, "missing_opset.onnx");
+    EXPECT_NE(message.find("does not declare"), std::string::npos)
+        << "message: " << message;
+}
+
+// At opset 18 the reduce axes are an input, so the old attribute is illegal
+// even though the opset normalizer admits it for older declarations.
+TEST_F(EngineLoaderNegative, ReduceAxesAttributeAtOpset18Rejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                      {encode_attribute_ints("axes", {1})}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "reduce_axes_18.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("opset 18"), std::string::npos)
+        << "message: " << message;
+}
+
+// An axes input is not part of the opset-13..17 reduce schemas.
+TEST_F(EngineLoaderNegative, ReduceAxesInputBeforeOpset18Rejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", "axes"}, {"y"},
+                      {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 13), "reduce_axes_input_13.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("opset 18"), std::string::npos)
+        << "message: " << message;
+}
+
+// noop_with_empty_axes was added at opset 18; it cannot appear in an older
+// reduce declaration.
+TEST_F(EngineLoaderNegative, ReduceNoopBeforeOpset18Rejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                      {encode_attribute_ints("axes", {1}),
+                          encode_attribute_int("noop_with_empty_axes", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 13), "reduce_noop_13.onnx");
+    EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("opset 18"), std::string::npos)
+        << "message: " << message;
+}
+
+// Only the default ScatterND reduction is executable here.
+TEST_F(EngineLoaderNegative, ScatterNDUnsupportedReductionRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("idx", {1, 1}, {0}));
+    put_sub(body, 5, encode_initializer("upd", {1, 3}, {1.0F, 2.0F, 3.0F}));
+    put_sub(body, 1, encode_node("scatter0", "ScatterND",
+                      {"x", "idx", "upd"}, {"y"},
+                      {encode_attribute_string("reduction", "add")}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "scatter_add.onnx");
+    EXPECT_NE(message.find("scatter0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("ScatterND"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("add"), std::string::npos) << "message: " << message;
+}
+
+// The reduction attribute itself is not legal before opset 16.
+TEST_F(EngineLoaderNegative, ScatterNDReductionBeforeOpset16Rejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("idx", {1, 1}, {0}));
+    put_sub(body, 5, encode_initializer("upd", {1, 3}, {1.0F, 2.0F, 3.0F}));
+    put_sub(body, 1, encode_node("scatter0", "ScatterND",
+                      {"x", "idx", "upd"}, {"y"},
+                      {encode_attribute_string("reduction", "none")}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 13), "scatter_13.onnx");
+    EXPECT_NE(message.find("reduction"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("opset 16"), std::string::npos)
         << "message: " << message;
 }
