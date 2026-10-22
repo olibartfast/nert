@@ -65,12 +65,6 @@ void put_varint_field(std::string& out, int field_number, uint64_t value) {
     put_varint(out, value);
 }
 
-std::string encode_opset18() {
-    std::string leaving; // domain (field 1) omitted; default ONNX domain
-    put_varint_field(leaving, 2, 18);
-    return leaving;
-}
-
 std::string encode_value_info(const std::string& name, int64_t elem_type, const std::vector<int64_t>& dims) {
     std::string vi;
     put_length_delimited(vi, 1, name);
@@ -199,9 +193,11 @@ std::string encode_attribute_tensor(const std::string& name, const std::string& 
     return a;
 }
 
-std::string encode_model(const std::string& graph_body) {
+std::string encode_model(const std::string& graph_body, int64_t opset = 18) {
     std::string model;
-    put_sub(model, 8, encode_opset18());
+    std::string declaration;
+    put_varint_field(declaration, 2, static_cast<uint64_t>(opset));
+    put_sub(model, 8, declaration);
     put_sub(model, 7, graph_body);
     return model;
 }
@@ -376,6 +372,73 @@ TEST_F(EngineShapes, ReduceMeanKeepdimsOff) {
     const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
     ASSERT_EQ(shapes.tensors.count("y"), 1U);
     EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
+}
+
+// A declared-13 ReduceMean keeps axes in the attribute and has no axes input.
+// Shape inference reads that form in place and produces the same output shape.
+TEST_F(EngineShapes, ReduceMeanAttributeFormDeclaredThirteen) {
+    std::string body;
+    put_sub(body, 1, encode_node("mean0", "ReduceMean", {"x"}, {"y"},
+                    {encode_attribute_ints("axes", {-1, -2}), encode_attribute_int("keepdims", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const nert::Graph graph = load_graph("mean_attr_13.onnx", encode_model(body, 13));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 13);
+    EXPECT_EQ(graph.nodes.front().inputs.size(), 1U);
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    ASSERT_EQ(shapes.tensors.count("y"), 1U);
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3}));
+}
+
+// A present-but-empty axes input is valid ONNX; with noop_with_empty_axes the
+// reduce is an identity copy rather than a shape error.
+TEST_F(EngineShapes, ReduceMeanEmptyAxesNoopIdentity) {
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {0}, {}));
+    put_sub(body, 1, encode_node("mean_empty", "ReduceMean", {"x", "axes"}, {"y"},
+                    {encode_attribute_int("noop_with_empty_axes", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4, 4}));
+
+    const nert::Graph graph = load_graph("mean_empty_noop.onnx", encode_model(body));
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3, 4, 4}}});
+    ASSERT_EQ(shapes.tensors.count("y"), 1U);
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 3, 4, 4}));
+}
+
+// ReduceL2 and ReduceMax also keep the pre-18 axes attribute in the graph.
+TEST_F(EngineShapes, ReduceL2AttributeFormDeclaredThirteen) {
+    std::string body;
+    put_sub(body, 1, encode_node("l2_0", "ReduceL2", {"x"}, {"y"},
+                    {encode_attribute_ints("axes", {1}), encode_attribute_int("keepdims", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
+
+    const nert::Graph graph = load_graph("l2_attr_13.onnx", encode_model(body, 13));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 13);
+    EXPECT_EQ(graph.nodes.front().inputs.size(), 1U);
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3, 4}}});
+    ASSERT_EQ(shapes.tensors.count("y"), 1U);
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4}));
+}
+
+TEST_F(EngineShapes, ReduceMaxAttributeFormDeclaredThirteen) {
+    std::string body;
+    put_sub(body, 1, encode_node("rmax_attr", "ReduceMax", {"x"}, {"y"},
+                    {encode_attribute_ints("axes", {1}), encode_attribute_int("keepdims", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 4}));
+
+    const nert::Graph graph = load_graph("rmax_attr_13.onnx", encode_model(body, 13));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 13);
+    EXPECT_EQ(graph.nodes.front().inputs.size(), 1U);
+    const nert::InferredShapes shapes = nert::InferShapes(graph, {{"x", {2, 3, 4}}});
+    ASSERT_EQ(shapes.tensors.count("y"), 1U);
+    EXPECT_EQ(shapes.tensors.at("y").dims, (std::vector<int64_t>{2, 4}));
 }
 
 // Conv: non-default stride and asymmetric pads.

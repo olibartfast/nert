@@ -13,6 +13,7 @@
 #include "nert/shapes.hpp"
 
 #include "nert/einsum.hpp"
+#include "reduce_axes.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1326,12 +1327,21 @@ TensorInfo reducemean_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
-    const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    const bool axes_supplied =
-        node.inputs.size() > 1 && !node.inputs[1].empty();
-    if (axes_supplied) {
+    bool axes_supplied = false;
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceMean 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes_supplied = true;
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
 
@@ -1350,10 +1360,10 @@ TensorInfo reducemean_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
-        // noop_with_empty_axes applies only when an empty axes input is
-        // present; with the axes input absent the mean reduces every axis,
-        // matching the CPU oracle in src/kernels/reduce_mean.cpp.
-        if (noop_empty && axes_supplied) {
+        // noop_with_empty_axes applies only to a present empty axes input;
+        // with the input absent, or with the old attribute form, the mean
+        // reduces every axis.
+        if (resolved_axes.noop_with_empty_axes && axes_supplied) {
             return TensorInfo{DataType::Float32, out};
         }
         for (int64_t i = 0; i < rank; ++i) {
@@ -1577,10 +1587,21 @@ TensorInfo reducel2_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
-    const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    bool axes_supplied = false;
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceL2 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes_supplied = true;
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
     std::set<int64_t> seen;
@@ -1598,7 +1619,7 @@ TensorInfo reducel2_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
-        if (noop_empty) {
+        if (resolved_axes.noop_with_empty_axes && axes_supplied) {
             return TensorInfo{dtype, out};
         }
         for (int64_t i = 0; i < rank; ++i) {
@@ -2258,11 +2279,19 @@ TensorInfo reducemax_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    const bool axes_supplied =
-        node.inputs.size() > 1 && !node.inputs[1].empty();
-    if (axes_supplied) {
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceMax 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
 

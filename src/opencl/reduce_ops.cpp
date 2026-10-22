@@ -4,6 +4,7 @@
 // work-item per output, walking the reduced axes; ArgMax walks one axis and
 // returns int64 indices. Accumulation is float32, compared with tolerance.
 
+#include "../reduce_axes.hpp"
 #include "nert/device.hpp"
 #include "runtime.hpp"
 
@@ -156,36 +157,54 @@ void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std
         throw InferenceException(context + ": rank exceeds the OpenCL reduction limit of 16");
     }
     const bool keepdims = IntAttribute(node, "keepdims", 1, context) != 0;
-    const bool noop_empty = IntAttribute(node, "noop_with_empty_axes", 0, context) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
+    // Resolve the axes once: the old attribute form reduces all axes when the
+    // attribute is absent or empty; the input form treats an absent input as
+    // all axes, and only a present empty input follows noop_with_empty_axes.
     std::vector<int64_t> axes;
     bool identity = false;
-    if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
-        const TensorView& axes_view = inputs[1];
-        if (axes_view.dtype != DataType::Int64) {
-            throw InferenceException(context + ": axes tensor must be int64");
-        }
-        int64_t axes_count = 1;
-        for (const int64_t dim : axes_view.dims) {
-            axes_count *= dim;
-        }
-        if (axes_count > 0) {
-            if (axes_view.data == nullptr) {
-                throw InferenceException(context + ": null axes buffer");
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
             }
-            axes.resize(static_cast<std::size_t>(axes_count), 0);
-            CheckCl(clEnqueueReadBuffer(
-                        opencl_runtime::Queue(), reinterpret_cast<cl_mem>(const_cast<void*>(axes_view.data)), CL_TRUE,
-                        0, static_cast<std::size_t>(axes_count) * sizeof(int64_t), axes.data(), 0, nullptr, nullptr),
-                    "clEnqueueReadBuffer", context);
+            axes = *values;
         }
-    }
-    if (axes.empty()) {
-        if (noop_empty) {
-            identity = true;
-        } else {
+        if (axes.empty()) {
             for (int64_t i = 0; i < rank; ++i) {
                 axes.push_back(i);
+            }
+        }
+    } else {
+        bool axes_supplied = false;
+        if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
+            axes_supplied = true;
+            const TensorView& axes_view = inputs[1];
+            if (axes_view.dtype != DataType::Int64) {
+                throw InferenceException(context + ": axes tensor must be int64");
+            }
+            const int64_t axes_count = ReduceAxesElementCount(axes_view.dims, context);
+            if (axes_count > 0) {
+                if (axes_view.data == nullptr) {
+                    throw InferenceException(context + ": null axes buffer");
+                }
+                axes.resize(static_cast<std::size_t>(axes_count), 0);
+                CheckCl(clEnqueueReadBuffer(opencl_runtime::Queue(),
+                                            reinterpret_cast<cl_mem>(const_cast<void*>(axes_view.data)), CL_TRUE, 0,
+                                            static_cast<std::size_t>(axes_count) * sizeof(int64_t), axes.data(), 0,
+                                            nullptr, nullptr),
+                        "clEnqueueReadBuffer", context);
+            }
+        }
+        if (axes.empty()) {
+            if (axes_supplied && resolved_axes.noop_with_empty_axes) {
+                identity = true;
+            } else {
+                for (int64_t i = 0; i < rank; ++i) {
+                    axes.push_back(i);
+                }
             }
         }
     }

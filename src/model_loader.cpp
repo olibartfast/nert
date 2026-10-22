@@ -24,6 +24,7 @@
 
 #include "opset_compat.hpp" // private src-local newer-opset gate
 #include "opset_normalize.hpp" // private src-local canonicalizer
+#include "reduce_axes.hpp" // private src-local shared reduce-form resolver
 #include "wire_reader.hpp" // private src-local reader
 
 #include "nert/einsum.hpp"
@@ -621,7 +622,8 @@ const std::unordered_map<std::string, AttrSlot>& reducemean_attrs()
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
         { "noop_with_empty_axes", AttrSlot::Int },
-        // Pre-18 form, consumed by the loader's opset normalizer.
+        // Pre-18 form; the loader admits it only below schema 18 and the
+        // shared reduce-axes resolver reads it in place.
         { "axes", AttrSlot::IntList },
     };
     return k;
@@ -727,8 +729,12 @@ const std::unordered_map<std::string, AttrSlot>& reducemax_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
-        // Pre-18 form, consumed by the loader's opset normalizer.
+        // Pre-18 form; the loader admits it only below schema 18 and the
+        // shared reduce-axes resolver reads it in place.
         { "axes", AttrSlot::IntList },
+        // Schema 18+ attribute, decoded so the form validator can report the
+        // tracked capability gap instead of the generic allowlist error.
+        { "noop_with_empty_axes", AttrSlot::Int },
     };
     return k;
 }
@@ -1441,6 +1447,59 @@ void validate_attr_policy(Node& node)
     // tensor-scalar decode already pinned it to INT64, FLOAT, or BOOL.
 }
 
+// ReduceMean/ReduceL2/ReduceMax admit only the axes form legal for the
+// node's effective schema. The old attribute form stays in the graph; this
+// gate only rejects a form the source schema does not have. `declared_opset`
+// is carried separately from the effective schema because the message must
+// distinguish the model declaration from the resolved schema.
+void validate_reduce_axes_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ReduceMean" && node.op_type != "ReduceL2" &&
+        node.op_type != "ReduceMax") {
+        return;
+    }
+    auto has_attribute = [&node](const std::string& name) {
+        for (const Attribute& attribute : node.attributes) {
+            if (attribute.name == name) {
+                return true;
+            }
+        }
+        return false;
+    };
+    // Any second operand is illegal before schema 18, including the empty
+    // string form an exporter may use for an omitted optional input.
+    const bool has_axes_input = node.inputs.size() > 1;
+    const std::string prefix = attr_msg_prefix(node.name, node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kReduceAxesInputSchema) {
+        if (has_axes_input) {
+            throw ModelLoadException(prefix +
+                ": the 'axes' input requires schema " +
+                std::to_string(kReduceAxesInputSchema) + context);
+        }
+        if (has_attribute("noop_with_empty_axes")) {
+            throw ModelLoadException(prefix +
+                ": 'noop_with_empty_axes' requires schema " +
+                std::to_string(kReduceAxesInputSchema) + context);
+        }
+        return;
+    }
+    if (has_attribute("axes")) {
+        throw ModelLoadException(prefix +
+            ": the 'axes' attribute is only valid before schema " +
+            std::to_string(kReduceAxesInputSchema) + context);
+    }
+    if (node.op_type == "ReduceMax" &&
+        has_attribute("noop_with_empty_axes")) {
+        throw ModelLoadException(prefix +
+            ": ReduceMax 'noop_with_empty_axes' is not implemented" + context +
+            " (tracked follow-up)");
+    }
+}
+
 Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
 {
     const NodeRaw raw = read_node_raw(data, size);
@@ -1528,6 +1587,7 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
             map_attribute(a, slot_it->second, node.name, node.op_type));
     }
     validate_attr_policy(node);
+    validate_reduce_axes_form(node, declared_opset);
     return node;
 }
 

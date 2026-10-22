@@ -18,6 +18,7 @@
 // cap rank at 16 where index math is packed into kernel arguments. The OpenCL
 // C sources compile once per process via the shared runtime.
 
+#include "../reduce_axes.hpp"
 #include "nert/device.hpp"
 #include "runtime.hpp"
 
@@ -611,23 +612,36 @@ void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const s
     }
 
     const int64_t keepdims = IntAttribute(node, "keepdims", 1, context);
-    const int64_t noopEmpty = IntAttribute(node, "noop_with_empty_axes", 0, context);
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     // Resolve the axes exactly like the CPU oracle (src/kernels/
-    // reduce_mean.cpp): an absent axes input reduces every axis and
-    // noop_with_empty_axes does not apply there; a present axes input
-    // carries the axes, and only a present-but-empty axes input turns the
-    // attribute into an identity copy. (A zero-element axes tensor is
-    // rejected by the dimension check today, so the identity branch mirrors
-    // the oracle without currently firing.)
+    // reduce_mean.cpp): the old attribute form reduces every axis when the
+    // attribute is absent or empty; the input form treats an absent input as
+    // every axis, and only a present-but-empty input follows
+    // noop_with_empty_axes as an identity copy. (A zero-element axes tensor
+    // is rejected by the dimension check today, so the identity branch
+    // mirrors the oracle without currently firing.)
     std::vector<int64_t> axes;
     bool identity = false;
-    if (inputs.size() == 2) {
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
+            }
+            axes = *values;
+        }
+        if (axes.empty()) {
+            for (int64_t i = 0; i < rank; ++i) {
+                axes.push_back(i);
+            }
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& axesView = inputs[1];
         if (axesView.dtype != DataType::Int64) {
             throw InferenceException(context + ": axes tensor must be int64");
         }
-        const int64_t axesCount = ElementCount(axesView.dims, context);
+        const int64_t axesCount = ReduceAxesElementCount(axesView.dims, context);
         if (axesCount > 0) {
             if (axesView.data == nullptr) {
                 throw InferenceException(context + ": null axes buffer");
@@ -635,7 +649,7 @@ void ReduceMean(const Node& node, const std::vector<TensorView>& inputs, const s
             // The axes tensor lives in device memory; read the small values
             // back so the host can validate them like the CPU oracle.
             axes = ReadInt64(axesView, axesCount, context);
-        } else if (noopEmpty != 0) {
+        } else if (resolved_axes.noop_with_empty_axes) {
             identity = true;
         } else {
             for (int64_t i = 0; i < rank; ++i) {

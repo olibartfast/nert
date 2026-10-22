@@ -1094,7 +1094,8 @@ TEST_F(EngineLoader, HermeticOpsetRangeElevenToEighteen)
 }
 
 // Opset-13 ReduceMean/ReduceL2/ReduceMax keep axes in an attribute. The loader
-// synthesizes an Int64 initializer and appends it as the second input.
+// leaves the source form in place: one input, the `axes` attribute, and no
+// synthesized axes initializer.
 TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
 {
     for (const std::string& op :
@@ -1111,27 +1112,33 @@ TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
         ASSERT_EQ(graph.nodes.size(), 1U) << op;
         const nert::Node& node = graph.nodes.front();
         EXPECT_EQ(node.op_type, op);
-        EXPECT_TRUE(node.attributes.empty()) << op;
-        ASSERT_EQ(node.inputs.size(), 2U) << op;
+        EXPECT_EQ(node.schema_version, 13) << op;
+        ASSERT_EQ(node.inputs.size(), 1U) << op;
         EXPECT_EQ(node.inputs[0], "x");
-        EXPECT_EQ(node.inputs[1], "reduce0/axes") << op;
 
-        const auto init_it = graph.initializers.find(node.inputs[1]);
-        ASSERT_NE(init_it, graph.initializers.end()) << op;
-        EXPECT_EQ(init_it->second.dtype, nert::DataType::Int64) << op;
-        EXPECT_EQ(init_it->second.dims, (std::vector<int64_t>{1})) << op;
-        EXPECT_EQ(std::get<std::vector<int64_t>>(init_it->second.values),
+        const nert::Attribute* axes = nullptr;
+        for (const nert::Attribute& attribute : node.attributes) {
+            if (attribute.name == "axes") {
+                axes = &attribute;
+            }
+        }
+        ASSERT_NE(axes, nullptr) << op;
+        EXPECT_EQ(std::get<std::vector<int64_t>>(axes->value),
             (std::vector<int64_t>{1}))
             << op;
+        EXPECT_EQ(node.attributes.size(), 1U) << op;
 
-        const auto tensor_it = graph.tensors.find(node.inputs[1]);
-        ASSERT_NE(tensor_it, graph.tensors.end()) << op;
-        EXPECT_EQ(tensor_it->second.dtype, nert::DataType::Int64) << op;
-        EXPECT_EQ(tensor_it->second.dims, (std::vector<int64_t>{1})) << op;
+        // No synthesized axes initializer or tensor name exists.
+        EXPECT_EQ(graph.initializers.count("reduce0/axes"), 0U) << op;
+        EXPECT_EQ(graph.initializers.count("reduce0/axes_1"), 0U) << op;
+        EXPECT_EQ(graph.tensors.count("reduce0/axes"), 0U) << op;
+        EXPECT_EQ(graph.tensors.count("reduce0/axes_1"), 0U) << op;
     }
 }
 
-// The synthesized axes name is stable and avoids every existing tensor name.
+// The old attribute form no longer allocates a synthesized axes name, so a
+// tensor that happens to use that name is left untouched and does not affect
+// loading or the node's inputs.
 TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
 {
     std::string body;
@@ -1143,12 +1150,17 @@ TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
 
     const nert::Graph first = nert::LoadGraphFromFile(
         write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
-    ASSERT_EQ(first.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(first.nodes.front().inputs[1], "reduce0/axes_1");
+    ASSERT_EQ(first.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(first.nodes.front().inputs[0], "x");
+    EXPECT_EQ(first.initializers.count("reduce0/axes"), 1U);
+    EXPECT_EQ(std::get<std::vector<int64_t>>(
+                  first.initializers.at("reduce0/axes").values),
+        (std::vector<int64_t>{0}));
 
     const nert::Graph second = nert::LoadGraphFromFile(
         write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
-    EXPECT_EQ(second.nodes.front().inputs[1], "reduce0/axes_1");
+    EXPECT_EQ(second.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(second.initializers.count("reduce0/axes"), 1U);
 }
 
 // An empty axes list and invalid axes keep their normal reduce semantics:
@@ -1772,14 +1784,22 @@ TEST_F(EngineLoader, HermeticNodeSchemaVersionTracksDeclaredOpset)
         EXPECT_EQ(graph.nodes.front().op_type, "ReduceMean");
         EXPECT_EQ(graph.nodes.front().schema_version, entry.second)
             << "declared " << entry.first;
-        // Phase A still normalizes the source form: every case leaves the
-        // reduce axes as the second input and removes the old attribute. The
-        // schema_version above remains the source schema until Phase B
-        // removes this rewrite.
-        EXPECT_EQ(graph.nodes.front().inputs.size(), 2U)
-            << "declared " << entry.first;
-        EXPECT_TRUE(graph.nodes.front().attributes.empty())
-            << "declared " << entry.first;
+        // The source form stays in the graph. Declarations before schema 18
+        // keep the axes attribute and one input; declarations at or above 18
+        // keep the axes input and no attribute.
+        if (entry.second < 18) {
+            EXPECT_EQ(graph.nodes.front().inputs.size(), 1U)
+                << "declared " << entry.first;
+            EXPECT_EQ(graph.nodes.front().attributes.size(), 1U)
+                << "declared " << entry.first;
+            EXPECT_EQ(graph.nodes.front().attributes.front().name, "axes")
+                << "declared " << entry.first;
+        } else {
+            EXPECT_EQ(graph.nodes.front().inputs.size(), 2U)
+                << "declared " << entry.first;
+            EXPECT_TRUE(graph.nodes.front().attributes.empty())
+                << "declared " << entry.first;
+        }
     }
 }
 
@@ -2424,8 +2444,7 @@ TEST_F(EngineLoaderNegative, NoEffectiveSchemaAtDeclaredOpsetRejected)
         << "message: " << message;
 }
 
-// At opset 18 the reduce axes are an input, so the old attribute is illegal
-// even though the opset normalizer admits it for older declarations.
+// At opset 18 the reduce axes are an input, so the old attribute is illegal.
 TEST_F(EngineLoaderNegative, ReduceAxesAttributeAtOpset18Rejected)
 {
     std::string body;
@@ -2438,8 +2457,12 @@ TEST_F(EngineLoaderNegative, ReduceAxesAttributeAtOpset18Rejected)
         load_error_message(encode_model(body, 18), "reduce_axes_18.onnx");
     EXPECT_NE(message.find("reduce0"), std::string::npos)
         << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("declared opset 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2457,8 +2480,64 @@ TEST_F(EngineLoaderNegative, ReduceAxesInputBeforeOpset18Rejected)
         load_error_message(encode_model(body, 13), "reduce_axes_input_13.onnx");
     EXPECT_NE(message.find("reduce0"), std::string::npos)
         << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
+        << "message: " << message;
+}
+
+// An empty-string second operand is still an operand; it is illegal before
+// schema 18, where the axes form is the attribute.
+TEST_F(EngineLoaderNegative, ReduceEmptyAxesInputBeforeOpset18Rejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", ""}, {"y"},
+                      {encode_attribute_ints("axes", {1})}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message = load_error_message(
+        encode_model(body, 13), "reduce_empty_axes_input_13.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
+        << "message: " << message;
+}
+
+// ReduceMax schema 18 defines noop_with_empty_axes, but the identity behavior
+// is not implemented yet; report it as a capability gap, not an unknown
+// attribute.
+TEST_F(EngineLoaderNegative, ReduceMaxNoopAtOpset18RejectedAsCapabilityGap)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+    put_sub(body, 1, encode_node("rmax0", "ReduceMax", {"x", "axes"}, {"y"},
+                      {encode_attribute_int("noop_with_empty_axes", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "reduce_max_noop_18.onnx");
+    EXPECT_NE(message.find("rmax0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("ReduceMax"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("not implemented"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2475,9 +2554,15 @@ TEST_F(EngineLoaderNegative, ReduceNoopBeforeOpset18Rejected)
 
     const std::string message =
         load_error_message(encode_model(body, 13), "reduce_noop_13.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
 }
 

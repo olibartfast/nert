@@ -1,8 +1,10 @@
 // ReduceMax: maximum over the requested axes.
 //
-// The axes arrive as an optional int64 input; an absent axes input reduces
-// every axis. The `keepdims` attribute defaults to 1.
+// The axes arrive as an optional int64 input from schema 18 and as an
+// optional int64-list attribute before it; an absent or empty axes value
+// reduces every axis. The `keepdims` attribute defaults to 1.
 
+#include "../reduce_axes.hpp"
 #include "kernels.hpp"
 
 #include <algorithm>
@@ -61,27 +63,34 @@ void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const st
     }
 
     const int64_t keepdims = IntAttribute(node, "keepdims", 1, context);
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
-    // Resolve the axes: an absent axes input means every axis.
+    // Resolve the axes once: the old attribute form and the input form both
+    // reduce every axis when the axes value is absent or empty.
     std::vector<int64_t> axes;
-    if (inputs.size() == 2) {
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& axesView = inputs[1];
         if (axesView.dtype != DataType::Int64) {
             throw InferenceException(context + ": axes tensor must be int64");
         }
-        const int64_t axesCount = ElementCount(axesView.dims, context);
+        const int64_t axesCount = ReduceAxesElementCount(axesView.dims, context);
         if (axesCount > 0 && axesView.data == nullptr) {
             throw InferenceException(context + ": null axes buffer");
         }
-        if (axesCount == 0) {
-            for (int64_t i = 0; i < rank; ++i) {
-                axes.push_back(i);
-            }
-        } else {
+        if (axesCount > 0) {
             const int64_t* values = static_cast<const int64_t*>(axesView.data);
             axes.assign(values, values + axesCount);
         }
-    } else {
+    }
+    if (axes.empty()) {
         for (int64_t i = 0; i < rank; ++i) {
             axes.push_back(i);
         }

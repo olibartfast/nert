@@ -56,15 +56,33 @@ assertions.
 
 ## Phase B — reduce family
 
-- [ ] [V-6] Reduce forms belong to [R-4]/[R-7]: a declared-13
+- [x] [V-6] Reduce forms belong to [R-4]/[R-7]: a declared-13
   `ReduceMean`/`ReduceL2`/`ReduceMax` with `axes` executes the old form
   without an inserted axes initializer and matches the declared-18 result.
-- [ ] [V-7] Loader legality belongs to [R-6]: axes as an input before 18,
+  Verified 2026-10-22: the loader keeps one input plus the `axes` attribute
+  and creates no `reduce0/axes*` initializer; CPU kernel, shape-inference,
+  CUDA, and OpenCL tests execute both forms and agree. Empty present axes
+  inputs are covered: `ReduceMean` with noop identity, omitted/Unknown axes,
+  and `ReduceMax` reducing all axes. Existing schema-0 / input-form tests
+  still pass.
+- [x] [V-7] Loader legality belongs to [R-6]: axes as an input before 18,
   axes as an attribute at 18+, and `noop_with_empty_axes` before 18 are
-  rejected with node/operator/declared/effective context.
-- [ ] [V-8] Device parity belongs to [R-7]: CPU and every enabled GPU device
+  rejected with node/operator/declared/effective context. The pre-18 empty
+  string second operand is rejected too. `ReduceMax` schema 18+
+  `noop_with_empty_axes` is reported as an explicit capability gap (the
+  identity behavior is a tracked follow-up), not as an unknown attribute.
+  Verified 2026-10-22 by the five `EngineLoaderNegative` reduce-form tests;
+  messages name the node, operator, offending form, declared opset 13 (or
+  18), and effective schema 13 (or 18). `nert_loader` passes 101/101.
+- [x] [V-8] Device parity belongs to [R-7]: CPU and every enabled GPU device
   that has the reduce row produce matching results for both forms; missing
-  HIP rows are recorded as gaps, not passes.
+  HIP rows are recorded as gaps, not passes. Verified 2026-10-22: CUDA
+  `ReduceMean`/`ReduceL2`/`ReduceMax` attribute-form tests match the CPU
+  oracle; OpenCL `ReduceMean` (`index_extra`), `ReduceL2` (`owlv2_rows`), and
+  `ReduceMax` (`reduce_extra`) do the same. HIP is a recorded gap: this build
+  has HIP off, and `src/hip/` has no `ReduceMean`/`ReduceL2`/`ReduceMax` row
+  (only add/div/mul/relu/reshape/sigmoid/softmax/sub/tanh), so parity cannot
+  be claimed there.
 
 ## Phase C — axes, Split, and ScatterND
 
@@ -99,7 +117,7 @@ assertions.
   remaining rejected post-18 capabilities.
 - [x] [V-18] Formatting and warnings: `scripts/format.sh --check` exits 0;
   the build uses the existing `-Wall -Wextra -Wpedantic` policy. Verified
-  2026-10-22: 238 files formatted; build warnings are pre-existing test
+  2026-10-22: 239 files formatted; build warnings are pre-existing test
   warnings, not new production warnings.
 
 ## Evidence table
@@ -111,4 +129,7 @@ assertions.
 | V-3 | `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_filter='EngineLoaderNegative.NoEffectiveSchemaAtDeclaredOpsetRejected'` | pass (1/1) | 2026-10-22 | `LayerNormalization` at declared 11 names `ln0`, `LayerNormalization`, `declared opset 11`, `no effective schema`, and `first schema is 17`. |
 | V-4 | `cmake -S . -B build -DNERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx && cmake --build build --parallel "$(nproc)" && NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ctest --test-dir build --output-on-failure` | pass (13/13) | 2026-10-22 | `nert_loader` 101/101, `nert_executor`, and `nert_opset_table` included. Environment note: the older `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export (GlobalAveragePool/Flatten, 42 initializers) and fails fixture-content assertions in the loader and shape suites; it is not the pinned reference. |
 | V-5 | `git diff --stat`; `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_color=no` | pass (101/101) | 2026-10-22 | `src/opset_normalize.{hpp,cpp}` are unmodified; the legacy Softmax expansion and all negative normalizer tests pass. |
-| V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 238 files formatted; no new production warnings. |
+| V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 101/101; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
+| V-7 | `nert_loader_negative` reduce-form tests | pass | 2026-10-22 | Five tests: pre-18 input, empty-string input, attribute at 18, noop before 18, and ReduceMax noop at 18 as a capability gap; each names node/op/declared/effective. |
+| V-8 | `ctest --test-dir build-gpu -R 'nert_cuda_misc|nert_cuda_kernels|nert_opencl_kernels|nert_opencl_reduce_extra|nert_opencl_index_extra|nert_opencl_owlv2_rows'` | pass (6/6) | 2026-10-22 | CUDA Mean/L2/Max and OpenCL Mean/L2/Max attribute forms match the CPU oracle. HIP has no reduce rows; recorded gap. |
+| V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

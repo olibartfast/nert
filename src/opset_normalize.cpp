@@ -14,7 +14,6 @@
 namespace nert {
 namespace {
 
-constexpr int64_t kReduceAxesAsInputOpset = 18;
 constexpr int64_t kScatterReductionOpset = 16;
 constexpr int64_t kAxesAsInputOpset = 13;
 constexpr int64_t kSoftmaxCoercionOpset = 13;
@@ -154,44 +153,6 @@ void append_int64_input(Graph& graph, NameAllocator& names, Node& node, const st
     graph.initializers.emplace(name, std::move(initializer));
     graph.tensors[name] = TensorInfo{DataType::Int64, {static_cast<int64_t>(values.size())}};
     node.inputs.push_back(name);
-}
-
-// Opsets 11..17 keep the reduce axes in an attribute; opset 18 made them an
-// optional second input. The canonical graph keeps the 18 form.
-void canonicalize_reduce_axes(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    const std::string who = node_label(node);
-    const Attribute* axes_attribute = find_attribute(node, "axes");
-
-    if (declared_opset >= kReduceAxesAsInputOpset) {
-        if (axes_attribute != nullptr) {
-            throw ModelLoadException(who + ": 'axes' must be an input at opset " + std::to_string(declared_opset) +
-                                     ", not an attribute");
-        }
-        return;
-    }
-
-    if (node.inputs.size() > 1) {
-        throw ModelLoadException(who + ": the 'axes' input is only valid from opset 18; this model declares opset " +
-                                 std::to_string(declared_opset));
-    }
-    if (find_attribute(node, "noop_with_empty_axes") != nullptr) {
-        throw ModelLoadException(who + ": 'noop_with_empty_axes' is only valid from opset 18; this model " +
-                                 "declares opset " + std::to_string(declared_opset));
-    }
-    if (axes_attribute == nullptr) {
-        return;
-    }
-
-    const std::vector<int64_t> axes = int_list_attribute(*axes_attribute, who);
-    if (axes.empty()) {
-        // An empty axes attribute means "reduce every axis"; in the 18 form
-        // that is expressed by omitting the optional axes input.
-        erase_attribute(node, "axes");
-        return;
-    }
-
-    append_int64_input(graph, names, node, axes, "axes");
-    erase_attribute(node, "axes");
 }
 
 // ScatterND gained an optional `reduction` attribute at opset 16. The kernels
@@ -413,9 +374,7 @@ void rewrite_legacy_softmax(const Graph& graph, NameAllocator& names, Node& node
 }
 
 void normalize_node(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    if (node.op_type == "ReduceMean" || node.op_type == "ReduceL2" || node.op_type == "ReduceMax") {
-        canonicalize_reduce_axes(graph, names, node, declared_opset);
-    } else if (node.op_type == "ReduceSum") {
+    if (node.op_type == "ReduceSum") {
         canonicalize_reduce_sum(graph, names, node, declared_opset);
     } else if (node.op_type == "Squeeze") {
         canonicalize_squeeze(graph, names, node, declared_opset);

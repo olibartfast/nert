@@ -238,6 +238,134 @@ TEST(NertKernels, ReduceMeanAllAxes) {
     EXPECT_EQ(out, (std::vector<float>{2.5f}));
 }
 
+// A present-but-empty axes tensor is the ONNX way to express an empty axes
+// operand; with noop_with_empty_axes it is an identity copy, not a dimension
+// error.
+TEST(NertKernels, ReduceMeanEmptyAxesNoopIdentity) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(4, 0.0f);
+    std::vector<int64_t> axes;
+    nert::Node node = MakeNode("reduce_empty_noop", "ReduceMean");
+    node.attributes.emplace_back("noop_with_empty_axes", int64_t{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), Int64View(axes, {0})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, in);
+}
+
+// An omitted optional axes operand arrives as a TensorView with Unknown
+// dtype and must behave like an absent input: reduce every axis.
+TEST(NertKernels, ReduceMeanOmittedAxesUnknownDtype) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(1, 0.0f);
+    nert::Node node = MakeNode("reduce_omitted", "ReduceMean");
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), nert::TensorView{}};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{2.5f}));
+}
+
+// ReduceMax has no identity form here; a present empty axes input reduces
+// every axis, matching its absent form.
+TEST(NertKernels, ReduceMaxEmptyAxesReducesAll) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 4.0f, 3.0f, 2.0f};
+    std::vector<float> out(1, 0.0f);
+    std::vector<int64_t> axes;
+    nert::Node node = MakeNode("max_empty", "ReduceMax");
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), Int64View(axes, {0})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{4.0f}));
+}
+
+// A pre-18 ReduceMean carries axes in an attribute and has no axes input. The
+// kernel reads that form in place; the result matches the schema-18 input
+// form.
+TEST(NertKernels, ReduceMeanOldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(2, 0.0f);
+    nert::Node old_node = MakeNode("reduce_attr", "ReduceMean");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {2, 3})}, {FloatView(old_out, {2, 1})});
+
+    std::vector<float> new_out(2, 0.0f);
+    nert::Node new_node = MakeNode("reduce_input", "ReduceMean");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {2, 3}), Int64View(axes, {1})}, {FloatView(new_out, {2, 1})});
+
+    EXPECT_EQ(old_out, (std::vector<float>{2.0f, 5.0f}));
+    EXPECT_EQ(old_out, new_out);
+}
+
+// Pre-18 ReduceL2 with axes in an attribute matches the input form.
+TEST(NertKernels, ReduceL2OldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceL2");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {3.0f, 4.0f, 0.0f, 0.0f, 1.0f, 1.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(3, -1.0f);
+    nert::Node old_node = MakeNode("reduce_l2_attr", "ReduceL2");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {3, 2})}, {FloatView(old_out, {3, 1})});
+
+    std::vector<float> new_out(3, -1.0f);
+    nert::Node new_node = MakeNode("reduce_l2_input", "ReduceL2");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {3, 2}), Int64View(axes, {1})}, {FloatView(new_out, {3, 1})});
+
+    EXPECT_FLOAT_EQ(old_out[0], 5.0f);
+    EXPECT_FLOAT_EQ(old_out[1], 0.0f);
+    EXPECT_NEAR(old_out[2], static_cast<float>(std::sqrt(2.0)), 1e-6f);
+    EXPECT_EQ(old_out, new_out);
+}
+
+// Pre-18 ReduceMax with axes in an attribute matches the input form.
+TEST(NertKernels, ReduceMaxOldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 5.0f, 3.0f, 4.0f, 2.0f, 6.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(2, 0.0f);
+    nert::Node old_node = MakeNode("reduce_max_attr", "ReduceMax");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {2, 3})}, {FloatView(old_out, {2, 1})});
+
+    std::vector<float> new_out(2, 0.0f);
+    nert::Node new_node = MakeNode("reduce_max_input", "ReduceMax");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {2, 3}), Int64View(axes, {1})}, {FloatView(new_out, {2, 1})});
+
+    EXPECT_EQ(old_out, (std::vector<float>{5.0f, 6.0f}));
+    EXPECT_EQ(old_out, new_out);
+}
+
 // Gemm computes the plain matrix product without transposes or scaling.
 TEST(NertKernels, GemmPlainProduct) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Gemm");

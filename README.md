@@ -1,9 +1,11 @@
 # NERT (Neuriplo Engine Runtime)
 
 NERT is a first-party ONNX inference runtime: an interpreter for ONNX
-opsets 11 and above. Opsets 11–18 are canonicalized to the opset-18 form at
-load; newer declarations are accepted only when every node resolves to a
-schema version the opset-18 kernels can execute. It computes in float32, with
+opsets 11 and above. Each node resolves its effective schema; the reduce
+axes forms are handled in place, while the remaining pre-18 forms are still
+canonicalized during the migration. Newer declarations are accepted only
+when every node resolves to a schema version the current kernels can execute.
+It computes in float32, with
 int64/bool shape data and I/O, and is standard-library-only by default (tests
 use GoogleTest; opt-in device layers add their own toolkit dependency, linked
 PRIVATE).
@@ -146,11 +148,14 @@ Check formatting with `scripts/format.sh --check` (or `--fix`).
 
 ## Opset policy
 
-NERT loads ONNX-domain opsets 11 and above. For 11–18, the loader
-canonicalizes the older node forms it supports to the opset-18 IR before
-shape inference:
+NERT loads ONNX-domain opsets 11 and above. For 11–18, each node carries its
+effective schema. The reduce family is already version-aware and keeps the
+source form in the graph; the remaining supported old forms are still
+canonicalized to the opset-18 IR before shape inference:
 
-- `ReduceMean`, `ReduceL2`, `ReduceMax`: pre-18 `axes` attribute → int64 input.
+- `ReduceMean`, `ReduceL2`, `ReduceMax`: pre-18 `axes` attribute is used in
+  place (shape inference and the CPU/CUDA/OpenCL rows select the form from
+  `Node::schema_version`); schema 18+ uses the optional int64 input.
 - `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute → int64 input.
 - `Split`: pre-13 `split` attribute → int64 input.
 - `Softmax`: pre-13 2-D coercion semantics → `Shape` → `Flatten` →
