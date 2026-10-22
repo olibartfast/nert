@@ -124,6 +124,13 @@ standard-library-only):
 | `NERT_ENABLE_HIP=ON` | CUDA compiler (NVIDIA target) + HIP headers | Builds `src/hip_device.cpp` + `src/hip/` and the `nert_hip_*` tests |
 | `NERT_BUILD_BENCH=ON` | None beyond the enabled devices | Builds the `bench/runtime` driver (`nert_bench_runtime`) |
 
+With `NERT_ENABLE_CUDA=ON` and cuDNN present, set
+`-DNERT_CUDNN_FRONTEND_DIR=<pinned cudnn-frontend/include>` to build the
+cached cuDNN Frontend `Conv` row (tested with frontend v1.31.0). Without it the
+legacy `cudnnConvolutionForward` row is used. The release validation runs that
+build in the `nert-gpu:26.08` container (CUDA 13.4 + cuDNN 9.25); see
+[`specs/2026-10-18-n1e-cudnn-graph/validation.md`](specs/2026-10-18-n1e-cudnn-graph/validation.md).
+
 ```bash
 cmake -S . -B build-cuda -DNERT_ENABLE_CUDA=ON -DNERT_BUILD_BENCH=ON
 cmake --build build-cuda --target nert_bench_runtime
