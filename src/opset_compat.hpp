@@ -3,10 +3,11 @@
 //
 // The committed table in `opset_compat_table.inc` is generated from ONNX's
 // full schema history. The resolver selects the effective schema for a decoded
-// node as `max { since_version <= declared_opset }`. The above-18 checks only
-// decide whether the opset-18 kernels can execute the node; they do not
-// implement newer semantics. Must not include anything from the backend
-// abstraction layer.
+// node as `max { since_version <= declared_opset }`. The gate applies to every
+// declaration: historical schemas are accepted after the loader's form
+// validation, and newer schemas are accepted only when their capability
+// guards are satisfied. Must not include anything from the backend abstraction
+// layer.
 
 #include <cstdint>
 #include <string>
@@ -39,9 +40,9 @@ struct OpsetAttributeView {
 int64_t ResolveNodeSchemaVersion(const std::string& node_name, const std::string& op_type, int64_t declared_opset);
 
 // Rejects a node whose effective schema version (the latest schema at or
-// before `declared_opset`) is not executable by the opset-18 implementation.
-// `declared_opset` must be above 18; older declarations use the range
-// packet's canonicalizer instead.
+// before `declared_opset`) is not executable by the implementation. Applies
+// to every declaration; historical rows are accepted after the loader's form
+// validation, and newer rows apply their attribute/value guards.
 void CheckNodeCompatibility(const std::string& node_name, const std::string& op_type,
                             const std::vector<OpsetAttributeView>& attributes, int64_t declared_opset);
 

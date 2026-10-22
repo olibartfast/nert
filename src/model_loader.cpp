@@ -1711,21 +1711,19 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
         patches.push_back(std::move(a));
     }
 
-    if (declared_opset > 18) {
-        std::vector<OpsetAttributeView> views;
-        views.reserve(patches.size());
-        for (const AttrPatch& patch : patches) {
-            OpsetAttributeView view;
-            view.name = patch.name;
-            if (patch.type == kAttrType_String) {
-                view.is_string = true;
-                view.string_value = patch.s;
-            }
-            views.push_back(std::move(view));
+    std::vector<OpsetAttributeView> views;
+    views.reserve(patches.size());
+    for (const AttrPatch& patch : patches) {
+        OpsetAttributeView view;
+        view.name = patch.name;
+        if (patch.type == kAttrType_String) {
+            view.is_string = true;
+            view.string_value = patch.s;
         }
-        CheckNodeCompatibility(
-            node.name, node.op_type, views, declared_opset);
+        views.push_back(std::move(view));
     }
+    CheckNodeCompatibility(
+        node.name, node.op_type, views, declared_opset);
 
     for (const AttrPatch& a : patches) {
         const auto slot_it = allowed.find(a.name);

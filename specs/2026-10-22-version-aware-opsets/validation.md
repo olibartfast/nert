@@ -114,7 +114,10 @@ assertions.
   `opset_normalize` source, build entry, include, call, or test remains.
 - [ ] [V-15] No global opset constant belongs to [R-3]: no
   `BASELINE_OPSET` or `opset-18 IR` policy remains in runtime or generator.
-  Deferred to Phase E; the generator still uses the baseline-18 catalog.
+  Runtime progress: the compatibility gate now applies to every declaration,
+  not only `>18`; historical rows are accepted after form validation.
+  Remaining: the generator still uses its baseline-18 catalog classification
+  and `BASELINE_OPSET`; this is the Phase E2 catalog-manifest work.
 
 ## Phase E — catalog/docs cleanup
 
@@ -146,6 +149,7 @@ assertions.
 | V-12 | `HermeticLegacySoftmaxDirect`, `HermeticLegacySoftmaxIntermediateInput`; CPU `SoftmaxLegacyDefaultAxisCoerces2D` | pass | 2026-10-22 | One Softmax node in the graph; no rank metadata needed for the intermediate input. |
 | V-13 | GPU `nert_cuda_activations` + `nert_opencl_kernels`; CPU legacy Softmax test | pass | 2026-10-22 | [2,2,3] default-axis legacy output is 1/6 per element on all built devices. HIP not built. |
 | V-14 | `rg opset_normalize`; `git ls-files`; CMake source list | pass | 2026-10-22 | Files removed; no include/call/build entry remains. |
+| V-15a | loader runs compatibility gate for declared 11/13/18/19/27; full CPU/GPU suites | pass | 2026-10-22 | Historical rows accepted after form validation; no `declared_opset > 18` branch. Generator baseline remains for Phase E2. |
 | V-10 | loader `ScatterNDReductionNonePreserved` and negative pre-16/non-none tests | pass | 2026-10-22 | `reduction` attribute remains; only `none`/absent accepted. |
 | V-11 | code review + `UnsqueezeOldAttributeForm` CPU/device tests | pass | 2026-10-22 | Squeeze copies bytes; Unsqueeze resolves axes at entry, not per element. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

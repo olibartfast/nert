@@ -124,11 +124,10 @@ void CheckNodeCompatibility(const std::string& node_name, const std::string& op_
     const std::string versions = version_text(declared_opset, schema->since_version);
 
     if (schema->compatibility == OpsetCompatibility::Historical) {
-        // Historical rows are catalog entries, not admission verdicts. The
-        // above-18 gate should never select one (the baseline is also <=18);
-        // fail closed if a future caller routes an old declaration here.
-        throw ModelLoadException(prefix + ": historical schema " + std::to_string(schema->since_version) +
-                                 " reached the compatibility gate" + versions);
+        // Supported historical schema. The loader's version-aware form
+        // validation covers the old attribute/input forms; the table has no
+        // post-baseline guards to apply here.
+        return;
     }
 
     if (schema->compatibility == OpsetCompatibility::BehaviorChange) {
