@@ -24,7 +24,6 @@
 
 #include "axes_form.hpp" // private src-local shared axes/reduction form resolver
 #include "opset_compat.hpp" // private src-local newer-opset gate
-#include "opset_normalize.hpp" // private src-local canonicalizer
 #include "reduce_axes.hpp" // private src-local shared reduce-form resolver
 #include "wire_reader.hpp" // private src-local reader
 
@@ -2195,10 +2194,8 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         }
         graph.initializers[name] = std::move(folded_constants[i].second);
     }
-    // Apply the remaining load-time rewrites (legacy Split input form and
-    // pre-13 Softmax) before any consumer (TopK checks, shape inference,
-    // planning, kernels) sees the graph. Version-aware forms stay in place.
-    NormalizeGraphForOpset(graph, declared_opset);
+    // All supported legacy forms stay in the graph; consumers resolve them
+    // from the source node's effective schema.
     // TopK's K input is a shape constant: it must resolve to an Int64
     // initializer at load. A non-constant K is a load rejection here, never
     // a dynamic shape downstream.

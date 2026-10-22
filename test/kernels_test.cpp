@@ -962,6 +962,26 @@ TEST(NertKernels, SoftmaxFirstAxis) {
     EXPECT_NEAR(out[5], 0.95257413f, 1e-6f);
 }
 
+// Pre-13 Softmax coerces to 2D at the default axis 1, so a [2,2,3] input
+// becomes [2,6] and each six-element row is normalized.
+TEST(NertKernels, SoftmaxLegacyDefaultAxisCoerces2D) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Softmax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in(12, 0.0f);
+    std::vector<float> out(12, 0.0f);
+    nert::Node node = MakeNode("softmax_legacy", "Softmax");
+    node.schema_version = 11;
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    for (const float value : out) {
+        EXPECT_NEAR(value, 1.0f / 6.0f, 1e-6f);
+    }
+}
+
 // ReduceMax over axis 1 of [2,3] with the default keepdims == 1.
 TEST(NertKernels, ReduceMaxOneAxisKeepdimsDefault) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMax");

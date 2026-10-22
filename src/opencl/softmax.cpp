@@ -7,6 +7,7 @@
 // `double` would need the fp64 extension), so results match the oracle
 // within the M2+ tolerance bar, not bit for bit.
 
+#include "../softmax_form.hpp"
 #include "nert/device.hpp"
 #include "runtime.hpp"
 
@@ -37,19 +38,6 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
         count *= dim;
     }
     return count;
-}
-
-int64_t IntAttribute(const Node& node, const std::string& name, int64_t fallback, const std::string& context) {
-    for (const Attribute& attr : node.attributes) {
-        if (attr.name == name) {
-            const int64_t* value = std::get_if<int64_t>(&attr.value);
-            if (value == nullptr) {
-                throw InferenceException(context + ": attribute '" + name + "' must be an integer");
-            }
-            return *value;
-        }
-    }
-    return fallback;
 }
 
 constexpr const char* kSource = R"CLC(
@@ -98,7 +86,8 @@ void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std:
     }
 
     const int64_t rank = static_cast<int64_t>(in.dims.size());
-    int64_t axis = IntAttribute(node, "axis", -1, context);
+    const SoftmaxForm form = ResolveSoftmaxForm(node);
+    int64_t axis = SoftmaxAxis(node, form, context);
     if (axis < -rank || axis >= rank) {
         throw InferenceException(context + ": axis out of range");
     }
@@ -110,10 +99,17 @@ void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std:
     for (int64_t i = 0; i < axis; ++i) {
         outer *= in.dims[static_cast<std::size_t>(i)];
     }
-    const int64_t dim = rank == 0 ? 1 : in.dims[static_cast<std::size_t>(axis)];
+    int64_t dim = rank == 0 ? 1 : in.dims[static_cast<std::size_t>(axis)];
     int64_t inner = 1;
-    for (int64_t i = axis + 1; i < rank; ++i) {
-        inner *= in.dims[static_cast<std::size_t>(i)];
+    if (form == SoftmaxForm::LegacyCoerce2D) {
+        dim = 1;
+        for (int64_t i = axis; i < rank; ++i) {
+            dim *= in.dims[static_cast<std::size_t>(i)];
+        }
+    } else {
+        for (int64_t i = axis + 1; i < rank; ++i) {
+            inner *= in.dims[static_cast<std::size_t>(i)];
+        }
     }
     const int64_t rows = outer * inner;
     if (rows == 0) {

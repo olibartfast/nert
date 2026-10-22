@@ -1262,10 +1262,9 @@ TEST_F(EngineLoader, HermeticScatterNDReductionNonePreserved)
     }
 }
 
-// Legacy Softmax coerced its input to 2D at `axis` and normalized over the
-// second dimension. The canonical graph is Shape -> Flatten -> Softmax(1) ->
-// Reshape, preserving the old default axis of 1.
-TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
+// Legacy Softmax keeps the source node in the graph; the kernel implements
+// the pre-13 2-D coercion directly. The default axis is 1.
+TEST_F(EngineLoader, HermeticLegacySoftmaxDirect)
 {
     std::vector<float> values;
     for (int i = 0; i < 24; ++i) {
@@ -1279,26 +1278,9 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
 
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_default_11.onnx", encode_model(body, 11)));
-    ASSERT_EQ(graph.nodes.size(), 4U);
-    EXPECT_EQ(graph.nodes[0].name, "sm0/shape");
-    EXPECT_EQ(graph.nodes[0].op_type, "Shape");
-    EXPECT_EQ(graph.nodes[1].name, "sm0/flatten");
-    EXPECT_EQ(graph.nodes[1].op_type, "Flatten");
-    EXPECT_EQ(graph.nodes[2].name, "sm0/softmax");
-    EXPECT_EQ(graph.nodes[2].op_type, "Softmax");
-    EXPECT_EQ(graph.nodes[3].name, "sm0/reshape");
-    EXPECT_EQ(graph.nodes[3].op_type, "Reshape");
-
-    ASSERT_EQ(graph.nodes[1].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(graph.nodes[1].attributes.front().value), 1);
-    ASSERT_EQ(graph.nodes[2].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(graph.nodes[2].attributes.front().value), 1);
-    EXPECT_EQ(graph.nodes[0].inputs, (std::vector<std::string>{"x"}));
-    EXPECT_EQ(graph.nodes[1].inputs, (std::vector<std::string>{"x"}));
-    EXPECT_EQ(graph.nodes[2].inputs, (std::vector<std::string>{"sm0/flatten_out"}));
-    EXPECT_EQ(graph.nodes[3].inputs,
-        (std::vector<std::string>{"sm0/softmax_out", "sm0/shape_out"}));
-    EXPECT_EQ(graph.nodes[3].outputs, (std::vector<std::string>{"y"}));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Softmax");
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1308,7 +1290,8 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
         EXPECT_NEAR(result.outputs.at("y")[i], expected[i], 1e-6F) << "element " << i;
     }
 
-    // A negative axis is resolved against the input rank before Flatten.
+    // A negative axis is resolved against the input rank; legacy Softmax
+    // then normalizes the trailing block from that axis.
     std::string negative;
     put_sub(negative, 1, encode_node("sm_neg", "Softmax", {"x"}, {"y"},
                            {encode_attribute_int("axis", -1)}));
@@ -1316,9 +1299,7 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
     put_sub(negative, 12, encode_value_info("y", 1, {2, 3, 4}));
     const nert::Graph negative_graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_neg_11.onnx", encode_model(negative, 11)));
-    ASSERT_EQ(negative_graph.nodes.size(), 4U);
-    ASSERT_EQ(negative_graph.nodes[1].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(negative_graph.nodes[1].attributes.front().value), 2);
+    ASSERT_EQ(negative_graph.nodes.size(), 1U);
 
     nert::Model negative_model(negative_graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult negative_result = negative_model.Run({ { "x", values } });
@@ -1329,8 +1310,8 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
     }
 }
 
-// An intermediate Softmax input gets its rank from value_info; the inserted
-// Shape node then supplies the Reshape shape at run time.
+// Legacy Softmax on an intermediate input does not need value_info for that
+// input: shape inference derives the rank from the producer.
 TEST_F(EngineLoader, HermeticLegacySoftmaxIntermediateInput)
 {
     std::vector<float> values;
@@ -1347,15 +1328,13 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxIntermediateInput)
     put_sub(body, 1, encode_node("sm0", "Softmax", {"h"}, {"y"},
                       {encode_attribute_int("axis", -1)}));
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
-    put_sub(body, 13, encode_value_info("h", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
 
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_intermediate_11.onnx", encode_model(body, 11)));
-    ASSERT_EQ(graph.nodes.size(), 5U);
+    ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Relu");
-    EXPECT_EQ(graph.nodes[1].op_type, "Shape");
-    EXPECT_EQ(graph.nodes[4].op_type, "Reshape");
+    EXPECT_EQ(graph.nodes[1].op_type, "Softmax");
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1838,10 +1817,8 @@ TEST_F(EngineLoader, HermeticNewerAddResolvesSchemaFourteen)
     EXPECT_EQ(graph.nodes.front().schema_version, 14);
 }
 
-// The remaining legacy Softmax rewrite still expands at declared 11. Its
-// synthesized nodes are not source nodes, so they keep schema_version 0 in
-// Phase A.
-TEST_F(EngineLoader, HermeticLegacySoftmaxExpansionKeepsMetadata)
+// Legacy Softmax stays a single source node with its schema metadata.
+TEST_F(EngineLoader, HermeticLegacySoftmaxKeepsMetadata)
 {
     std::string body;
     put_sub(body, 1, encode_node("sm0", "Softmax", {"x"}, {"y"}, {}));
@@ -1851,14 +1828,9 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpansionKeepsMetadata)
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("schema_softmax_11.onnx", encode_model(body, 11)));
     EXPECT_EQ(graph.declared_opset, 11);
-    ASSERT_EQ(graph.nodes.size(), 4U);
-    EXPECT_EQ(graph.nodes[0].op_type, "Shape");
-    EXPECT_EQ(graph.nodes[1].op_type, "Flatten");
-    EXPECT_EQ(graph.nodes[2].op_type, "Softmax");
-    EXPECT_EQ(graph.nodes[3].op_type, "Reshape");
-    for (const nert::Node& node : graph.nodes) {
-        EXPECT_EQ(node.schema_version, 0) << node.op_type;
-    }
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Softmax");
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
 }
 
 // ===========================================================================
@@ -2799,26 +2771,6 @@ TEST_F(EngineLoaderNegative, LegacyReduceSumNoopBeforeThirteenRejected)
         << "message: " << message;
 }
 
-// Legacy Softmax expansion needs the input rank. A value_info entry supplies
-// it; without one the loader fails fast rather than guessing.
-TEST_F(EngineLoaderNegative, LegacySoftmaxUnknownRankRejected)
-{
-    std::string body;
-    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"h"}, {}));
-    put_sub(body, 1, encode_node("sm0", "Softmax", {"h"}, {"y"}, {}));
-    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
-    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
-
-    const std::string message =
-        load_error_message(encode_model(body, 11), "softmax_rank_11.onnx");
-    EXPECT_NE(message.find("sm0"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("legacy Softmax"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("value_info"), std::string::npos)
-        << "message: " << message;
-}
-
 TEST_F(EngineLoaderNegative, LegacySoftmaxAxisOutOfRangeRejected)
 {
     std::string body;
@@ -2827,14 +2779,18 @@ TEST_F(EngineLoaderNegative, LegacySoftmaxAxisOutOfRangeRejected)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
 
-    const std::string message =
-        load_error_message(encode_model(body, 11), "softmax_axis_11.onnx");
-    EXPECT_NE(message.find("sm0"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("out of range"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("opset 11"), std::string::npos)
-        << "message: " << message;
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("softmax_axis_11.onnx", encode_model(body, 11)));
+    try {
+        nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
+        FAIL() << "expected shape inference to reject the Softmax axis";
+    } catch (const nert::ModelLoadException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("sm0"), std::string::npos)
+            << "message: " << message;
+        EXPECT_NE(message.find("out of range"), std::string::npos)
+            << "message: " << message;
+    }
 }
 
 // Cast's post-18 attributes change rounding/saturation semantics. A plain

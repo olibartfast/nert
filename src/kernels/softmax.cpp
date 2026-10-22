@@ -3,6 +3,7 @@
 // The `axis` attribute defaults to -1; negative values count back from the
 // last axis.
 
+#include "../softmax_form.hpp"
 #include "kernels.hpp"
 
 #include <cmath>
@@ -64,7 +65,8 @@ void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std:
     }
 
     const int64_t rank = static_cast<int64_t>(in.dims.size());
-    int64_t axis = IntAttribute(node, "axis", -1, context);
+    const SoftmaxForm form = ResolveSoftmaxForm(node);
+    int64_t axis = SoftmaxAxis(node, form, context);
     if (axis < -rank || axis >= rank) {
         throw InferenceException(context + ": axis out of range");
     }
@@ -76,10 +78,19 @@ void Softmax(const Node& node, const std::vector<TensorView>& inputs, const std:
     for (int64_t i = 0; i < axis; ++i) {
         outer *= in.dims[static_cast<std::size_t>(i)];
     }
-    const int64_t dim = rank == 0 ? 1 : in.dims[static_cast<std::size_t>(axis)];
+    int64_t dim = rank == 0 ? 1 : in.dims[static_cast<std::size_t>(axis)];
     int64_t inner = 1;
-    for (int64_t i = axis + 1; i < rank; ++i) {
-        inner *= in.dims[static_cast<std::size_t>(i)];
+    if (form == SoftmaxForm::LegacyCoerce2D) {
+        // Pre-13 Softmax coerces to [prod(prefix), prod(suffix)] and
+        // normalizes the trailing block.
+        dim = 1;
+        for (int64_t i = axis; i < rank; ++i) {
+            dim *= in.dims[static_cast<std::size_t>(i)];
+        }
+    } else {
+        for (int64_t i = axis + 1; i < rank; ++i) {
+            inner *= in.dims[static_cast<std::size_t>(i)];
+        }
     }
 
     const float* x = static_cast<const float*>(in.data);

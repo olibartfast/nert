@@ -297,6 +297,21 @@ TEST(NertOpenCLKernels, SoftmaxLastAxis) {
     }
 }
 
+// Pre-13 Softmax coerces [2,2,3] to [2,6] at the default axis 1.
+TEST(NertOpenCLKernels, SoftmaxLegacyDefaultAxisCoerces2D) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Node node = MakeNode("sm_legacy", "Softmax");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    const std::vector<float> gpu = RunOcl("Softmax", node, std::vector<float>(12, 0.0F), {2, 2, 3});
+    for (const float value : gpu) {
+        EXPECT_NEAR(value, 1.0F / 6.0F, 1e-3F);
+    }
+}
+
 // Softmax axis=0 over [3,2] with large values: stability via max subtraction.
 TEST(NertOpenCLKernels, SoftmaxAxisZeroStable) {
     if (!HasOpenCLDevice()) {

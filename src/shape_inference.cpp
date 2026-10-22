@@ -15,6 +15,7 @@
 #include "nert/einsum.hpp"
 #include "axes_form.hpp"
 #include "reduce_axes.hpp"
+#include "softmax_form.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2804,7 +2805,24 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
         return {TensorInfo{lhs.dtype,
             broadcast_shape(lhs.dims, rhs.dims, node)}};
     }
-    if (op == "Relu" || op == "Sigmoid" || op == "Softmax" || op == "Floor" ||
+    if (op == "Softmax") {
+        const TensorInfo& in = need(0);
+        const int64_t rank = static_cast<int64_t>(in.dims.size());
+        const SoftmaxForm form = ResolveSoftmaxForm(node);
+        int64_t axis = SoftmaxDefaultAxis(form);
+        if (const Attribute* attr = FindNodeAttribute(node, "axis")) {
+            const int64_t* value = std::get_if<int64_t>(&attr->value);
+            if (value == nullptr) {
+                fail(node, "Softmax 'axis' must be an integer");
+            }
+            axis = *value;
+        }
+        if (axis < -rank || axis >= rank) {
+            fail(node, "Softmax axis is out of range");
+        }
+        return {TensorInfo{DataType::Float32, in.dims}};
+    }
+    if (op == "Relu" || op == "Sigmoid" || op == "Floor" ||
         op == "Erf" || op == "Sqrt" || op == "Tanh" || op == "Exp" ||
         op == "Log" || op == "Cos" || op == "Sin" || op == "Elu") {
         return {TensorInfo{DataType::Float32, need(0).dims}};

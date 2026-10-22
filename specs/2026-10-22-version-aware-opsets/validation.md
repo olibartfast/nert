@@ -43,7 +43,7 @@ assertions.
   the documented rejection of an operator introduced after the declaration;
   the ResNet-18 gate still loads and executes. Verified 2026-10-22 with
   `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx`: 13/13 CTest entries
-  passed, including `nert_loader` (104/104), `nert_executor`, and
+  passed, including `nert_loader` (103/103), `nert_executor`, and
   `nert_opset_table`. Environment note:
   `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export
   (`GlobalAveragePool`/`Flatten`, 42 initializers) and is not the pinned
@@ -73,7 +73,7 @@ assertions.
   identity behavior is a tracked follow-up), not as an unknown attribute.
   Verified 2026-10-22 by the five `EngineLoaderNegative` reduce-form tests;
   messages name the node, operator, offending form, declared opset 13 (or
-  18), and effective schema 13 (or 18). `nert_loader` passes 104/104; the explicit `noop_with_empty_axes=0` form is accepted.
+  18), and effective schema 13 (or 18). `nert_loader` passes 103/103; the explicit `noop_with_empty_axes=0` form is accepted.
 - [x] [V-8] Device parity belongs to [R-7]: CPU and every enabled GPU device
   that has the reduce row produce matching results for both forms; missing
   HIP rows are recorded as gaps, not passes. Verified 2026-10-22: CUDA
@@ -101,17 +101,20 @@ assertions.
 
 ## Phase D — legacy Softmax and normalizer removal
 
-- [ ] [V-12] Legacy Softmax belongs to [R-5]/[R-7]: declared-11/12 Softmax
-  with default axis 1 and explicit axes matches ONNX Runtime or the frozen
-  pre-refactor output within the existing tolerance; no rank metadata is
-  required for an intermediate input.
-- [ ] [V-13] The direct kernel uses `outer = prod(prefix)`,
-  `dim = prod(suffix)`, `inner = 1`; CPU/CUDA/OpenCL/HIP agree where the row
-  exists.
-- [ ] [V-14] Normalizer removal belongs to [R-3]/[T-19]: no
+- [x] [V-12] Legacy Softmax belongs to [R-5]/[R-7]: declared-11 Softmax
+  with default axis 1 and explicit negative axis matches the frozen
+  row-softmax oracle; no rank metadata is required for an intermediate
+  input. Verified 2026-10-22 by `HermeticLegacySoftmaxDirect` and
+  `HermeticLegacySoftmaxIntermediateInput`.
+- [x] [V-13] The direct kernel uses `outer = prod(prefix)`,
+  `dim = prod(suffix)`, `inner = 1`; CPU, CUDA, and OpenCL agree where the
+  row exists. HIP was not built on this host; its row mirrors the CUDA
+  decomposition and remains a recorded hardware gap.
+- [x] [V-14] Normalizer removal belongs to [R-3]/[T-19]: no
   `opset_normalize` source, build entry, include, call, or test remains.
 - [ ] [V-15] No global opset constant belongs to [R-3]: no
   `BASELINE_OPSET` or `opset-18 IR` policy remains in runtime or generator.
+  Deferred to Phase E; the generator still uses the baseline-18 catalog.
 
 ## Phase E — catalog/docs cleanup
 
@@ -133,13 +136,16 @@ assertions.
 | V-1 | `python3 tools/gen_opset_compat.py --check` | pass | 2026-10-22 | `opset compatibility table is current (288 entries)`; every ONNX history version is present for all 72 implemented operators. |
 | V-2 | `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_filter='EngineLoader.HermeticNodeSchemaVersionTracksDeclaredOpset:EngineLoader.HermeticEffectiveSchemaBelowEleven:EngineLoader.HermeticNewerAddResolvesSchemaFourteen:EngineLoader.HermeticLegacySoftmaxExpansionKeepsMetadata'` | pass (4/4) | 2026-10-22 | ReduceMean declared 11/13/18/19/27 resolves to 11/13/18/18/18; declared-11 Relu resolves to 6; declared-27 `Add` resolves to 14; `Graph.declared_opset` matches each declaration. The ReduceMean test also records the Phase A post-normalization form. |
 | V-3 | `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_filter='EngineLoaderNegative.NoEffectiveSchemaAtDeclaredOpsetRejected'` | pass (1/1) | 2026-10-22 | `LayerNormalization` at declared 11 names `ln0`, `LayerNormalization`, `declared opset 11`, `no effective schema`, and `first schema is 17`. |
-| V-4 | `cmake -S . -B build -DNERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx && cmake --build build --parallel "$(nproc)" && NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ctest --test-dir build --output-on-failure` | pass (13/13) | 2026-10-22 | `nert_loader` 104/104, `nert_executor`, and `nert_opset_table` included. Environment note: the older `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export (GlobalAveragePool/Flatten, 42 initializers) and fails fixture-content assertions in the loader and shape suites; it is not the pinned reference. |
-| V-5 | `git diff --stat`; `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_color=no` | pass (104/104) | 2026-10-22 | `src/opset_normalize.{hpp,cpp}` are unmodified; the legacy Softmax expansion and all negative normalizer tests pass. |
-| V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 104/104; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
+| V-4 | `cmake -S . -B build -DNERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx && cmake --build build --parallel "$(nproc)" && NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ctest --test-dir build --output-on-failure` | pass (13/13) | 2026-10-22 | `nert_loader` 103/103, `nert_executor`, and `nert_opset_table` included. Environment note: the older `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export (GlobalAveragePool/Flatten, 42 initializers) and fails fixture-content assertions in the loader and shape suites; it is not the pinned reference. |
+| V-5 | `git diff --stat`; `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_color=no` | pass (103/103) | 2026-10-22 | `src/opset_normalize.{hpp,cpp}` are unmodified; the legacy Softmax expansion and all negative normalizer tests pass. |
+| V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 103/103; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
 | V-7 | `nert_loader_negative` reduce-form tests | pass | 2026-10-22 | Five tests: pre-18 input, empty-string input, attribute at 18, noop before 18, and ReduceMax noop at 18 as a capability gap; each names node/op/declared/effective. |
 | V-8 | `ctest --test-dir build-gpu -R 'nert_cuda_misc|nert_cuda_kernels|nert_opencl_kernels|nert_opencl_reduce_extra|nert_opencl_index_extra|nert_opencl_owlv2_rows'` | pass (6/6) | 2026-10-22 | CUDA Mean/L2/Max and OpenCL Mean/L2/Max attribute forms match the CPU oracle. HIP has no reduce rows; recorded gap. |
 | V-9a | CPU `ctest`; loader legacy-form tests; kernel `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; CUDA `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; OpenCL counterparts | pass | 2026-10-22 | Source form stays in the graph; CPU 13/13, GPU filtered 8/8. |
 | V-9b | loader `HermeticLegacySplitPreserved` + Split negatives; CPU `SplitOldAttributeForm`; CUDA/OpenCL Split old-form | pass | 2026-10-22 | Source `split` attribute stays; CPU 13/13, GPU `nert_cuda_concat` + `nert_opencl_index_move` pass. |
+| V-12 | `HermeticLegacySoftmaxDirect`, `HermeticLegacySoftmaxIntermediateInput`; CPU `SoftmaxLegacyDefaultAxisCoerces2D` | pass | 2026-10-22 | One Softmax node in the graph; no rank metadata needed for the intermediate input. |
+| V-13 | GPU `nert_cuda_activations` + `nert_opencl_kernels`; CPU legacy Softmax test | pass | 2026-10-22 | [2,2,3] default-axis legacy output is 1/6 per element on all built devices. HIP not built. |
+| V-14 | `rg opset_normalize`; `git ls-files`; CMake source list | pass | 2026-10-22 | Files removed; no include/call/build entry remains. |
 | V-10 | loader `ScatterNDReductionNonePreserved` and negative pre-16/non-none tests | pass | 2026-10-22 | `reduction` attribute remains; only `none`/absent accepted. |
 | V-11 | code review + `UnsqueezeOldAttributeForm` CPU/device tests | pass | 2026-10-22 | Squeeze copies bytes; Unsqueeze resolves axes at entry, not per element. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |
