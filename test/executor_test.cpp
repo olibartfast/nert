@@ -293,13 +293,15 @@ class CountingTransfer final : public nert::Transfer {
 // per-run input staging) with no hardware.
 class NonHostTestDevice final : public nert::Device {
   public:
-    explicit NonHostTestDevice(const nert::KernelTable* table) : table_(table) {}
+    explicit NonHostTestDevice(const nert::KernelTable* table, bool arena_offsets = true)
+        : table_(table), arena_offsets_(arena_offsets) {}
 
     const char* name() const override { return "test-device"; }
     nert::Allocator& allocator() override { return allocator_; }
     nert::Transfer& transfer() override { return transfer_; }
     const nert::KernelTable& kernels() const override { return *table_; }
     bool is_host() const override { return false; }
+    bool supports_arena_offsets() const override { return arena_offsets_; }
 
     const CountingAllocator& counting() const { return allocator_; }
     const CountingTransfer& traffic() const { return transfer_; }
@@ -308,6 +310,7 @@ class NonHostTestDevice final : public nert::Device {
     CountingAllocator allocator_;
     CountingTransfer transfer_;
     const nert::KernelTable* table_;
+    bool arena_offsets_;
 };
 
 void ThrowingAddKernel(const nert::Node&, const std::vector<nert::TensorView>&, const std::vector<nert::TensorView>&) {
@@ -400,6 +403,57 @@ TEST(NertExecutor, ResidentInitializersUploadOnceAcrossRuns) {
     // allocation is balanced.
     EXPECT_EQ(device.counting().allocate_calls, 4);
     EXPECT_EQ(device.counting().release_calls, 4);
+}
+
+// Handle-based devices allocate only live intermediates at run time. The
+// three-node chain has one resident initializer and no construction arena; each
+// run allocates the staged input plus two overlapping live outputs, then reuses
+// the released buffer for the last output.
+TEST(NertExecutor, HandleDeviceAllocatesOnlyLiveTensors) {
+    const std::vector<float> constant(16, 0.0F);
+    const nert::Graph graph = load_hermetic_chain(constant, 2);
+    NonHostTestDevice device(&nert::CpuDevice().kernels(), false);
+    {
+        nert::Model model(graph, {{"x", {16}}}, device);
+        EXPECT_EQ(device.counting().allocate_calls, 1); // resident initializer only
+        EXPECT_EQ(device.counting().release_calls, 0);
+
+        const std::vector<float> input(16, 1.0F);
+        const nert::InferenceResult first = model.Run({{"x", input}});
+        EXPECT_EQ(first.outputs.at("t2"), input);
+        EXPECT_EQ(device.counting().allocate_calls, 4);
+        EXPECT_EQ(device.counting().release_calls, 3);
+
+        const nert::InferenceResult second = model.Run({{"x", input}});
+        EXPECT_EQ(second.outputs.at("t2"), input);
+        EXPECT_EQ(device.counting().allocate_calls, 7);
+        EXPECT_EQ(device.counting().release_calls, 6);
+    }
+    EXPECT_EQ(device.counting().allocate_calls, 7);
+    EXPECT_EQ(device.counting().release_calls, 7); // resident released
+}
+
+// A throwing kernel on a handle device releases both the staged input and
+// the node output allocated before the launch.
+TEST(NertExecutor, HandleDeviceReleasesBuffersOnKernelThrow) {
+    const nert::Graph graph = load_hermetic_add_relu({-0.5F, 0.5F});
+    ThrowOnAddTable throwing_table;
+    NonHostTestDevice device(&throwing_table, false);
+    {
+        nert::Model model(graph, {{"x", {2}}}, device);
+        EXPECT_EQ(device.counting().allocate_calls, 1); // resident initializer
+        try {
+            (void)model.Run({{"x", {1.0F, -2.0F}}});
+            FAIL() << "expected InferenceException from the throwing Add kernel";
+        } catch (const nert::InferenceException& e) {
+            EXPECT_NE(std::string(e.what()).find("boom"), std::string::npos) << e.what();
+        }
+        // Staged input + the Add output were released on unwind.
+        EXPECT_EQ(device.counting().allocate_calls, 3);
+        EXPECT_EQ(device.counting().release_calls, 2);
+    }
+    EXPECT_EQ(device.counting().allocate_calls, 3);
+    EXPECT_EQ(device.counting().release_calls, 3);
 }
 
 // A throwing kernel still releases the staged graph inputs: the per-run

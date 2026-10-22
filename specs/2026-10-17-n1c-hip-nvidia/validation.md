@@ -8,6 +8,10 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 - [V-1] M1: device names itself, empty table, 1 KiB round trip on the
   RTX 3060 via the HIP NVIDIA backend; OFF 8/8; format clean.
 - [V-2] M2+: per-op parity within `1e-3·(1+|ref|)` on the RTX 3060.
+- [V-3] M6: the 68-row first-party table builds and resolves through the HIP
+  NVIDIA backend; the adapted CUDA first-party suites pass; library-backed rows
+  (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) remain null so the executor
+  rejects them explicitly.
 
 ## Evidence
 
@@ -18,4 +22,4 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 | M3 | Mul/Sub/Div HIP (hipified, reviewed, GPU-agnostic audit clean) vs CPU (float bcast, int64, IEEE div, div-by-zero throws) + OFF 8/8 + HIP-leg 10/10 + format | pass | 2026-10-17 | RTX 3060; Div-int64 device-flag/host-report via portable `atomicExch`. |
 | M2 | Relu/Add HIP (hipified, reviewed) vs CPU (exact, int64 bcast, Gemm permanent probe) + OFF 8/8 + HIP-leg 10/10 + format | pass | 2026-10-17 | Translation is API-names only; `<<<>>>` kept, nvcc-compiled. |
 | M1 | HipDevice names/seam/empty-table/1KiB round trip on RTX 3060 via HIP NVIDIA backend + OFF 8/8 + HIP-leg 9/9 + format | pass | 2026-10-17 | nvcc 12.0 + hip-dev 6.2 headers (rootless scratch); deprecated-CUDA warnings come from AMD headers, not our code. |
-| — | — | pending | — | — |
+| M6 | 59 additional hipified files; 68-row first-party table; `build-hip` on RTX 3060 via NVIDIA HIP; `ctest --test-dir build-hip` 15/15; adapted CUDA first-party suites 149/149; format 298 | pass | 2026-10-22 | `Gemm`, `MatMul`, `Conv`, `ConvTranspose` intentionally absent; AMD/ROCm half still pending. |

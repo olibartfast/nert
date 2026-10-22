@@ -27,7 +27,7 @@ HIP is not part of the 0.2.0 release gate.
 | CPU (oracle) | 72 | Complete reference set. |
 | CUDA | 72 | Complete set; `Conv` and `ConvTranspose` require cuDNN. Strict float32 (`CUBLAS_PEDANTIC_MATH`, `CUDNN_FMA_MATH`). |
 | OpenCL | 68 | Complete for every currently loadable catalog entry. Missing `Abs`, `Floor`, `GreaterOrEqual`, `Neg`, none used by those entries. |
-| HIP | 9 | Original scaffold only; **unsupported for 0.2.0**. |
+| HIP | 68 | First-party rows hipified from CUDA and validated on the NVIDIA HIP backend. `Gemm`, `MatMul`, `Conv`, and `ConvTranspose` remain the rocBLAS/hipBLAS/MIOpen slice; **not part of the 0.2.0 release gate**. |
 
 The CUDA 72 rows assume a cuDNN-enabled build: `Conv` and `ConvTranspose` sit
 behind `#ifdef NERT_HAS_CUDNN`, so a non-cuDNN CUDA build would not have those
@@ -44,7 +44,7 @@ rows.
 | RAFT-large | optical flow | PASS | PASS | PASS | CPU 1.317e-04, CUDA 1.344e-04, OpenCL 1.323e-04 vs ORT. |
 | RAFT-small | optical flow | PASS | PASS | PASS | Gate 2026-10-20; opset 18 converted from an opset-16 raw export (conversion does not prove equivalence — the full-model gate is the evidence); 1,630 nodes on disk / **1,115** dispatched equally on all three legs (515 `Constant` folded); `input1`/`input2` [1,3,384,512] float32 → `flow_prediction` [1,2,384,512] float32 (393,216 elements); export sha256 `8be6b770acab2da0093891eb568397b98bb82bb4c54d91298e2a8842f2d7f950`; fixtures `frame1.bin` sha256 `95c3b7f01a346c8306b7c96437b3e8d02deebc1497003e116c83fd1bf80a1e38`, `frame2.bin` sha256 `870533ce8bfac4508b9d2cc2fc35335a7abd798ed4c79c9bc4da29382debf548`; ORT 1.27.0 CPUExecutionProvider reference sha256 `a622b211ac522e5a040df357065c227e1dae0f768a04937e1f18f96547aaf3e5`. `--tol 1e-3` scaled, over_tol 0 on all three legs; max_abs/mean/max_ratio CPU 6.10352e-05/4.84344e-06/0.01218946, CUDA 6.10352e-05/4.85096e-06/0.01224228, OpenCL 6.19888e-05/1.08869e-05/0.01226346. All legs exit 0. Reviewer PASS-WITH-FINDINGS; non-blocking: docs-scoped subject carrying the prior engine fix (hygiene hazard), missing ORT stdout log, float32-vs-float64 mean cosmetic. |
 | YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x | detection / pose / depth | PASS | PASS | PASS | 2026-10-19 converted-variant gates; YOLO26s/x carry the documented R-6 sub-0.001 TopK deviation. |
-| Grounding DINO | open-vocab detection | PASS (GD deviation) | PASS (GD deviation) | GAP | Task-equivalence gate 2026-10-20; gate metrics are post-canonicalization. Raw: pred_boxes 72/3,600 CPU and 80/3,600 CUDA over 1e-3(1+\|ref\|) (max abs 9.74e-01); per-box IoU min 0.0, 882/900 CPU and 880/900 CUDA above 0.999; raw max Δ max-score 2.12e-02 exceeds the 1.39e-02 margin, so "no query can cross" holds only canonicalized. Canonicalized: pred_boxes 0/3600 and per-box IoU min 0.99973 (900/900); top-1 900/900; decoded set_diff 0 at the 0.25/0.25 HF proxy (1 kept query, margin 1.39e-02, max score delta 5.36e-03); logits envelope diagnostic only, per-device to be recalibrated (canonicalized mean 7.35e-03 CPU, 7.64e-03 CUDA). OpenCL backend GAP: the handle path demands 11,028.5 MiB on a 5,803.3 MiB device (model live set 1,687.9 MiB); rejected remedies — sub-buffer views (measured 70x the arena, driver release crash) and per-view liveness (inherits both); named remedy (per-tensor plain-buffer liveness, or a kernel-offset arena) deferred post-0.2.0. |
+| Grounding DINO | open-vocab detection | PASS (GD deviation) | PASS (GD deviation) | PASS (GD deviation) | Task-equivalence gate 2026-10-20; gate metrics are post-canonicalization. Raw: pred_boxes 72/3,600 CPU and 80/3,600 CUDA over 1e-3(1+\|ref\|) (max abs 9.74e-01); per-box IoU min 0.0, 882/900 CPU and 880/900 CUDA above 0.999; raw max Δ max-score 2.12e-02 exceeds the 1.39e-02 margin, so "no query can cross" holds only canonicalized. Canonicalized: pred_boxes 0/3600 and per-box IoU min 0.99973 (900/900); top-1 900/900; decoded set_diff 0 at the 0.25/0.25 HF proxy (1 kept query, margin 1.39e-02, max score delta 5.36e-03); logits envelope diagnostic only, per-device to be recalibrated (canonicalized mean 7.35e-03 CPU, 7.64e-03 CUDA). OpenCL live-buffer remedy 2026-10-22: exit 0, 19,224 nodes, wall 38:27.88, peak board 2,215 MiB; canonicalized pred_boxes 0/3,600 (max 7.045e-05), IoU min 0.999759 with 900/900 at or above 0.999, top-1 token 900/900, decoded set_diff 0; envelope canonicalized mean 7.63878e-03 (the same diagnostic breach as CUDA, not one of the task criteria). |
 | RF-DETR seg-nano-576 | detection + segmentation | PASS | PASS (SN deviation) | PASS (SN deviation) | Rank-99 TopK near-tie (SN-DEV): ORT 182 vs GPU 1503; ORT gap 1.43051e-06 vs max score-vector ORT−device deviation 4.81606e-05 CUDA / 1.24216e-04 OpenCL on `/transformer/ReduceMax_output_0` (2,304 elements). Selection rule already ORT's; no engine change. Unpinned, both GPUs: query 99 flips 64→84, top-1 99/100; dets 50/400; labels 3,629 CUDA / 3,628 OpenCL of 9,100; masks 1,240,141 CUDA / 1,239,727 OpenCL of 2,073,600 over tolerance (max ratio 47,350.3 / 47,350.4). PASS is on the ORT-neutral pin (TopK→2×Constant; ORT max_abs 0): dets 0/400, labels 0/9,100, top-1 100/100 on all three; masks 2/36/17 (CPU/OpenCL/CUDA) of 2,073,600, max ratio ≤ 2.6; IoU min 0.999800 at raw>=0; CUDA 0.984375 at raw>=0.5 (query 36, 63/64; CPU/OpenCL 1.000000). The pinned graph is a single-input counterfactual for this gate (TopK removed; 1,215 vs 1,216 nodes): not a TopK-correctness result, not a deployable substitute. Result-level equivalence, not bit-identity. |
 | RT-DETRv4-s | detection | PASS | PASS | PASS | CUDA asymmetric-pad Conv remedy (explicit zero pre-pad in both CUDA Conv rows; symmetric path unchanged); full-model CUDA gate: boxes 0/1200 (max 7.93e-04), scores 0/300 (max 2.46e-05), labels 300/300 exact; 11 detections over 0.25, class ids [5,0,0,0,0,26,9,11,26,26,26]. |
 | YOLOv8n detector | detection | PASS | PASS | PASS | Gate 2026-10-20; opset 18 pinned at export by the Neuriplo YOLO exporter (`export/detection/yolo/export.py --opset 18`); 301 nodes on disk / **260** dispatched (41 `Constant` folded); `images [1,3,640,640]` float32 → `output0 [1,84,8400]` float32; export sha256 `fc34eff309da7fbd723c597f9621bac0b8e55695cbd102f6807c18bda325edf5`; three legs exit 0, 260 dispatched on each: CPU run_ms 31,366.9 / wall 31.527 s, CUDA 751.398 ms / 1.347 s, OpenCL 362.951 ms / 0.806 s. `--tol 1e-3` on `output0` (705,600 elements): over_tol 0 on all three devices; max_abs / mean_abs / max_ratio CPU 0.000717163 / 7.75374e-07 / 0.00976039, CUDA 0.0010376 / 1.17403e-06 / 0.0178353, OpenCL 0.00134277 / 1.75999e-06 / 0.0277979. Host-side postprocessing, outside the ONNX gate: top-1 class agreement 8046/8400 (95.7857 %) on every device; the 354 disagreements are all argmax tie-breaks (max reference score at any such anchor 2.360e-05, zero above 0.01); at a fixed raw score > 0.25 all three devices give 47/47 anchors with identical sets and class-id diff 0. |
@@ -65,39 +65,35 @@ Video fixture/reference provenance: one frozen canonical `(1,32,3,224,224)` buff
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS | 23 | Five primary models + eight converted variants + RT-DETRv4-s + RF-DETR seg-nano-576 (SN deviation) + YOLOv8n detector + YOLO11m-seg + OWL-ViT + ResNet-50 + ViTPose-base-simple + Depth-Anything-V2-Small + entry 31 (optical-flow small) + entry 29 (video: VideoMAE/ViViT/TimeSformer) |
-| Open | 1 | Grounding DINO (CPU/CUDA task-equivalence PASS; OpenCL backend gap) |
+| PASS | 24 | Five primary models + eight converted variants + RT-DETRv4-s + RF-DETR seg-nano-576 (SN deviation) + Grounding DINO (GD deviation) + YOLOv8n detector + YOLO11m-seg + OWL-ViT + ResNet-50 + ViTPose-base-simple + Depth-Anything-V2-Small + entry 31 (optical-flow small) + entry 29 (video: VideoMAE/ViViT/TimeSformer) |
+| Open | 0 | — |
 | Missing export | 6 | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
 | **Total** | **32** | 30 in scope |
 
-23 + 1 + 6 = 30 in-scope entries. RAFT-small (entry 31) is the
-twenty-second PASS and entry 29 (video) is the twenty-third: the entry closes
-once, with VideoMAE, ViViT and TimeSformer recorded as its three gated models.
-The release gate is zero open entries and
-zero missing exports among those 30; HIP is outside the gate. The catalog is
-not complete and 0.2.0 is not release-ready.
+24 + 0 + 6 = 30 in-scope entries. RAFT-small (entry 31) is the
+twenty-second PASS, entry 29 (video) is the twenty-third, and Grounding DINO
+is the twenty-fourth: the video entry closes once, with VideoMAE, ViViT and
+TimeSformer recorded as its three gated models. The release gate is zero open
+entries and zero missing exports among those 30; HIP is outside the gate. The
+catalog is not complete and 0.2.0 is not release-ready.
 
 The PASS count assumes one gated representative per catalog entry closes that
 entry (YOLOv8n detector for entry 17, YOLO11m-seg for entry 18, OWL-ViT for
 entry 25, ResNet-50 for entry 30, RAFT-small for entry 31); other sizes of
-those groups are not gated and do not move the scoreboard. Entry 29 is counted
-once, as a single entry, even though all three of its gated models are recorded
-in the evidence table. That is the ledger's prepared-decomposition
-working assumption and an open maintainer decision, so the counts depend on it.
+those groups are not gated and do not move the scoreboard. Grounding DINO is
+the entry itself. Entry 29 is counted once, as a single entry, even though all
+three of its gated models are recorded in the evidence table. That is the
+ledger's prepared-decomposition working assumption and an open maintainer
+decision, so the counts depend on it.
 
 ## Open items
 
 Closed and dropped from this list: the Grounding DINO CPU/CUDA
-task-equivalence gate, the RF-DETR seg-nano-576 SN-DEV ruling and the
-RT-DETRv4-s full-model CUDA gate.
+task-equivalence gate and OpenCL live-buffer repair, the RF-DETR seg-nano-576
+SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
 
-1. **Grounding DINO OpenCL cell** — a recorded backend gap (the handle path
-   demands 11,028.5 MiB on a 5,803.3 MiB device). Whether the release gate
-   admits a documented GAP-with-deviation is still an open maintainer
-   decision. Boundary 7 (video) did not touch this cell; it remains Open, not
-   PASS.
-2. **Missing exports** — provision, probe, gate and review the 6 remaining
+1. **Missing exports** — provision, probe, gate and review the 6 remaining
    entries: EdgeCrafter detection, EdgeCrafter segmentation, EdgeCrafter pose,
    RF-DETR detection other sizes, RF-DETR segmentation other sizes and
    RF-DETR keypoint other sizes.
@@ -117,8 +113,10 @@ RT-DETRv4-s full-model CUDA gate.
   rendering are host-side and outside the ONNX gate.
 - **Consumer adapter.** Neuriplo selects CPU or opt-in CUDA for NERT; there is
   no OpenCL/HIP consumer selection. OpenCL/HIP columns are engine capability.
-- **HIP.** Recorded unsupported for 0.2.0: no ROCm toolchain or AMD device on
-  the reference host; nine rows only. No paper mirror is planned.
+- **HIP.** Not part of the 0.2.0 release gate. The first-party table is now 68
+  rows, hipified from CUDA and validated through the NVIDIA HIP backend. The
+  four library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) still
+  need rocBLAS/hipBLAS/MIOpen on an AMD runner; no AMD device is present here.
 
 ## Sources
 

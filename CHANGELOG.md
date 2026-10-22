@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NERT_HAS_CUDNN` only, non-zero output_padding and asymmetric pads still
   rejected on CUDA `ConvTranspose`). Every CPU op now has a CUDA row (`ConvTranspose`
   only under `NERT_HAS_CUDNN`) — tables complete.
+- HIP first-party table: 68 rows hipified from `src/cuda/` and validated
+  through the NVIDIA HIP backend on the RTX 3060. `Gemm`, `MatMul`, `Conv`,
+  and `ConvTranspose` remain the rocBLAS/hipBLAS/MIOpen slice and are absent
+  from the HIP table, so the executor rejects them explicitly. HIP remains
+  outside the 0.2.0 release gate until the AMD runner validates the library
+  half.
 - OpenCL shared movement rows: `Transpose`, `Slice`, `Concat`,
   `Shape`, `Unsqueeze`, `Gather` (hand-written OpenCL C, oracle
   vs device green on the RTX 3060) — table 9→15; per-model portable
@@ -285,10 +291,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged at CPU 72 / CUDA 72 / OpenCL 68 / HIP 9) and no engine source file
   changed. Entry 29 closes once, with all three gated models recorded as
   evidence. Scoreboard moved 22 → 23 and the missing-export count 7 → 6;
-  Grounding DINO's OpenCL GAP is untouched. No release or tag was cut.
+  Grounding DINO's OpenCL GAP was later closed by the live-buffer remedy. No
+  release or tag was cut.
 
 ### Fixed
 
+- Grounding DINO's OpenCL leg: the handle-device executor now allocates
+  intermediates at their defining node, reuses released buffers under a
+  256 MiB cache cap, and releases them after their last consumer instead of
+  materializing every planned offset at construction. The full leg now exits
+  0 in 38:27.88 with 19,224 nodes and a 2,215 MiB board peak (previously
+  `CL_MEM_OBJECT_ALLOCATION_FAILURE` at 11,028.5 MiB of demanded buffers on a
+  5,803.3 MiB device). Canonicalized task gate: pred_boxes 0/3,600, IoU min
+  0.999759 (900/900), top-1 900/900, decoded set_diff 0.
 - OpenCL `ReduceSum` int64 path, found by the RF-DETR seg-small gate:
   `/transformer/ReduceSum` (bool→Cast int64 data, axes [-1],
   keepdims 1) threw "data tensors must be float32"; `ReduceSum` now
@@ -298,8 +313,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now keeps the data input's dtype (float32 or int64) instead of
   coercing, and the CPU/CUDA `Clip` rows accept int64 — unblocking
   Grounding DINO's reference gate at `/model/model/Clip`; the gate
-  re-run has since passed on CPU and CUDA under the task-equivalence bar, with
-  the OpenCL leg a backend gap).
+  re-run has since passed on CPU, CUDA, and OpenCL under the task-equivalence
+  bar; the OpenCL live-buffer remedy closed the last backend gap).
 - Review-driven OpenCL corrections landed after `6924949`: `ScatterND`
   now applies duplicate update slices in order (last duplicate wins,
   matching the CPU oracle), `Or` enforces the oracle's two-input

@@ -17,3 +17,4 @@ evidence yet.
 | ID | Command/Check | Result | Date | Notes |
 |----|---------------|--------|------|-------|
 | — | — | blocked | 2026-10-16 | no AMD GPU / ROCm / hipify here or in nert-gpu:26.08 |
+| — | NVIDIA first-party translation (sibling `2026-10-17-n1c-hip-nvidia`) | pass | 2026-10-22 | 68 hipified rows validated on the RTX 3060 through the NVIDIA HIP backend; the AMD `HIP_PLATFORM=amd` half and rocBLAS/MIOpen rows remain blocked on AMD hardware. |

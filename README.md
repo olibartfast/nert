@@ -40,14 +40,15 @@ and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
 
 CPU and CUDA tables are complete at 72 op rows each. OpenCL has 68
 rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`)
-are unused by the catalog entries that currently load. HIP is
-unsupported for 0.2.0: nine rows, and the reference host has no ROCm
-toolchain or AMD device.
+are unused by the catalog entries that currently load. HIP has 68
+first-party rows hipified from the CUDA sources; `Gemm`, `MatMul`,
+`Conv`, and `ConvTranspose` remain deferred to the rocBLAS/hipBLAS/
+MIOpen slice. HIP is not part of the 0.2.0 release gate, and the
+reference host has no AMD device for the AMD half.
 
-Full-model gates, not op-table presence, define coverage. As of 2026-10-20,
-22 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; one
-entry remains open (Grounding DINO: CPU/CUDA task-equivalence pass, OpenCL
-backend gap), and 7 entries need an ONNX export.
+Full-model gates, not op-table presence, define coverage. As of 2026-10-22,
+24 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; no
+entry remains open, and 6 entries need an ONNX export.
 Image understanding (GGUF/llama.cpp) and Gaussian
 Splatting (LGM/GRM) are out of scope for this ONNX runtime. The catalog
 is incomplete and 0.2.0 is not release-ready; see the
@@ -68,8 +69,11 @@ is incomplete and 0.2.0 is not release-ready; see the
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
 `HipDevice()` exist only when the matching build flag is on. CPU and
 CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
-require cuDNN. OpenCL implements 68 rows as the portable backend. HIP is
-unsupported for 0.2.0 and remains a nine-row scaffold.
+require cuDNN. OpenCL implements 68 rows as the portable backend. HIP
+implements the same 68 first-party rows as hipified sources; its four
+library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) are the
+next slice. The HIP sources are validated on the NVIDIA HIP backend;
+the AMD/ROCm build still needs an AMD runner.
 
 A device can load only graphs whose op types all have a row. Op-table
 presence is a coverage statement, not a correctness claim; full-model
@@ -119,6 +123,13 @@ standard-library-only):
 | `NERT_ENABLE_OPENCL=ON` | OpenCL headers + ICD loader | Builds `src/opencl_device.cpp` + `src/opencl/` and the `nert_opencl_*` tests |
 | `NERT_ENABLE_HIP=ON` | CUDA compiler (NVIDIA target) + HIP headers | Builds `src/hip_device.cpp` + `src/hip/` and the `nert_hip_*` tests |
 | `NERT_BUILD_BENCH=ON` | None beyond the enabled devices | Builds the `bench/runtime` driver (`nert_bench_runtime`) |
+
+With `NERT_ENABLE_CUDA=ON` and cuDNN present, set
+`-DNERT_CUDNN_FRONTEND_DIR=<pinned cudnn-frontend/include>` to build the
+cached cuDNN Frontend `Conv` row (tested with frontend v1.31.0). Without it the
+legacy `cudnnConvolutionForward` row is used. The release validation runs that
+build in the `nert-gpu:26.08` container (CUDA 13.4 + cuDNN 9.25); see
+[`specs/2026-10-18-n1e-cudnn-graph/validation.md`](specs/2026-10-18-n1e-cudnn-graph/validation.md).
 
 ```bash
 cmake -S . -B build-cuda -DNERT_ENABLE_CUDA=ON -DNERT_BUILD_BENCH=ON

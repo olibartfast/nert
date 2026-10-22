@@ -1,4 +1,4 @@
-// HIP pilot kernels (N1c-M2 on NVIDIA): hipified Relu/Add vs the CPU oracle.
+// HIP first-party kernels (N1c on NVIDIA): hipified rows vs the CPU oracle.
 //
 // Needs a HIP-usable GPU at run time; without one every test SKIPs (never
 // fails). Gemm never lands on HIP-NVIDIA (rocBLAS is the AMD half), so it

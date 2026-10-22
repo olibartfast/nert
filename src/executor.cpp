@@ -1,14 +1,16 @@
 // The sequential executor (T-16).
 //
 // Construction runs shape inference and memory planning for the supplied input
-// shapes, then reserves the whole arena in one allocation from the device's
-// allocator. Run allocates no arena memory: it resolves a TensorView for every
-// graph input, initializer, and node output, walks the nodes in order, and
-// dispatches each to the device kernel table. The planner's inclusive liveness
-// guarantees that no node output shares bytes with any input of its defining
-// node, so Run binds each tensor's view directly — no transient copies. Graph
-// outputs are copied out of the arena, so a second Run observes the same plan
-// and the same arena.
+// shapes. Pointer-offset devices reserve the whole arena in one allocation;
+// handle-based devices allocate each live intermediate separately at its
+// defining node and release it after its last consumer, so their peak follows
+// the live set instead of the total planned construction demand. Run resolves
+// a TensorView for every graph input, initializer, and node output, walks the
+// nodes in order, and dispatches each to the device kernel table. The planner's
+// inclusive liveness guarantees that no node output shares bytes with any input
+// of its defining node, so Run binds each tensor's view directly — no transient
+// copies. Graph outputs are copied out before handle-backed buffers are
+// released, so a second Run observes the same plan.
 
 #include "nert/executor.hpp"
 
@@ -16,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -78,6 +81,122 @@ class StagedBuffers {
     std::vector<void*> buffers_;
 };
 
+constexpr int64_t kHandleFreeCacheBytes = 256LL * 1024 * 1024;
+
+// Per-run buffers for handle-based devices (OpenCL). They are allocated when a
+// node produces a tensor and released once its inclusive last-use node has run;
+// the destructor releases any survivors on a kernel error. Freed buffers are
+// reused up to a small cache cap so per-node driver allocation stays bounded.
+class TensorBuffers {
+  public:
+    explicit TensorBuffers(Device* device) : device_(device) {}
+
+    TensorBuffers(const TensorBuffers&) = delete;
+    TensorBuffers& operator=(const TensorBuffers&) = delete;
+
+    ~TensorBuffers() { ReleaseAll(); }
+
+    // Reuse the smallest freed buffer that fits, or allocate a new one. The
+    // returned capacity is at least `bytes`; kernels still see the requested
+    // shape.
+    void* acquire(int64_t bytes, int64_t& capacity) {
+        const auto fit = free_.lower_bound(bytes);
+        if (fit != free_.end()) {
+            capacity = fit->first;
+            void* buffer = fit->second;
+            free_.erase(fit);
+            free_bytes_ -= capacity;
+            return buffer;
+        }
+        capacity = bytes;
+        return device_->allocator().allocate(bytes);
+    }
+
+    void add(const std::string& name, void* buffer, int64_t capacity) {
+        auto inserted = buffers_.emplace(name, Buffer{buffer, capacity});
+        if (!inserted.second) {
+            cache_or_release(buffer, capacity);
+            throw InferenceException("executor: duplicate live buffer for tensor '" + name + "'");
+        }
+    }
+
+    void release_before(int64_t node_index, const std::map<std::string, int64_t>& last_use,
+                        const std::set<std::string>& keep) {
+        for (auto it = buffers_.begin(); it != buffers_.end();) {
+            const auto use = last_use.find(it->first);
+            if (use != last_use.end() && use->second < node_index && keep.count(it->first) == 0) {
+                cache_or_release(it->second.data, it->second.size);
+                it = buffers_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void ReleaseAll() {
+        for (const auto& entry : buffers_) {
+            device_->allocator().release(entry.second.data);
+        }
+        buffers_.clear();
+        for (const auto& entry : free_) {
+            device_->allocator().release(entry.second);
+        }
+        free_.clear();
+        free_bytes_ = 0;
+    }
+
+  private:
+    struct Buffer {
+        void* data;
+        int64_t size;
+    };
+
+    void cache_or_release(void* buffer, int64_t bytes) {
+        if (free_bytes_ + bytes <= kHandleFreeCacheBytes) {
+            free_.emplace(bytes, buffer);
+            free_bytes_ += bytes;
+        } else {
+            device_->allocator().release(buffer);
+        }
+    }
+
+    Device* device_;
+    std::map<std::string, Buffer> buffers_;
+    std::multimap<int64_t, void*> free_; // capacity -> reusable buffer
+    int64_t free_bytes_ = 0;
+};
+
+// Inclusive last-use node index for every planned arena tensor, plus the graph
+// outputs that must survive until download.
+void ComputeLifetimes(const Graph& graph, const MemoryPlan& plan, std::map<std::string, int64_t>& last_use,
+                      std::set<std::string>& graph_outputs) {
+    std::map<std::string, int64_t> definitions;
+    for (std::size_t i = 0; i < graph.nodes.size(); ++i) {
+        for (const std::string& output : graph.nodes[i].outputs) {
+            if (plan.buffers.count(output) != 0) {
+                definitions.emplace(output, static_cast<int64_t>(i));
+            }
+        }
+    }
+    for (const auto& entry : plan.buffers) {
+        last_use[entry.first] = definitions.at(entry.first);
+    }
+    for (std::size_t i = 0; i < graph.nodes.size(); ++i) {
+        for (const std::string& input : graph.nodes[i].inputs) {
+            const auto use = last_use.find(input);
+            if (use != last_use.end() && static_cast<int64_t>(i) > use->second) {
+                use->second = static_cast<int64_t>(i);
+            }
+        }
+    }
+    for (const auto& output : graph.outputs) {
+        if (plan.buffers.count(output.first) != 0) {
+            graph_outputs.insert(output.first);
+            last_use[output.first] = static_cast<int64_t>(graph.nodes.size()) - 1;
+        }
+    }
+}
+
 } // namespace
 
 Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& device)
@@ -89,26 +208,6 @@ Model::Model(const Graph& graph, const ShapeMap& input_dims, const Device& devic
             if (arena_ == nullptr) {
                 throw InferenceException("executor: could not allocate the " + std::to_string(plan_.arena_size) +
                                          "-byte arena");
-            }
-        } else if (plan_.arena_size > 0) {
-            // Handle-based devices cannot add a byte offset to a base
-            // allocation. Back every distinct planned offset with one buffer
-            // sized to the largest tensor placed there; the planner's liveness
-            // guarantees tensors sharing an offset do not overlap in time.
-            std::map<int64_t, int64_t> slot_sizes;
-            for (const auto& entry : plan_.buffers) {
-                if (entry.second.size > 0) {
-                    int64_t& size = slot_sizes[entry.second.offset];
-                    size = std::max(size, entry.second.size);
-                }
-            }
-            for (const auto& entry : slot_sizes) {
-                void* buffer = device_->allocator().allocate(entry.second);
-                if (buffer == nullptr) {
-                    throw InferenceException("executor: could not allocate the " + std::to_string(entry.second) +
-                                             "-byte arena slot at offset " + std::to_string(entry.first));
-                }
-                arena_slots_.emplace(entry.first, buffer);
             }
         }
         UploadResidents();
@@ -131,6 +230,13 @@ Model::~Model() {
     if (arena_ != nullptr) {
         device_->allocator().release(arena_);
     }
+}
+
+void Model::ReleaseArenaSlots() {
+    for (const auto& entry : arena_slots_) {
+        device_->allocator().release(entry.second);
+    }
+    arena_slots_.clear();
 }
 
 size_t HostElementSize(DataType dtype) {
@@ -313,13 +419,6 @@ void Model::ReleaseResidents() {
     resident_.clear();
 }
 
-void Model::ReleaseArenaSlots() {
-    for (const auto& entry : arena_slots_) {
-        device_->allocator().release(entry.second);
-    }
-    arena_slots_.clear();
-}
-
 void Model::Execute(std::map<std::string, TensorView>& views,
                     std::map<std::string, std::vector<uint8_t>>& host_outputs) {
     for (const auto& entry : graph_.initializers) {
@@ -342,6 +441,13 @@ void Model::Execute(std::map<std::string, TensorView>& views,
     }
 
     StagedBuffers staged(device_);
+    TensorBuffers tensor_buffers(device_);
+    const bool pointer_arena = device_->supports_arena_offsets();
+    std::map<std::string, int64_t> last_use;
+    std::set<std::string> graph_outputs;
+    if (!pointer_arena) {
+        ComputeLifetimes(graph_, plan_, last_use, graph_outputs);
+    }
     if (!device_->is_host()) {
         // Per-run staging covers the graph inputs only: initializers are
         // resident from construction, so a second Run uploads no weights.
@@ -371,7 +477,11 @@ void Model::Execute(std::map<std::string, TensorView>& views,
         }
     }
 
-    for (const Node& node : graph_.nodes) {
+    for (std::size_t node_index = 0; node_index < graph_.nodes.size(); ++node_index) {
+        const Node& node = graph_.nodes[node_index];
+        if (!pointer_arena) {
+            tensor_buffers.release_before(static_cast<int64_t>(node_index), last_use, graph_outputs);
+        }
         const KernelFn kernel = device_->kernels().find(node.op_type);
         if (kernel == nullptr) {
             throw InferenceException("executor: no kernel for op '" + node.op_type + "' (node '" + node.name + "')");
@@ -401,17 +511,19 @@ void Model::Execute(std::map<std::string, TensorView>& views,
             }
             const TensorInfo& info = ShapeOf(shapes_, name);
             TensorView view;
-            if (device_->supports_arena_offsets()) {
+            if (pointer_arena) {
                 view.data = static_cast<char*>(arena_) + buffer->second.offset;
             } else if (buffer->second.size == 0) {
                 view.data = nullptr;
             } else {
-                const auto slot = arena_slots_.find(buffer->second.offset);
-                if (slot == arena_slots_.end()) {
-                    throw InferenceException("executor: no arena slot for output '" + name + "' of node '" + node.name +
-                                             "'");
+                int64_t capacity = 0;
+                void* data = tensor_buffers.acquire(buffer->second.size, capacity);
+                if (data == nullptr) {
+                    throw InferenceException("executor: could not allocate the " + std::to_string(buffer->second.size) +
+                                             "-byte buffer for output '" + name + "' of node '" + node.name + "'");
                 }
-                view.data = slot->second;
+                tensor_buffers.add(name, data, capacity);
+                view.data = data;
             }
             view.dtype = info.dtype;
             view.dims = info.dims;
@@ -444,6 +556,7 @@ void Model::Execute(std::map<std::string, TensorView>& views,
             view.data = host.data();
         }
     }
+    tensor_buffers.ReleaseAll();
 }
 
 } // namespace nert

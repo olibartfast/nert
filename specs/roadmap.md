@@ -130,16 +130,18 @@ What is complete:
 - OpenCL device support and the movement, pool, reshape, `Conv`, `Flatten`,
   and `Gemm` rows. The OpenCL table is still being expanded; the live
   model-by-device matrix is in `specs/2026-10-17-task-models/coverage.md`.
-- HIP device support for the original nine operators. HIP parity for the
-  newer rows is blocked on a host with `hipify-perl`, ROCm, and AMD hardware.
+- HIP first-party parity: 68 rows are hipified from the CUDA sources and
+  validated through the NVIDIA HIP backend on the RTX 3060. `Gemm`, `MatMul`,
+  `Conv`, and `ConvTranspose` remain blocked on rocBLAS/hipBLAS/MIOpen and an
+  AMD runner.
 
 The development environment is the `.devcontainer` 26.08 stack; the host stays
 toolkit-minimal.
 
-Still queued: the remaining OpenCL transformer and reduction rows, HIP parity
-where hardware permits, bias fusion and executor activation fusion, additional
-bench fixtures, a Vulkan shader toolchain, and an AMD runner built on rocBLAS
-and MIOpen.
+Still queued: the remaining OpenCL transformer and reduction rows, the
+HIP library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`),
+bias fusion and executor activation fusion, additional bench fixtures, a
+Vulkan shader toolchain, and an AMD runner built on rocBLAS and MIOpen.
 
 The opt-in `bench/` harness exists under
 `specs/2026-10-16-kernel-bench-harness/`. It provides per-kernel CPU-oracle

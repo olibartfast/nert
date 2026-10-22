@@ -232,8 +232,9 @@ endif()
 # NERT_ENABLE_HIP=ON requires a CUDA compiler (the NVIDIA backend drives
 # nvcc) plus the HIP headers (HIP_INCLUDE_DIR or $HIP_PATH, e.g. from the
 # hip-dev package); OFF (default) leaves the link closure
-# standard-library-only. Independent of the other device flags. The AMD
-# half (hipcc/clang, rocBLAS/MIOpen) is a later slice on the AMD runner.
+# standard-library-only. Independent of the other device flags. The table
+# covers the 68 first-party rows; Gemm/MatMul/Conv/ConvTranspose need the
+# rocBLAS/hipBLAS/MIOpen AMD slice.
 option(NERT_ENABLE_HIP "Build NERT with the HIP device layer (NVIDIA target)" OFF)
 if(NERT_ENABLE_HIP)
     include(CheckLanguage)
@@ -252,11 +253,19 @@ if(NERT_ENABLE_HIP)
         message(FATAL_ERROR
             "NERT_ENABLE_HIP=ON requires the HIP headers (set HIP_INCLUDE_DIR or HIP_PATH); none were found.")
     endif()
-    target_sources(nert PRIVATE src/hip_device.cpp)
-    target_sources(nert PRIVATE src/hip/relu.cu src/hip/add.cu src/hip/table.cpp)
-    target_sources(nert PRIVATE src/hip/mul.cu src/hip/sub.cu src/hip/div.cu)
-    target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/tanh.cu src/hip/softmax.cu)
-    target_sources(nert PRIVATE src/hip/reshape.cu)
+    target_sources(nert PRIVATE src/hip_device.cpp src/hip/table.cpp)
+    target_sources(nert PRIVATE src/hip/abs.cu src/hip/add.cu src/hip/and.cu src/hip/arg_max.cu src/hip/average_pool.cu src/hip/cast.cu)
+    target_sources(nert PRIVATE src/hip/clip.cu src/hip/concat.cu src/hip/constant_of_shape.cu src/hip/cos.cu src/hip/cum_sum.cu src/hip/div.cu)
+    target_sources(nert PRIVATE src/hip/einsum.cu src/hip/elu.cu src/hip/equal.cu src/hip/erf.cu src/hip/exp.cu src/hip/expand.cu)
+    target_sources(nert PRIVATE src/hip/eye_like.cu src/hip/flatten.cu src/hip/floor.cu src/hip/gather.cu src/hip/gather_elements.cu src/hip/global_average_pool.cu)
+    target_sources(nert PRIVATE src/hip/greater.cu src/hip/greater_or_equal.cu src/hip/grid_sample.cu src/hip/identity.cu src/hip/instance_normalization.cu src/hip/is_nan.cu)
+    target_sources(nert PRIVATE src/hip/layer_normalization.cu src/hip/less.cu src/hip/less_or_equal.cu src/hip/log.cu src/hip/max.cu src/hip/max_pool.cu)
+    target_sources(nert PRIVATE src/hip/min.cu src/hip/mod.cu src/hip/mul.cu src/hip/neg.cu src/hip/not.cu src/hip/or.cu)
+    target_sources(nert PRIVATE src/hip/pad.cu src/hip/pow.cu src/hip/range.cu src/hip/reduce_l2.cu src/hip/reduce_max.cu src/hip/reduce_mean.cu)
+    target_sources(nert PRIVATE src/hip/reduce_sum.cu src/hip/relu.cu src/hip/reshape.cu src/hip/resize.cu src/hip/scatter_nd.cu src/hip/shape.cu)
+    target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/sin.cu src/hip/slice.cu src/hip/softmax.cu src/hip/split.cu src/hip/sqrt.cu)
+    target_sources(nert PRIVATE src/hip/squeeze.cu src/hip/sub.cu src/hip/tanh.cu src/hip/tile.cu src/hip/top_k.cu src/hip/transpose.cu)
+    target_sources(nert PRIVATE src/hip/unsqueeze.cu src/hip/where.cu)
     # The HIP dialect compiles with nvcc on the NVIDIA target (what
     # hipcc -platform=nvidia does). .cu files pick up CUDA automatically;
     # the .cpp device file needs it set explicitly.
