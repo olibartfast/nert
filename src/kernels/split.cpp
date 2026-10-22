@@ -4,6 +4,7 @@
 // dim divides evenly across the outputs. Unequal parts are allowed when the
 // sizes input is present. Data is float32 or int64.
 
+#include "../axes_form.hpp"
 #include "kernels.hpp"
 
 #include <cstdint>
@@ -41,7 +42,7 @@ int64_t IntAttribute(const Node& node, const std::string& name, int64_t fallback
 
 template <typename T>
 void SplitTyped(const TensorView& in, const std::vector<TensorView>& outputs, const std::vector<int64_t>& parts,
-    int64_t axis, int64_t outer, int64_t inner) {
+                int64_t axis, int64_t outer, int64_t inner) {
     const T* x = static_cast<const T*>(in.data);
     int64_t begin = 0;
     for (std::size_t i = 0; i < outputs.size(); ++i) {
@@ -89,7 +90,18 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
     const int64_t dim = in.dims[static_cast<std::size_t>(axis)];
 
     std::vector<int64_t> parts;
-    if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
+    bool parts_supplied = false;
+    const SplitForm split_form = ResolveSplitForm(node);
+    if (split_form.source == AxesSource::Attribute) {
+        if (split_form.split_attribute != nullptr) {
+            const std::vector<int64_t>* values = NodeAttributeIntList(split_form.split_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'split' must be an integer list");
+            }
+            parts = *values;
+            parts_supplied = true;
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& sizes = inputs[1];
         if (sizes.dtype != DataType::Int64) {
             throw InferenceException(context + ": split sizes must be int64");
@@ -100,6 +112,9 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
         }
         const int64_t* values = static_cast<const int64_t*>(sizes.data);
         parts.assign(values, values + count);
+        parts_supplied = true;
+    }
+    if (parts_supplied) {
         if (parts.size() != outputs.size()) {
             throw InferenceException(context + ": Split split sizes must match the output count");
         }

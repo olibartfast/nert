@@ -1094,8 +1094,9 @@ TEST_F(EngineLoader, HermeticOpsetRangeElevenToEighteen)
 }
 
 // Opset-13 ReduceMean/ReduceL2/ReduceMax keep axes in an attribute. The loader
-// synthesizes an Int64 initializer and appends it as the second input.
-TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
+// leaves the source form in place: one input, the `axes` attribute, and no
+// synthesized axes initializer.
+TEST_F(EngineLoader, HermeticReduceAxesAttributePreserved)
 {
     for (const std::string& op :
         { std::string("ReduceMean"), std::string("ReduceL2"),
@@ -1111,27 +1112,33 @@ TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
         ASSERT_EQ(graph.nodes.size(), 1U) << op;
         const nert::Node& node = graph.nodes.front();
         EXPECT_EQ(node.op_type, op);
-        EXPECT_TRUE(node.attributes.empty()) << op;
-        ASSERT_EQ(node.inputs.size(), 2U) << op;
+        EXPECT_EQ(node.schema_version, 13) << op;
+        ASSERT_EQ(node.inputs.size(), 1U) << op;
         EXPECT_EQ(node.inputs[0], "x");
-        EXPECT_EQ(node.inputs[1], "reduce0/axes") << op;
 
-        const auto init_it = graph.initializers.find(node.inputs[1]);
-        ASSERT_NE(init_it, graph.initializers.end()) << op;
-        EXPECT_EQ(init_it->second.dtype, nert::DataType::Int64) << op;
-        EXPECT_EQ(init_it->second.dims, (std::vector<int64_t>{1})) << op;
-        EXPECT_EQ(std::get<std::vector<int64_t>>(init_it->second.values),
+        const nert::Attribute* axes = nullptr;
+        for (const nert::Attribute& attribute : node.attributes) {
+            if (attribute.name == "axes") {
+                axes = &attribute;
+            }
+        }
+        ASSERT_NE(axes, nullptr) << op;
+        EXPECT_EQ(std::get<std::vector<int64_t>>(axes->value),
             (std::vector<int64_t>{1}))
             << op;
+        EXPECT_EQ(node.attributes.size(), 1U) << op;
 
-        const auto tensor_it = graph.tensors.find(node.inputs[1]);
-        ASSERT_NE(tensor_it, graph.tensors.end()) << op;
-        EXPECT_EQ(tensor_it->second.dtype, nert::DataType::Int64) << op;
-        EXPECT_EQ(tensor_it->second.dims, (std::vector<int64_t>{1})) << op;
+        // No synthesized axes initializer or tensor name exists.
+        EXPECT_EQ(graph.initializers.count("reduce0/axes"), 0U) << op;
+        EXPECT_EQ(graph.initializers.count("reduce0/axes_1"), 0U) << op;
+        EXPECT_EQ(graph.tensors.count("reduce0/axes"), 0U) << op;
+        EXPECT_EQ(graph.tensors.count("reduce0/axes_1"), 0U) << op;
     }
 }
 
-// The synthesized axes name is stable and avoids every existing tensor name.
+// The old attribute form no longer allocates a synthesized axes name, so a
+// tensor that happens to use that name is left untouched and does not affect
+// loading or the node's inputs.
 TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
 {
     std::string body;
@@ -1143,17 +1150,22 @@ TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
 
     const nert::Graph first = nert::LoadGraphFromFile(
         write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
-    ASSERT_EQ(first.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(first.nodes.front().inputs[1], "reduce0/axes_1");
+    ASSERT_EQ(first.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(first.nodes.front().inputs[0], "x");
+    EXPECT_EQ(first.initializers.count("reduce0/axes"), 1U);
+    EXPECT_EQ(std::get<std::vector<int64_t>>(
+                  first.initializers.at("reduce0/axes").values),
+        (std::vector<int64_t>{0}));
 
     const nert::Graph second = nert::LoadGraphFromFile(
         write_model_bytes("reduce_name_collision.onnx", encode_model(body, 13)));
-    EXPECT_EQ(second.nodes.front().inputs[1], "reduce0/axes_1");
+    EXPECT_EQ(second.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(second.initializers.count("reduce0/axes"), 1U);
 }
 
-// An empty axes list and invalid axes keep their normal reduce semantics:
+// An empty axes attribute and invalid axes keep their normal reduce semantics:
 // empty means every axis; duplicates and out-of-range values are rejected by
-// shape inference after the attribute has become an input.
+// shape inference while the attribute is still in place.
 TEST_F(EngineLoader, HermeticReduceAxesEmptyAndInvalid)
 {
     auto load = [](const std::vector<int64_t>& axes, const std::vector<int64_t>& out_dims) {
@@ -1182,7 +1194,7 @@ TEST_F(EngineLoader, HermeticReduceAxesEmptyAndInvalid)
     EXPECT_THROW(nert::Model(out_of_range, {{"x", {2, 3, 4}}}, nert::CpuDevice()), nert::ModelLoadException);
 }
 
-// The canonicalized opset-13 graph executes exactly like the opset-18 form.
+// The opset-13 graph executes exactly like the opset-18 form.
 TEST_F(EngineLoader, HermeticOpset13ReduceMeanMatchesOpset18)
 {
     std::vector<float> values;
@@ -1224,8 +1236,8 @@ TEST_F(EngineLoader, HermeticOpset13ReduceMeanMatchesOpset18)
 }
 
 // ScatterND's explicit default reduction ("none") is legal from opset 16 and
-// is dropped so the kernel sees the canonical no-reduction form.
-TEST_F(EngineLoader, HermeticScatterNDReductionNoneCanonicalized)
+// stays in the graph; the kernels implement the overwrite form directly.
+TEST_F(EngineLoader, HermeticScatterNDReductionNonePreserved)
 {
     for (const int64_t opset : { int64_t{16}, int64_t{18} }) {
         std::string body;
@@ -1241,15 +1253,18 @@ TEST_F(EngineLoader, HermeticScatterNDReductionNoneCanonicalized)
             "scatter_none_" + std::to_string(opset) + ".onnx",
             encode_model(body, opset)));
         ASSERT_EQ(graph.nodes.size(), 1U) << "opset " << opset;
-        EXPECT_TRUE(graph.nodes.front().attributes.empty()) << "opset " << opset;
-        EXPECT_EQ(graph.nodes.front().inputs.size(), 3U) << "opset " << opset;
+        const nert::Node& node = graph.nodes.front();
+        EXPECT_EQ(node.inputs.size(), 3U) << "opset " << opset;
+        ASSERT_EQ(node.attributes.size(), 1U) << "opset " << opset;
+        EXPECT_EQ(node.attributes.front().name, "reduction") << "opset " << opset;
+        EXPECT_EQ(std::get<std::string>(node.attributes.front().value), "none")
+            << "opset " << opset;
     }
 }
 
-// Legacy Softmax coerced its input to 2D at `axis` and normalized over the
-// second dimension. The canonical graph is Shape -> Flatten -> Softmax(1) ->
-// Reshape, preserving the old default axis of 1.
-TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
+// Legacy Softmax keeps the source node in the graph; the kernel implements
+// the pre-13 2-D coercion directly. The default axis is 1.
+TEST_F(EngineLoader, HermeticLegacySoftmaxDirect)
 {
     std::vector<float> values;
     for (int i = 0; i < 24; ++i) {
@@ -1263,26 +1278,9 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
 
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_default_11.onnx", encode_model(body, 11)));
-    ASSERT_EQ(graph.nodes.size(), 4U);
-    EXPECT_EQ(graph.nodes[0].name, "sm0/shape");
-    EXPECT_EQ(graph.nodes[0].op_type, "Shape");
-    EXPECT_EQ(graph.nodes[1].name, "sm0/flatten");
-    EXPECT_EQ(graph.nodes[1].op_type, "Flatten");
-    EXPECT_EQ(graph.nodes[2].name, "sm0/softmax");
-    EXPECT_EQ(graph.nodes[2].op_type, "Softmax");
-    EXPECT_EQ(graph.nodes[3].name, "sm0/reshape");
-    EXPECT_EQ(graph.nodes[3].op_type, "Reshape");
-
-    ASSERT_EQ(graph.nodes[1].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(graph.nodes[1].attributes.front().value), 1);
-    ASSERT_EQ(graph.nodes[2].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(graph.nodes[2].attributes.front().value), 1);
-    EXPECT_EQ(graph.nodes[0].inputs, (std::vector<std::string>{"x"}));
-    EXPECT_EQ(graph.nodes[1].inputs, (std::vector<std::string>{"x"}));
-    EXPECT_EQ(graph.nodes[2].inputs, (std::vector<std::string>{"sm0/flatten_out"}));
-    EXPECT_EQ(graph.nodes[3].inputs,
-        (std::vector<std::string>{"sm0/softmax_out", "sm0/shape_out"}));
-    EXPECT_EQ(graph.nodes[3].outputs, (std::vector<std::string>{"y"}));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Softmax");
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1292,7 +1290,8 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
         EXPECT_NEAR(result.outputs.at("y")[i], expected[i], 1e-6F) << "element " << i;
     }
 
-    // A negative axis is resolved against the input rank before Flatten.
+    // A negative axis is resolved against the input rank; legacy Softmax
+    // then normalizes the trailing block from that axis.
     std::string negative;
     put_sub(negative, 1, encode_node("sm_neg", "Softmax", {"x"}, {"y"},
                            {encode_attribute_int("axis", -1)}));
@@ -1300,9 +1299,7 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
     put_sub(negative, 12, encode_value_info("y", 1, {2, 3, 4}));
     const nert::Graph negative_graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_neg_11.onnx", encode_model(negative, 11)));
-    ASSERT_EQ(negative_graph.nodes.size(), 4U);
-    ASSERT_EQ(negative_graph.nodes[1].attributes.size(), 1U);
-    EXPECT_EQ(std::get<std::int64_t>(negative_graph.nodes[1].attributes.front().value), 2);
+    ASSERT_EQ(negative_graph.nodes.size(), 1U);
 
     nert::Model negative_model(negative_graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult negative_result = negative_model.Run({ { "x", values } });
@@ -1313,8 +1310,8 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxExpanded)
     }
 }
 
-// An intermediate Softmax input gets its rank from value_info; the inserted
-// Shape node then supplies the Reshape shape at run time.
+// Legacy Softmax on an intermediate input does not need value_info for that
+// input: shape inference derives the rank from the producer.
 TEST_F(EngineLoader, HermeticLegacySoftmaxIntermediateInput)
 {
     std::vector<float> values;
@@ -1331,15 +1328,13 @@ TEST_F(EngineLoader, HermeticLegacySoftmaxIntermediateInput)
     put_sub(body, 1, encode_node("sm0", "Softmax", {"h"}, {"y"},
                       {encode_attribute_int("axis", -1)}));
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
-    put_sub(body, 13, encode_value_info("h", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
 
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("softmax_intermediate_11.onnx", encode_model(body, 11)));
-    ASSERT_EQ(graph.nodes.size(), 5U);
+    ASSERT_EQ(graph.nodes.size(), 2U);
     EXPECT_EQ(graph.nodes[0].op_type, "Relu");
-    EXPECT_EQ(graph.nodes[1].op_type, "Shape");
-    EXPECT_EQ(graph.nodes[4].op_type, "Reshape");
+    EXPECT_EQ(graph.nodes[1].op_type, "Softmax");
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1366,9 +1361,9 @@ TEST_F(EngineLoader, HermeticSoftmaxAtOpset13Unchanged)
     EXPECT_EQ(graph.nodes.front().op_type, "Softmax");
 }
 
-// ReduceSum's axes attribute (11/12) becomes the int64 axes input. An empty
-// list means reduce every axis, so the canonical form omits the input.
-TEST_F(EngineLoader, HermeticLegacyReduceSumAxesCanonicalized)
+// ReduceSum's pre-13 axes attribute stays in the graph; shape inference and
+// the kernel read it in place. An empty list still means reduce every axis.
+TEST_F(EngineLoader, HermeticLegacyReduceSumAxesPreserved)
 {
     std::vector<float> values;
     for (int i = 1; i <= 24; ++i) {
@@ -1386,13 +1381,10 @@ TEST_F(EngineLoader, HermeticLegacyReduceSumAxesCanonicalized)
         write_model_bytes("reduce_sum_axes_11.onnx", encode_model(body, 11)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     const nert::Node& node = graph.nodes.front();
-    ASSERT_EQ(node.inputs.size(), 2U);
-    EXPECT_EQ(node.inputs[1], "rs0/axes");
-    ASSERT_EQ(node.attributes.size(), 1U);
-    EXPECT_EQ(node.attributes.front().name, "keepdims");
-    const auto init = graph.initializers.find(node.inputs[1]);
-    ASSERT_NE(init, graph.initializers.end());
-    EXPECT_EQ(std::get<std::vector<int64_t>>(init->second.values), (std::vector<int64_t>{1}));
+    ASSERT_EQ(node.inputs.size(), 1U);
+    EXPECT_EQ(node.schema_version, 11);
+    ASSERT_EQ(node.attributes.size(), 2U);
+    EXPECT_EQ(graph.initializers.count("rs0/axes"), 0U);
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1420,7 +1412,8 @@ TEST_F(EngineLoader, HermeticLegacyReduceSumAxesCanonicalized)
         write_model_bytes("reduce_sum_empty_11.onnx", encode_model(empty, 11)));
     ASSERT_EQ(empty_graph.nodes.size(), 1U);
     EXPECT_EQ(empty_graph.nodes.front().inputs.size(), 1U);
-    EXPECT_TRUE(empty_graph.nodes.front().attributes.empty());
+    ASSERT_EQ(empty_graph.nodes.front().attributes.size(), 1U);
+    EXPECT_EQ(empty_graph.nodes.front().attributes.front().name, "axes");
 
     nert::Model empty_model(empty_graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult empty_result = empty_model.Run({ { "x", values } });
@@ -1428,9 +1421,9 @@ TEST_F(EngineLoader, HermeticLegacyReduceSumAxesCanonicalized)
     EXPECT_NEAR(empty_result.outputs.at("y").front(), 300.0F, 1e-5F);
 }
 
-// Squeeze's axes attribute becomes the optional int64 input. An empty list
-// means squeeze every size-1 axis, so the canonical form omits the input.
-TEST_F(EngineLoader, HermeticLegacySqueezeCanonicalized)
+// Squeeze's pre-13 axes attribute stays in the graph; shape inference reads
+// it in place. An empty list means squeeze every size-1 axis.
+TEST_F(EngineLoader, HermeticLegacySqueezePreserved)
 {
     std::vector<float> values;
     for (int i = 0; i < 8; ++i) {
@@ -1446,9 +1439,11 @@ TEST_F(EngineLoader, HermeticLegacySqueezeCanonicalized)
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("squeeze_axes_11.onnx", encode_model(body, 11)));
     ASSERT_EQ(graph.nodes.size(), 1U);
-    ASSERT_EQ(graph.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(graph.nodes.front().inputs[1], "sq0/axes");
-    EXPECT_TRUE(graph.nodes.front().attributes.empty());
+    ASSERT_EQ(graph.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
+    ASSERT_EQ(graph.nodes.front().attributes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().attributes.front().name, "axes");
+    EXPECT_EQ(graph.initializers.count("sq0/axes"), 0U);
 
     nert::Model model(graph, { { "x", { 2, 1, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1466,11 +1461,12 @@ TEST_F(EngineLoader, HermeticLegacySqueezeCanonicalized)
         write_model_bytes("squeeze_empty_11.onnx", encode_model(empty, 11)));
     ASSERT_EQ(empty_graph.nodes.size(), 1U);
     EXPECT_EQ(empty_graph.nodes.front().inputs.size(), 1U);
-    EXPECT_TRUE(empty_graph.nodes.front().attributes.empty());
+    ASSERT_EQ(empty_graph.nodes.front().attributes.size(), 1U);
+    EXPECT_EQ(empty_graph.nodes.front().attributes.front().name, "axes");
 }
 
-// Unsqueeze's required axes attribute becomes the required int64 input.
-TEST_F(EngineLoader, HermeticLegacyUnsqueezeCanonicalized)
+// Unsqueeze's required pre-13 axes attribute stays in the graph.
+TEST_F(EngineLoader, HermeticLegacyUnsqueezePreserved)
 {
     std::vector<float> values;
     for (int i = 0; i < 6; ++i) {
@@ -1486,12 +1482,11 @@ TEST_F(EngineLoader, HermeticLegacyUnsqueezeCanonicalized)
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("unsqueeze_axes_11.onnx", encode_model(body, 11)));
     ASSERT_EQ(graph.nodes.size(), 1U);
-    ASSERT_EQ(graph.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(graph.nodes.front().inputs[1], "us0/axes");
-    EXPECT_TRUE(graph.nodes.front().attributes.empty());
-    const auto init = graph.initializers.find(graph.nodes.front().inputs[1]);
-    ASSERT_NE(init, graph.initializers.end());
-    EXPECT_EQ(std::get<std::vector<int64_t>>(init->second.values), (std::vector<int64_t>{0}));
+    ASSERT_EQ(graph.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
+    ASSERT_EQ(graph.nodes.front().attributes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().attributes.front().name, "axes");
+    EXPECT_EQ(graph.initializers.count("us0/axes"), 0U);
 
     nert::Model model(graph, { { "x", { 2, 3 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1501,8 +1496,8 @@ TEST_F(EngineLoader, HermeticLegacyUnsqueezeCanonicalized)
     }
 }
 
-// Split's `split` attribute becomes the optional int64 input.
-TEST_F(EngineLoader, HermeticLegacySplitCanonicalized)
+// Split's pre-13 `split` attribute stays in the graph and is read in place.
+TEST_F(EngineLoader, HermeticLegacySplitPreserved)
 {
     std::vector<float> values;
     for (int i = 0; i < 24; ++i) {
@@ -1520,13 +1515,10 @@ TEST_F(EngineLoader, HermeticLegacySplitCanonicalized)
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("split_attr_11.onnx", encode_model(body, 11)));
     ASSERT_EQ(graph.nodes.size(), 1U);
-    ASSERT_EQ(graph.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(graph.nodes.front().inputs[1], "sp0/split");
-    ASSERT_EQ(graph.nodes.front().attributes.size(), 1U);
-    EXPECT_EQ(graph.nodes.front().attributes.front().name, "axis");
-    const auto init = graph.initializers.find(graph.nodes.front().inputs[1]);
-    ASSERT_NE(init, graph.initializers.end());
-    EXPECT_EQ(std::get<std::vector<int64_t>>(init->second.values), (std::vector<int64_t>{1, 2}));
+    ASSERT_EQ(graph.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
+    ASSERT_EQ(graph.nodes.front().attributes.size(), 2U);
+    EXPECT_EQ(graph.initializers.count("sp0/split"), 0U);
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -1734,6 +1726,111 @@ TEST_F(EngineLoader, HermeticGridSampleAt19Accepted)
         write_model_bytes("gridsample_19.onnx", encode_model(body, 19)));
     ASSERT_EQ(graph.nodes.size(), 1U);
     EXPECT_EQ(graph.nodes.front().op_type, "GridSample");
+}
+
+// ===========================================================================
+// Phase A — per-node effective schema metadata.
+// ===========================================================================
+
+// Every source node carries the effective ONNX schema selected by the
+// declaration: ReduceMean history is 1, 11, 13, 18. The graph records the
+// declaration itself.
+TEST_F(EngineLoader, HermeticNodeSchemaVersionTracksDeclaredOpset)
+{
+    auto load = [](int64_t declared) {
+        std::string body;
+        if (declared < 18) {
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                              {encode_attribute_ints("axes", {1})}));
+        } else {
+            put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", "axes"},
+                              {"y"}, {}));
+        }
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+        return nert::LoadGraphFromFile(write_model_bytes(
+            "schema_meta_" + std::to_string(declared) + ".onnx",
+            encode_model(body, declared)));
+    };
+
+    const std::vector<std::pair<int64_t, int64_t>> cases = {
+        {11, 11}, {13, 13}, {18, 18}, {19, 18}, {27, 18}};
+    for (const auto& entry : cases) {
+        const nert::Graph graph = load(entry.first);
+        EXPECT_EQ(graph.declared_opset, entry.first)
+            << "declared " << entry.first;
+        ASSERT_EQ(graph.nodes.size(), 1U) << "declared " << entry.first;
+        EXPECT_EQ(graph.nodes.front().op_type, "ReduceMean");
+        EXPECT_EQ(graph.nodes.front().schema_version, entry.second)
+            << "declared " << entry.first;
+        // The source form stays in the graph. Declarations before schema 18
+        // keep the axes attribute and one input; declarations at or above 18
+        // keep the axes input and no attribute.
+        if (entry.second < 18) {
+            EXPECT_EQ(graph.nodes.front().inputs.size(), 1U)
+                << "declared " << entry.first;
+            EXPECT_EQ(graph.nodes.front().attributes.size(), 1U)
+                << "declared " << entry.first;
+            EXPECT_EQ(graph.nodes.front().attributes.front().name, "axes")
+                << "declared " << entry.first;
+        } else {
+            EXPECT_EQ(graph.nodes.front().inputs.size(), 2U)
+                << "declared " << entry.first;
+            EXPECT_TRUE(graph.nodes.front().attributes.empty())
+                << "declared " << entry.first;
+        }
+    }
+}
+
+// A declared-11 Relu resolves to schema 6: the full-history catalog must
+// select a version below the old opset-18 baseline.
+TEST_F(EngineLoader, HermeticEffectiveSchemaBelowEleven)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_relu_11.onnx", encode_model(body, 11)));
+    EXPECT_EQ(graph.declared_opset, 11);
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Relu");
+    EXPECT_EQ(graph.nodes.front().schema_version, 6);
+}
+
+// Add's effective schema at declared 27 is 14, not 27.
+TEST_F(EngineLoader, HermeticNewerAddResolvesSchemaFourteen)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("b", {2}, {1.0F, 2.0F}));
+    put_sub(body, 1, encode_node("add0", "Add", {"x", "b"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_add_27.onnx", encode_model(body, 27)));
+    EXPECT_EQ(graph.declared_opset, 27);
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Add");
+    EXPECT_EQ(graph.nodes.front().schema_version, 14);
+}
+
+// Legacy Softmax stays a single source node with its schema metadata.
+TEST_F(EngineLoader, HermeticLegacySoftmaxKeepsMetadata)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("sm0", "Softmax", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_softmax_11.onnx", encode_model(body, 11)));
+    EXPECT_EQ(graph.declared_opset, 11);
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Softmax");
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
 }
 
 // ===========================================================================
@@ -2297,8 +2394,30 @@ TEST_F(EngineLoaderNegative, MissingOpsetDeclarationRejected)
         << "message: " << message;
 }
 
-// At opset 18 the reduce axes are an input, so the old attribute is illegal
-// even though the opset normalizer admits it for older declarations.
+// A source node whose operator has no schema at or below the declaration has
+// no effective schema. LayerNormalization first appears at schema 17.
+TEST_F(EngineLoaderNegative, NoEffectiveSchemaAtDeclaredOpsetRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("ln0", "LayerNormalization", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 11), "layernorm_11.onnx");
+    EXPECT_NE(message.find("ln0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("LayerNormalization"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("no effective schema"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("first schema is 17"), std::string::npos)
+        << "message: " << message;
+}
+
+// At opset 18 the reduce axes are an input, so the old attribute is illegal.
 TEST_F(EngineLoaderNegative, ReduceAxesAttributeAtOpset18Rejected)
 {
     std::string body;
@@ -2311,8 +2430,12 @@ TEST_F(EngineLoaderNegative, ReduceAxesAttributeAtOpset18Rejected)
         load_error_message(encode_model(body, 18), "reduce_axes_18.onnx");
     EXPECT_NE(message.find("reduce0"), std::string::npos)
         << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("declared opset 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2330,8 +2453,81 @@ TEST_F(EngineLoaderNegative, ReduceAxesInputBeforeOpset18Rejected)
         load_error_message(encode_model(body, 13), "reduce_axes_input_13.onnx");
     EXPECT_NE(message.find("reduce0"), std::string::npos)
         << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
+        << "message: " << message;
+}
+
+// An empty-string second operand is still an operand; it is illegal before
+// schema 18, where the axes form is the attribute.
+TEST_F(EngineLoaderNegative, ReduceEmptyAxesInputBeforeOpset18Rejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", ""}, {"y"},
+                      {encode_attribute_ints("axes", {1})}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message = load_error_message(
+        encode_model(body, 13), "reduce_empty_axes_input_13.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("ReduceMean"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
+        << "message: " << message;
+}
+
+// The explicit default noop=0 on ReduceMax is valid and needs no capability
+// rejection; only the nonzero identity form is a tracked gap.
+TEST_F(EngineLoader, HermeticReduceMaxNoopZeroAtOpset18Accepted)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+    put_sub(body, 1, encode_node("rmax0", "ReduceMax", {"x", "axes"}, {"y"},
+                      {encode_attribute_int("noop_with_empty_axes", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("reduce_max_noop0_18.onnx", encode_model(body, 18)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "ReduceMax");
+}
+
+// ReduceMax schema 18 defines noop_with_empty_axes, but the identity behavior
+// is not implemented yet; report it as a capability gap, not an unknown
+// attribute.
+TEST_F(EngineLoaderNegative, ReduceMaxNoopAtOpset18RejectedAsCapabilityGap)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+    put_sub(body, 1, encode_node("rmax0", "ReduceMax", {"x", "axes"}, {"y"},
+                      {encode_attribute_int("noop_with_empty_axes", 1)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "reduce_max_noop_18.onnx");
+    EXPECT_NE(message.find("rmax0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("ReduceMax"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("not implemented"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2348,9 +2544,15 @@ TEST_F(EngineLoaderNegative, ReduceNoopBeforeOpset18Rejected)
 
     const std::string message =
         load_error_message(encode_model(body, 13), "reduce_noop_13.onnx");
+    EXPECT_NE(message.find("reduce0"), std::string::npos)
+        << "message: " << message;
     EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 18"), std::string::npos)
+    EXPECT_NE(message.find("schema 18"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2391,7 +2593,11 @@ TEST_F(EngineLoaderNegative, ScatterNDReductionBeforeOpset16Rejected)
         load_error_message(encode_model(body, 13), "scatter_13.onnx");
     EXPECT_NE(message.find("reduction"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 16"), std::string::npos)
+    EXPECT_NE(message.find("schema 16"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2416,7 +2622,7 @@ TEST_F(EngineLoaderNegative, LegacyAxesAttributeAtThirteenRejected)
             << "message: " << message;
         EXPECT_NE(message.find("axes"), std::string::npos)
             << "message: " << message;
-        EXPECT_NE(message.find("opset 13"), std::string::npos)
+        EXPECT_NE(message.find("schema 13"), std::string::npos)
             << "message: " << message;
     }
 }
@@ -2438,7 +2644,11 @@ TEST_F(EngineLoaderNegative, LegacySplitAttributeAtThirteenRejected)
         << "message: " << message;
     EXPECT_NE(message.find("split"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 13"), std::string::npos)
+    EXPECT_NE(message.find("schema 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2461,7 +2671,7 @@ TEST_F(EngineLoaderNegative, LegacyAxesInputBeforeThirteenRejected)
             << "message: " << message;
         EXPECT_NE(message.find("axes"), std::string::npos)
             << "message: " << message;
-        EXPECT_NE(message.find("only valid from opset 13"), std::string::npos)
+        EXPECT_NE(message.find("requires schema 13"), std::string::npos)
             << "message: " << message;
     }
 }
@@ -2481,7 +2691,11 @@ TEST_F(EngineLoaderNegative, LegacySplitInputBeforeThirteenRejected)
         << "message: " << message;
     EXPECT_NE(message.find("split"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("only valid from opset 13"), std::string::npos)
+    EXPECT_NE(message.find("requires schema 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 11"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2553,27 +2767,7 @@ TEST_F(EngineLoaderNegative, LegacyReduceSumNoopBeforeThirteenRejected)
         << "message: " << message;
     EXPECT_NE(message.find("noop_with_empty_axes"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 13"), std::string::npos)
-        << "message: " << message;
-}
-
-// Legacy Softmax expansion needs the input rank. A value_info entry supplies
-// it; without one the loader fails fast rather than guessing.
-TEST_F(EngineLoaderNegative, LegacySoftmaxUnknownRankRejected)
-{
-    std::string body;
-    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"h"}, {}));
-    put_sub(body, 1, encode_node("sm0", "Softmax", {"h"}, {"y"}, {}));
-    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
-    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
-
-    const std::string message =
-        load_error_message(encode_model(body, 11), "softmax_rank_11.onnx");
-    EXPECT_NE(message.find("sm0"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("legacy Softmax"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("value_info"), std::string::npos)
+    EXPECT_NE(message.find("schema 13"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2585,14 +2779,18 @@ TEST_F(EngineLoaderNegative, LegacySoftmaxAxisOutOfRangeRejected)
     put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
     put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
 
-    const std::string message =
-        load_error_message(encode_model(body, 11), "softmax_axis_11.onnx");
-    EXPECT_NE(message.find("sm0"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("out of range"), std::string::npos)
-        << "message: " << message;
-    EXPECT_NE(message.find("opset 11"), std::string::npos)
-        << "message: " << message;
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("softmax_axis_11.onnx", encode_model(body, 11)));
+    try {
+        nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
+        FAIL() << "expected shape inference to reject the Softmax axis";
+    } catch (const nert::ModelLoadException& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("sm0"), std::string::npos)
+            << "message: " << message;
+        EXPECT_NE(message.find("out of range"), std::string::npos)
+            << "message: " << message;
+    }
 }
 
 // Cast's post-18 attributes change rounding/saturation semantics. A plain
@@ -2699,6 +2897,66 @@ TEST_F(EngineLoaderNegative, NewerRangeStashTypeRejected)
         << "message: " << message;
     EXPECT_NE(message.find("effective schema 27"), std::string::npos)
         << "message: " << message;
+}
+
+// A historical schema that carries an unimplemented attribute is guarded by
+// the full-history manifest. ConvTranspose.output_shape is legal at schema 11
+// but has no kernel or shape-inference implementation.
+TEST_F(EngineLoaderNegative, ConvTransposeOutputShapeRejectedByManifest)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("w", {1, 1, 2, 2}, {1.0F, 1.0F, 1.0F, 1.0F}));
+    put_sub(body, 1, encode_node("ct0", "ConvTranspose", {"x", "w"}, {"y"},
+                      {encode_attribute_ints("output_shape", {2, 2})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 2, 2}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 3, 3}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 11), "convtranspose_output_shape_11.onnx");
+    EXPECT_NE(message.find("ct0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("ConvTranspose"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("output_shape"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 11"), std::string::npos) << "message: " << message;
+}
+
+// Resize.axes is a schema-18 attribute but the kernel and shape inference do
+// not consume it, so the manifest guards it instead of silently ignoring it.
+TEST_F(EngineLoaderNegative, ResizeAxesAtSchemaEighteenRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("scales", {4}, {1.0F, 1.0F, 1.0F, 1.0F}));
+    put_sub(body, 1, encode_node("resize0", "Resize", {"x", "", "scales"}, {"y"},
+                      {encode_attribute_ints("axes", {2, 3})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 3, 8, 8}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "resize_axes_18.onnx");
+    EXPECT_NE(message.find("resize0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("Resize"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos) << "message: " << message;
+}
+
+// Split.num_outputs is legal at schema 18 but is not implemented by the
+// source-form Split path.
+TEST_F(EngineLoaderNegative, SplitNumOutputsAtSchemaEighteenRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("split0", "Split", {"x"}, {"y0", "y1"},
+                      {encode_attribute_int("axis", 1),
+                          encode_attribute_int("num_outputs", 2)}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 4}));
+    put_sub(body, 12, encode_value_info("y0", 1, {1, 2}));
+    put_sub(body, 12, encode_value_info("y1", 1, {1, 2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "split_num_outputs_18.onnx");
+    EXPECT_NE(message.find("split0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("Split"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("num_outputs"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos) << "message: " << message;
 }
 
 // GridSample's schema-20 mode default/value change is a behavior change, so

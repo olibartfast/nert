@@ -172,6 +172,23 @@ Follow-up capability slices (rejected explicitly today): `Cast.saturate`,
 `Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`, `Range.stash_type`,
 and `GridSample` opset-20 semantics.
 
+### Version-aware opsets (Phases A–E validated 2026-10-22)
+
+`specs/2026-10-22-version-aware-opsets/` replaces the global opset-18
+canonical target with per-node effective schema metadata and version-aware
+shape/kernel resolution. Phase A adds `Graph.declared_opset` and
+`Node.schema_version` and extends the generated catalog to the full schema
+history while keeping the normalizer behavior-neutral. Phase B keeps the
+pre-18 reduce `axes` attribute in the graph and resolves it in shape
+inference plus the CPU/CUDA/OpenCL reduce rows. Phase C does the same for
+`ReduceSum`/`Squeeze`/`Unsqueeze` axes, Split's `split`, and
+`ScatterND.reduction`. Phase D implements legacy `Softmax`'s 2-D coercion
+directly in the CPU/CUDA/OpenCL/HIP rows and deletes the normalizer; there is
+no global load-time canonicalization pass left. Phase E removes the
+baseline-18 catalog policy, replaces it with the reviewed per-operator
+implementation manifest in `tools/opset_manifest.py`, and updates the docs.
+This supersedes decisions `D-1` and `D-4` of the opset-range packet.
+
 ## Tooling — Memory Footprint Report (Planned)
 
 The planned model fit/sizing report adds `MemoryFootprint` to `Model` and an

@@ -96,6 +96,32 @@ TEST(NertOpenCLReduceExtra, ReduceSumLastAxisKeepdims) {
     ocl.allocator().release(dy);
 }
 
+// A pre-13 ReduceSum keeps axes in the attribute; OpenCL and CPU agree.
+TEST(NertOpenCLReduceExtra, ReduceSumOldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    nert::Node node = MakeNode("rsum_attr", "ReduceSum");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    node.attributes.push_back(nert::Attribute("axes", std::vector<int64_t>{1}));
+    std::vector<float> ref(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostFloat(x, {2, 3})}, {HostFloat(ref, {2, 1})});
+    EXPECT_EQ(ref, (std::vector<float>{6.0F, 15.0F}));
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gout(2, 0.0F);
+    void* dy = Upload(ocl, gout);
+    nert::opencl_kernels::ReduceSum(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    gout = Download(ocl, dy, 2);
+    ExpectNear(gout, ref, 1e-6F);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
 // ReduceSum without keepdims: a negative axis ({-1}) matches axis 1 and
 // axis 0 gives the column sums {5, 7, 9}.
 TEST(NertOpenCLReduceExtra, ReduceSumNoKeepdimsAndNegativeAxis) {
@@ -311,6 +337,39 @@ TEST(NertOpenCLReduceExtra, ReduceMaxAxes) {
     ExpectNear(gout_cols, ref_cols, 1e-6F);
     ocl.allocator().release(dx);
     ocl.allocator().release(daxes);
+    ocl.allocator().release(dy);
+}
+
+// A declared-13 ReduceMax keeps axes in the attribute and has no axes input.
+// The OpenCL row reads that form in place and matches the CPU oracle and the
+// schema-18 input form.
+TEST(NertOpenCLReduceExtra, ReduceMaxOldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {1.0F, 5.0F, 3.0F, 4.0F, 2.0F, 6.0F};
+    std::vector<int64_t> axes = {1};
+
+    nert::Node attr_node = MakeReduceNode("rmax_attr", "ReduceMax", {});
+    attr_node.schema_version = 13;
+    attr_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    std::vector<float> cpu_attr(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceMax")(attr_node, {HostFloat(x, {2, 3})}, {HostFloat(cpu_attr, {2, 1})});
+    EXPECT_EQ(cpu_attr, (std::vector<float>{5.0F, 6.0F}));
+
+    nert::Node input_node = MakeReduceNode("rmax_input", "ReduceMax", {});
+    input_node.schema_version = 18;
+    std::vector<float> cpu_input(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceMax")(input_node, {HostFloat(x, {2, 3}), HostInt64(axes, {1})},
+                                                  {HostFloat(cpu_input, {2, 1})});
+    EXPECT_EQ(cpu_attr, cpu_input);
+
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, std::vector<float>(2, 0.0F));
+    nert::opencl_kernels::ReduceMax(attr_node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    ExpectNear(Download(ocl, dy, 2), cpu_attr, 1e-6F);
+    ocl.allocator().release(dx);
     ocl.allocator().release(dy);
 }
 

@@ -151,6 +151,41 @@ TEST(NertCudaConcat, SplitSizesExact) {
     EXPECT_EQ(g2, c2);
 }
 
+// A pre-13 Split carries split sizes in an attribute; CUDA and CPU agree.
+TEST(NertCudaConcat, SplitOldAttributeForm) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F};
+    nert::Node node = MakeNode("sp_attr", "Split");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.attributes.emplace_back("split", std::vector<int64_t>{1, 3});
+    node.inputs = {"x"};
+    node.outputs = {"y0", "y1"};
+    std::vector<float> c0(2, 0.0F), c1(6, 0.0F);
+    nert::CpuDevice().kernels().find("Split")(node, {HostFloat(x, {2, 4})},
+                                              {HostFloat(c0, {2, 1}), HostFloat(c1, {2, 3})});
+    EXPECT_EQ(c0, (std::vector<float>{1.0F, 5.0F}));
+    EXPECT_EQ(c1, (std::vector<float>{2.0F, 3.0F, 4.0F, 6.0F, 7.0F, 8.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> g0(2, 0.0F), g1(6, 0.0F);
+    void* dy0 = Upload(cuda, g0);
+    void* dy1 = Upload(cuda, g1);
+    nert::CudaDevice().kernels().find("Split")(node, {DeviceFloat(dx, {2, 4})},
+                                               {DeviceFloat(dy0, {2, 1}), DeviceFloat(dy1, {2, 3})});
+    g0 = Download(cuda, dy0, 2);
+    g1 = Download(cuda, dy1, 6);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy0);
+    cuda.allocator().release(dy1);
+    EXPECT_EQ(g0, c0);
+    EXPECT_EQ(g1, c1);
+}
+
 // Slice {3,4} rows 1..3 cols 1..3 -> {2,2} [[5,6],[9,10]].
 TEST(NertCudaConcat, SliceBasicExact) {
     if (!HasCudaDevice()) {

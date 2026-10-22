@@ -81,6 +81,21 @@ TEST(NertCudaActivations, SoftmaxLastAxis) {
     ExpectNear(RunCuda(cuda, "Softmax", node, x, {2, 3}), expected);
 }
 
+// Pre-13 Softmax coerces [2,2,3] to [2,6] at the default axis 1.
+TEST(NertCudaActivations, SoftmaxLegacyDefaultAxisCoerces2D) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x(12, 0.0F);
+    nert::Node node = MakeNode("sm_legacy", "Softmax");
+    node.schema_version = 11;
+    const std::vector<float> expected(12, 1.0F / 6.0F);
+    ExpectNear(RunCpu("Softmax", node, x, {2, 2, 3}), expected);
+    ExpectNear(RunCuda(cuda, "Softmax", node, x, {2, 2, 3}), expected);
+}
+
 // Softmax axis=0 over [3,2] with large values: stability via max subtraction.
 // Column j is softmax([1000+j, 1001+j, 1002+j]) = same as softmax([0,1,2]).
 TEST(NertCudaActivations, SoftmaxAxisZeroStable) {

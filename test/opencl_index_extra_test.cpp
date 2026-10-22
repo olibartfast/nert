@@ -567,6 +567,43 @@ TEST(NertOpenCLIndexExtra, ReduceMeanAbsentAxesAndNoop) {
     }
 }
 
+// A declared-13 ReduceMean keeps axes in the attribute and has no axes input.
+// The OpenCL row reads that form in place and matches the CPU oracle and the
+// schema-18 input form.
+TEST(NertOpenCLIndexExtra, ReduceMeanOldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<int64_t> axes = {1};
+
+    nert::Node attr_node = MakeNode("mean_attr", "ReduceMean");
+    attr_node.schema_version = 13;
+    attr_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    attr_node.inputs = {"x"};
+    attr_node.outputs = {"y"};
+    std::vector<float> cpu_attr(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceMean")(attr_node, {HostFloat(x, {2, 3})}, {HostFloat(cpu_attr, {2, 1})});
+    ExpectNear(cpu_attr, {2.0F, 5.0F});
+
+    nert::Node input_node = MakeNode("mean_input", "ReduceMean");
+    input_node.schema_version = 18;
+    input_node.inputs = {"x", "axes"};
+    input_node.outputs = {"y"};
+    std::vector<float> cpu_input(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceMean")(input_node, {HostFloat(x, {2, 3}), HostInt64(axes, {1})},
+                                                   {HostFloat(cpu_input, {2, 1})});
+    ExpectNear(cpu_attr, cpu_input);
+
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, std::vector<float>(2, 0.0F));
+    nert::opencl_kernels::ReduceMean(attr_node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    ExpectNear(Download(ocl, dy, 2), cpu_attr);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
 // Negative paths name the node and the op.
 TEST(NertOpenCLIndexExtra, Negatives) {
     if (!HasOpenCLDevice()) {

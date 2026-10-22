@@ -4,6 +4,7 @@
 // The axes must be unique and within range; the data buffer is copied flat in
 // order. Data is float32 or int64.
 
+#include "../axes_form.hpp"
 #include "kernels.hpp"
 
 #include <cstdint>
@@ -30,11 +31,10 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
 
 void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     const std::string context = "Unsqueeze (node '" + node.name + "')";
-    if (inputs.size() != 2 || outputs.size() != 1) {
-        throw InferenceException(context + ": expected a data input, an axes input, and one output");
+    if (inputs.empty() || outputs.size() != 1) {
+        throw InferenceException(context + ": expected a data input and one output");
     }
     const TensorView& in = inputs[0];
-    const TensorView& axes_view = inputs[1];
     const TensorView& out = outputs[0];
     if (in.dtype != DataType::Float32 && in.dtype != DataType::Int64 && in.dtype != DataType::Bool) {
         throw InferenceException(context + ": tensors must be float32, int64, or bool");
@@ -42,16 +42,40 @@ void Unsqueeze(const Node& node, const std::vector<TensorView>& inputs, const st
     if (out.dtype != in.dtype) {
         throw InferenceException(context + ": output dtype must match the input dtype");
     }
-    if (axes_view.dtype != DataType::Int64) {
-        throw InferenceException(context + ": Unsqueeze requires an axes input");
+    // Resolve the axes form once; the source schema decides between the
+    // pre-13 attribute and the schema-13+ input.
+    const AxesForm axes_form = ResolveAxesForm(node);
+    std::vector<int64_t> axes;
+    if (axes_form.source == AxesSource::Attribute) {
+        if (inputs.size() != 1) {
+            throw InferenceException(context + ": expected one data input for the attribute axes form");
+        }
+        const std::vector<int64_t>* values = NodeAttributeIntList(axes_form.axes_attribute);
+        if (values == nullptr) {
+            throw InferenceException(context + ": Unsqueeze requires an axes attribute");
+        }
+        axes = *values;
+    } else {
+        if (inputs.size() != 2) {
+            throw InferenceException(context + ": expected a data input, an axes input, and one output");
+        }
+        const TensorView& axes_view = inputs[1];
+        if (axes_view.dtype != DataType::Int64) {
+            throw InferenceException(context + ": Unsqueeze requires an axes input");
+        }
+        const int64_t axes_count = ElementCount(axes_view.dims, context);
+        if (axes_count > 0) {
+            if (axes_view.data == nullptr) {
+                throw InferenceException(context + ": null axes buffer");
+            }
+            const int64_t* raw = static_cast<const int64_t*>(axes_view.data);
+            axes.assign(raw, raw + axes_count);
+        }
     }
-    const int64_t axes_count = ElementCount(axes_view.dims, context);
-    if (axes_count > 0 && axes_view.data == nullptr) {
-        throw InferenceException(context + ": null axes buffer");
+    if (axes.empty()) {
+        throw InferenceException(context + ": Unsqueeze axes must not be empty");
     }
-    const int64_t* raw = static_cast<const int64_t*>(axes_view.data);
-    std::vector<int64_t> axes(raw, raw + axes_count);
-
+    const int64_t axes_count = static_cast<int64_t>(axes.size());
     const int64_t rank_out = static_cast<int64_t>(in.dims.size()) + axes_count;
     std::vector<bool> seen(static_cast<std::size_t>(rank_out), false);
     for (int64_t& axis : axes) {

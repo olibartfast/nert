@@ -13,6 +13,9 @@
 #include "nert/shapes.hpp"
 
 #include "nert/einsum.hpp"
+#include "axes_form.hpp"
+#include "reduce_axes.hpp"
+#include "softmax_form.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1326,12 +1329,21 @@ TensorInfo reducemean_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
-    const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    const bool axes_supplied =
-        node.inputs.size() > 1 && !node.inputs[1].empty();
-    if (axes_supplied) {
+    bool axes_supplied = false;
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceMean 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes_supplied = true;
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
 
@@ -1350,10 +1362,10 @@ TensorInfo reducemean_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
-        // noop_with_empty_axes applies only when an empty axes input is
-        // present; with the axes input absent the mean reduces every axis,
-        // matching the CPU oracle in src/kernels/reduce_mean.cpp.
-        if (noop_empty && axes_supplied) {
+        // noop_with_empty_axes applies only to a present empty axes input;
+        // with the input absent, or with the old attribute form, the mean
+        // reduces every axis.
+        if (resolved_axes.noop_with_empty_axes && axes_supplied) {
             return TensorInfo{DataType::Float32, out};
         }
         for (int64_t i = 0; i < rank; ++i) {
@@ -1388,9 +1400,19 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
     const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const AxesForm axes_form = ResolveAxesForm(node);
 
     std::vector<int64_t> axes;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    if (axes_form.source == AxesSource::Attribute) {
+        if (axes_form.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(axes_form.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceSum 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
     std::set<int64_t> seen;
@@ -1408,6 +1430,8 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
+        // For ReduceSum, noop_with_empty_axes makes an empty/absent axes
+        // input an identity copy; the old attribute form has no noop flag.
         if (noop_empty) {
             return TensorInfo{dtype, out};
         }
@@ -1577,10 +1601,21 @@ TensorInfo reducel2_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
-    const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    bool axes_supplied = false;
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceL2 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes_supplied = true;
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
     std::set<int64_t> seen;
@@ -1598,7 +1633,7 @@ TensorInfo reducel2_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
-        if (noop_empty) {
+        if (resolved_axes.noop_with_empty_axes && axes_supplied) {
             return TensorInfo{dtype, out};
         }
         for (int64_t i = 0; i < rank; ++i) {
@@ -1879,8 +1914,23 @@ std::vector<TensorInfo> split_shapes(const StaticContext& ctx, const Node& node,
         fail(node, "Split must produce at least one output");
     }
     std::vector<int64_t> parts;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    bool parts_supplied = false;
+    const SplitForm split_form = ResolveSplitForm(node);
+    if (split_form.source == AxesSource::Attribute) {
+        if (split_form.split_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(split_form.split_attribute);
+            if (values == nullptr) {
+                fail(node, "Split 'split' attribute must be an integer list");
+            }
+            parts = *values;
+            parts_supplied = true;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         parts = int64_constant(ctx, node, node.inputs[1]);
+        parts_supplied = true;
+    }
+    if (parts_supplied) {
         if (parts.size() != count) {
             fail(node, "Split split sizes must match the output count");
         }
@@ -1918,11 +1968,25 @@ TensorInfo unsqueeze_shape(const StaticContext& ctx, const Node& node,
     if (inputs.empty() || inputs[0] == nullptr) {
         fail(node, "Unsqueeze requires an input");
     }
-    if (node.inputs.size() < 2 || node.inputs[1].empty()) {
-        fail(node, "Unsqueeze requires an axes input");
+    const AxesForm axes_form = ResolveAxesForm(node);
+    std::vector<int64_t> axes;
+    if (axes_form.source == AxesSource::Attribute) {
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(axes_form.axes_attribute);
+        if (values == nullptr) {
+            fail(node, "Unsqueeze requires an axes attribute");
+        }
+        axes = *values;
+    } else {
+        if (node.inputs.size() < 2 || node.inputs[1].empty()) {
+            fail(node, "Unsqueeze requires an axes input");
+        }
+        axes = int64_constant(ctx, node, node.inputs[1]);
+    }
+    if (axes.empty()) {
+        fail(node, "Unsqueeze axes must not be empty");
     }
     const std::vector<int64_t>& in = inputs[0]->dims;
-    std::vector<int64_t> axes = int64_constant(ctx, node, node.inputs[1]);
     const int64_t rank_out =
         static_cast<int64_t>(in.size() + axes.size());
     std::set<int64_t> seen;
@@ -2258,11 +2322,19 @@ TensorInfo reducemax_shape(const StaticContext& ctx, const Node& node,
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
     std::vector<int64_t> axes;
-    const bool axes_supplied =
-        node.inputs.size() > 1 && !node.inputs[1].empty();
-    if (axes_supplied) {
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceMax 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
 
@@ -2440,20 +2512,34 @@ TensorInfo squeeze_shape(const StaticContext& ctx, const Node& node,
     }
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
+    const AxesForm axes_form = ResolveAxesForm(node);
+    std::vector<int64_t> axes;
+    if (axes_form.source == AxesSource::Attribute) {
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(axes_form.axes_attribute);
+        if (values == nullptr) {
+            // An absent attribute means every size-1 axis.
+            axes.clear();
+        } else {
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes = int64_constant(ctx, node, node.inputs[1]);
+    }
     std::set<int64_t> drop;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
-        for (const int64_t axis : int64_constant(ctx, node, node.inputs[1])) {
+    if (axes.empty()) {
+        for (int64_t a = 0; a < rank; ++a) {
+            if (in[static_cast<size_t>(a)] == 1) {
+                drop.insert(a);
+            }
+        }
+    } else {
+        for (const int64_t axis : axes) {
             const int64_t a = normalize_axis(node, axis, rank, "Squeeze");
             if (in[static_cast<size_t>(a)] != 1) {
                 fail(node, "Squeeze axis does not have size 1");
             }
             drop.insert(a);
-        }
-    } else {
-        for (int64_t a = 0; a < rank; ++a) {
-            if (in[static_cast<size_t>(a)] == 1) {
-                drop.insert(a);
-            }
         }
     }
     std::vector<int64_t> out;
@@ -2719,7 +2805,24 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
         return {TensorInfo{lhs.dtype,
             broadcast_shape(lhs.dims, rhs.dims, node)}};
     }
-    if (op == "Relu" || op == "Sigmoid" || op == "Softmax" || op == "Floor" ||
+    if (op == "Softmax") {
+        const TensorInfo& in = need(0);
+        const int64_t rank = static_cast<int64_t>(in.dims.size());
+        const SoftmaxForm form = ResolveSoftmaxForm(node);
+        int64_t axis = SoftmaxDefaultAxis(form);
+        if (const Attribute* attr = FindNodeAttribute(node, "axis")) {
+            const int64_t* value = std::get_if<int64_t>(&attr->value);
+            if (value == nullptr) {
+                fail(node, "Softmax 'axis' must be an integer");
+            }
+            axis = *value;
+        }
+        if (axis < -rank || axis >= rank) {
+            fail(node, "Softmax axis is out of range");
+        }
+        return {TensorInfo{DataType::Float32, in.dims}};
+    }
+    if (op == "Relu" || op == "Sigmoid" || op == "Floor" ||
         op == "Erf" || op == "Sqrt" || op == "Tanh" || op == "Exp" ||
         op == "Log" || op == "Cos" || op == "Sin" || op == "Elu") {
         return {TensorInfo{DataType::Float32, need(0).dims}};

@@ -1,5 +1,5 @@
-// Load-time opset compatibility table lookup and guards.
-// See opset_compat.hpp and tools/gen_opset_compat.py.
+// Load-time full-history schema catalog lookup and implementation guards.
+// See opset_compat.hpp, tools/gen_opset_compat.py, and tools/opset_manifest.py.
 
 #include "opset_compat.hpp"
 
@@ -17,14 +17,14 @@ struct OpsetSchemaInfo {
     const char* op_type;
     int64_t since_version;
     OpsetCompatibility compatibility;
-    const char* added_attributes;
+    const char* unsupported_attributes;
     const char* guarded_values;
     const char* reason;
 };
 
 static constexpr OpsetSchemaInfo kOpsetSchemaTable[] = {
-#define NERT_OPSET_ENTRY(op, version, compatibility, added, guards, why)                                               \
-    {op, version, OpsetCompatibility::compatibility, added, guards, why},
+#define NERT_OPSET_ENTRY(op, version, compatibility, unsupported, guards, why)                                         \
+    {op, version, OpsetCompatibility::compatibility, unsupported, guards, why},
 #include "opset_compat_table.inc"
 #undef NERT_OPSET_ENTRY
 };
@@ -83,7 +83,33 @@ const OpsetSchemaInfo* find_effective_schema(const std::string& op_type, int64_t
     return best;
 }
 
+int64_t first_schema_version(const std::string& op_type) {
+    int64_t first = -1;
+    for (size_t i = 0; i < kOpsetSchemaTableSize; ++i) {
+        const OpsetSchemaInfo& entry = kOpsetSchemaTable[i];
+        if (op_type != entry.op_type) {
+            continue;
+        }
+        if (first < 0 || entry.since_version < first) {
+            first = entry.since_version;
+        }
+    }
+    return first;
+}
+
 } // namespace
+
+int64_t ResolveNodeSchemaVersion(const std::string& node_name, const std::string& op_type, int64_t declared_opset) {
+    const OpsetSchemaInfo* schema = find_effective_schema(op_type, declared_opset);
+    if (schema == nullptr) {
+        const int64_t first = first_schema_version(op_type);
+        const std::string detail = first < 0 ? std::string(" (operator is not in the schema catalog)")
+                                             : " (operator's first schema is " + std::to_string(first) + ")";
+        throw ModelLoadException(node_prefix(node_name, op_type) + ": no effective schema at or below declared opset " +
+                                 std::to_string(declared_opset) + detail);
+    }
+    return schema->since_version;
+}
 
 void CheckNodeCompatibility(const std::string& node_name, const std::string& op_type,
                             const std::vector<OpsetAttributeView>& attributes, int64_t declared_opset) {
@@ -97,13 +123,17 @@ void CheckNodeCompatibility(const std::string& node_name, const std::string& op_
     }
     const std::string versions = version_text(declared_opset, schema->since_version);
 
+    if (schema->compatibility == OpsetCompatibility::Implemented) {
+        return;
+    }
+
     if (schema->compatibility == OpsetCompatibility::BehaviorChange) {
         throw ModelLoadException(prefix + ": schema " + std::to_string(schema->since_version) + " " +
                                  (schema->reason == nullptr ? "changed semantics" : schema->reason) +
                                  "; this behavior is not implemented" + versions + " (tracked follow-up)");
     }
 
-    for (const std::string& attribute : split_csv(schema->added_attributes)) {
+    for (const std::string& attribute : split_csv(schema->unsupported_attributes)) {
         if (find_attribute(attributes, attribute) != nullptr) {
             throw ModelLoadException(prefix + ": attribute " + quote(attribute) + " is not implemented" + versions +
                                      " (tracked follow-up: " + op_type + "." + attribute + ")");

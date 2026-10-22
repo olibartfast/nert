@@ -238,6 +238,134 @@ TEST(NertKernels, ReduceMeanAllAxes) {
     EXPECT_EQ(out, (std::vector<float>{2.5f}));
 }
 
+// A present-but-empty axes tensor is the ONNX way to express an empty axes
+// operand; with noop_with_empty_axes it is an identity copy, not a dimension
+// error.
+TEST(NertKernels, ReduceMeanEmptyAxesNoopIdentity) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(4, 0.0f);
+    std::vector<int64_t> axes;
+    nert::Node node = MakeNode("reduce_empty_noop", "ReduceMean");
+    node.attributes.emplace_back("noop_with_empty_axes", int64_t{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), Int64View(axes, {0})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 2})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, in);
+}
+
+// An omitted optional axes operand arrives as a TensorView with Unknown
+// dtype and must behave like an absent input: reduce every axis.
+TEST(NertKernels, ReduceMeanOmittedAxesUnknownDtype) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f};
+    std::vector<float> out(1, 0.0f);
+    nert::Node node = MakeNode("reduce_omitted", "ReduceMean");
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), nert::TensorView{}};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{2.5f}));
+}
+
+// ReduceMax has no identity form here; a present empty axes input reduces
+// every axis, matching its absent form.
+TEST(NertKernels, ReduceMaxEmptyAxesReducesAll) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 4.0f, 3.0f, 2.0f};
+    std::vector<float> out(1, 0.0f);
+    std::vector<int64_t> axes;
+    nert::Node node = MakeNode("max_empty", "ReduceMax");
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2}), Int64View(axes, {0})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {1, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{4.0f}));
+}
+
+// A pre-18 ReduceMean carries axes in an attribute and has no axes input. The
+// kernel reads that form in place; the result matches the schema-18 input
+// form.
+TEST(NertKernels, ReduceMeanOldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMean");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(2, 0.0f);
+    nert::Node old_node = MakeNode("reduce_attr", "ReduceMean");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {2, 3})}, {FloatView(old_out, {2, 1})});
+
+    std::vector<float> new_out(2, 0.0f);
+    nert::Node new_node = MakeNode("reduce_input", "ReduceMean");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {2, 3}), Int64View(axes, {1})}, {FloatView(new_out, {2, 1})});
+
+    EXPECT_EQ(old_out, (std::vector<float>{2.0f, 5.0f}));
+    EXPECT_EQ(old_out, new_out);
+}
+
+// Pre-18 ReduceL2 with axes in an attribute matches the input form.
+TEST(NertKernels, ReduceL2OldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceL2");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {3.0f, 4.0f, 0.0f, 0.0f, 1.0f, 1.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(3, -1.0f);
+    nert::Node old_node = MakeNode("reduce_l2_attr", "ReduceL2");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {3, 2})}, {FloatView(old_out, {3, 1})});
+
+    std::vector<float> new_out(3, -1.0f);
+    nert::Node new_node = MakeNode("reduce_l2_input", "ReduceL2");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {3, 2}), Int64View(axes, {1})}, {FloatView(new_out, {3, 1})});
+
+    EXPECT_FLOAT_EQ(old_out[0], 5.0f);
+    EXPECT_FLOAT_EQ(old_out[1], 0.0f);
+    EXPECT_NEAR(old_out[2], static_cast<float>(std::sqrt(2.0)), 1e-6f);
+    EXPECT_EQ(old_out, new_out);
+}
+
+// Pre-18 ReduceMax with axes in an attribute matches the input form.
+TEST(NertKernels, ReduceMaxOldAttributeFormMatchesInputForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceMax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 5.0f, 3.0f, 4.0f, 2.0f, 6.0f};
+    std::vector<int64_t> axes = {1};
+
+    std::vector<float> old_out(2, 0.0f);
+    nert::Node old_node = MakeNode("reduce_max_attr", "ReduceMax");
+    old_node.schema_version = 13;
+    old_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    kernel(old_node, {FloatView(in, {2, 3})}, {FloatView(old_out, {2, 1})});
+
+    std::vector<float> new_out(2, 0.0f);
+    nert::Node new_node = MakeNode("reduce_max_input", "ReduceMax");
+    new_node.schema_version = 18;
+    kernel(new_node, {FloatView(in, {2, 3}), Int64View(axes, {1})}, {FloatView(new_out, {2, 1})});
+
+    EXPECT_EQ(old_out, (std::vector<float>{5.0f, 6.0f}));
+    EXPECT_EQ(old_out, new_out);
+}
+
 // Gemm computes the plain matrix product without transposes or scaling.
 TEST(NertKernels, GemmPlainProduct) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Gemm");
@@ -832,6 +960,26 @@ TEST(NertKernels, SoftmaxFirstAxis) {
     EXPECT_NEAR(out[3], 0.95257413f, 1e-6f);
     EXPECT_NEAR(out[4], 0.95257413f, 1e-6f);
     EXPECT_NEAR(out[5], 0.95257413f, 1e-6f);
+}
+
+// Pre-13 Softmax coerces to 2D at the default axis 1, so a [2,2,3] input
+// becomes [2,6] and each six-element row is normalized.
+TEST(NertKernels, SoftmaxLegacyDefaultAxisCoerces2D) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Softmax");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in(12, 0.0f);
+    std::vector<float> out(12, 0.0f);
+    nert::Node node = MakeNode("softmax_legacy", "Softmax");
+    node.schema_version = 11;
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 2, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    for (const float value : out) {
+        EXPECT_NEAR(value, 1.0f / 6.0f, 1e-6f);
+    }
 }
 
 // ReduceMax over axis 1 of [2,3] with the default keepdims == 1.
@@ -1564,6 +1712,27 @@ TEST(NertKernels, SplitUnequalSizes) {
     EXPECT_EQ(out1, (std::vector<float>{2.0f, 3.0f, 4.0f, 6.0f, 7.0f, 8.0f}));
 }
 
+// A pre-13 Split carries split sizes in an attribute, not an input.
+TEST(NertKernels, SplitOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Split");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<float> out0(2, 0.0f);
+    std::vector<float> out1(6, 0.0f);
+    nert::Node node = MakeNode("split_attr", "Split");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.attributes.emplace_back("split", std::vector<int64_t>{1, 3});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 4})};
+    std::vector<nert::TensorView> outputs = {FloatView(out0, {2, 1}), FloatView(out1, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out0, (std::vector<float>{1.0f, 5.0f}));
+    EXPECT_EQ(out1, (std::vector<float>{2.0f, 3.0f, 4.0f, 6.0f, 7.0f, 8.0f}));
+}
+
 // Split with no sizes input divides evenly; negative axis, int64 data.
 TEST(NertKernels, SplitEvenNegativeAxisInt64) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Split");
@@ -1615,6 +1784,24 @@ TEST(NertKernels, UnsqueezeNegativeAxisInt64) {
     kernel(node, inputs, outputs);
 
     EXPECT_EQ(out, (std::vector<int64_t>{10, 20}));
+}
+
+// A pre-13 Unsqueeze carries axes in an attribute and has no axes input.
+TEST(NertKernels, UnsqueezeOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Unsqueeze");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> out(6, 0.0f);
+    nert::Node node = MakeNode("unsqueeze_attr", "Unsqueeze");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, in);
 }
 
 // Expand broadcasts [1,3] to [2,3] by repeating the leading axis.
@@ -3469,8 +3656,7 @@ TEST(NertKernels, ClipInt64Identity) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
     ASSERT_NE(kernel, nullptr);
 
-    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(),
-        std::numeric_limits<int64_t>::max()};
+    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max()};
     std::vector<int64_t> out(x.size(), 0);
     nert::Node node = MakeNode("clip_i64_id", "Clip");
     std::vector<nert::TensorView> inputs = {Int64View(x, {static_cast<int64_t>(x.size())})};
@@ -3775,6 +3961,24 @@ TEST(NertKernels, ReduceSumKeepdimsDefault) {
     std::vector<int64_t> axes = {1};
     nert::Node node = MakeNode("rsum0", "ReduceSum");
     std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3}), Int64View(axes, {1})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{6.0f, 15.0f}));
+}
+
+// A pre-13 ReduceSum carries axes in an attribute and has no axes input.
+TEST(NertKernels, ReduceSumOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceSum");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> out(2, 0.0f);
+    nert::Node node = MakeNode("rsum_attr", "ReduceSum");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1})};
 
     kernel(node, inputs, outputs);

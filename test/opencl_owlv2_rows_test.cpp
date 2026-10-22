@@ -308,6 +308,43 @@ TEST(NertOpenCLOWLv2Rows, ReduceL2Axes) {
     ocl.allocator().release(dy);
 }
 
+// A declared-13 ReduceL2 keeps axes in the attribute and has no axes input.
+// The OpenCL row reads that form in place and matches the CPU oracle and the
+// schema-18 input form.
+TEST(NertOpenCLOWLv2Rows, ReduceL2OldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {3.0F, 4.0F, 0.0F, 0.0F, 1.0F, 1.0F};
+    std::vector<int64_t> axes = {1};
+
+    nert::Node attr_node = MakeNode("l2_attr", "ReduceL2");
+    attr_node.schema_version = 13;
+    attr_node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    attr_node.inputs = {"x"};
+    attr_node.outputs = {"y"};
+    std::vector<float> cpu_attr(3, -1.0F);
+    nert::CpuDevice().kernels().find("ReduceL2")(attr_node, {HostFloat(x, {3, 2})}, {HostFloat(cpu_attr, {3, 1})});
+    ExpectNear(cpu_attr, {5.0F, 0.0F, 1.41421356F});
+
+    nert::Node input_node = MakeNode("l2_input", "ReduceL2");
+    input_node.schema_version = 18;
+    input_node.inputs = {"x", "axes"};
+    input_node.outputs = {"y"};
+    std::vector<float> cpu_input(3, -1.0F);
+    nert::CpuDevice().kernels().find("ReduceL2")(input_node, {HostFloat(x, {3, 2}), HostInt64(axes, {1})},
+                                                 {HostFloat(cpu_input, {3, 1})});
+    ExpectNear(cpu_attr, cpu_input);
+
+    void* dx = Upload(ocl, x);
+    void* dy = Upload(ocl, std::vector<float>(3, -1.0F));
+    nert::OpenCLDevice().kernels().find("ReduceL2")(attr_node, {DeviceFloat(dx, {3, 2})}, {DeviceFloat(dy, {3, 1})});
+    ExpectNear(Download(ocl, dy, 3), cpu_attr);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+}
+
 // ArgMax axis/keepdims and first-index tie-breaking.
 TEST(NertOpenCLOWLv2Rows, ArgMaxAxes) {
     if (!HasOpenCLDevice()) {

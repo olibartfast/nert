@@ -1,6 +1,7 @@
 // ReduceL2: sqrt of the sum of squares over the requested axes; float32
 // (double accumulation, rounded once to float32).
 
+#include "../reduce_axes.hpp"
 #include "kernels.hpp"
 
 #include <cmath>
@@ -100,34 +101,50 @@ void ReduceL2(const Node& node, const std::vector<TensorView>& inputs, const std
     }
 
     const bool keepdims = IntAttribute(node, "keepdims", 1) != 0;
-    const bool noopEmpty = IntAttribute(node, "noop_with_empty_axes", 0) != 0;
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
-    // An absent or empty axes input means every axis unless noop_with_empty_axes asks for identity.
+    // Resolve the axes once: the old attribute form reduces all axes when the
+    // attribute is absent or empty; the input form treats an absent input as
+    // all axes, and only a present empty input follows noop_with_empty_axes.
     std::vector<int64_t> axes;
     bool identity = false;
-    if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
-        const TensorView& axesView = inputs[1];
-        if (axesView.dtype != DataType::Int64) {
-            throw InferenceException(context + ": axes tensor must be int64");
-        }
-        int64_t axesCount = 1;
-        for (int64_t dim : axesView.dims) {
-            axesCount *= dim;
-        }
-        if (axesCount > 0) {
-            if (axesView.data == nullptr) {
-                throw InferenceException(context + ": null axes buffer");
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
             }
-            const int64_t* values = static_cast<const int64_t*>(axesView.data);
-            axes.assign(values, values + axesCount);
+            axes = *values;
         }
-    }
-    if (axes.empty()) {
-        if (noopEmpty) {
-            identity = true;
-        } else {
+        if (axes.empty()) {
             for (int64_t i = 0; i < rank; ++i) {
                 axes.push_back(i);
+            }
+        }
+    } else {
+        bool axes_supplied = false;
+        if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
+            axes_supplied = true;
+            const TensorView& axesView = inputs[1];
+            if (axesView.dtype != DataType::Int64) {
+                throw InferenceException(context + ": axes tensor must be int64");
+            }
+            const int64_t axesCount = ReduceAxesElementCount(axesView.dims, context);
+            if (axesCount > 0) {
+                if (axesView.data == nullptr) {
+                    throw InferenceException(context + ": null axes buffer");
+                }
+                const int64_t* values = static_cast<const int64_t*>(axesView.data);
+                axes.assign(values, values + axesCount);
+            }
+        }
+        if (axes.empty()) {
+            if (axes_supplied && resolved_axes.noop_with_empty_axes) {
+                identity = true;
+            } else {
+                for (int64_t i = 0; i < rank; ++i) {
+                    axes.push_back(i);
+                }
             }
         }
     }

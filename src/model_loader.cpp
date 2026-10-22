@@ -22,8 +22,9 @@
 #include <variant>
 #include <vector>
 
-#include "opset_compat.hpp" // private src-local newer-opset gate
-#include "opset_normalize.hpp" // private src-local canonicalizer
+#include "axes_form.hpp" // private src-local shared axes/reduction form resolver
+#include "opset_compat.hpp" // private src-local schema implementation gate
+#include "reduce_axes.hpp" // private src-local shared reduce-form resolver
 #include "wire_reader.hpp" // private src-local reader
 
 #include "nert/einsum.hpp"
@@ -621,15 +622,16 @@ const std::unordered_map<std::string, AttrSlot>& reducemean_attrs()
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
         { "noop_with_empty_axes", AttrSlot::Int },
-        // Pre-18 form, consumed by the loader's opset normalizer.
+        // Pre-18 form; the loader admits it only below schema 18 and the
+        // shared reduce-axes resolver reads it in place.
         { "axes", AttrSlot::IntList },
     };
     return k;
 }
 
 // ReduceSum took axes as an input at opset 13; the pre-13 form uses the
-// attribute. The normalizer rejects whichever form the declared version does
-// not allow.
+// attribute. The form validator rejects whichever form the effective schema
+// does not allow, and consumers resolve the source form in place.
 const std::unordered_map<std::string, AttrSlot>& reducesum_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
@@ -727,8 +729,12 @@ const std::unordered_map<std::string, AttrSlot>& reducemax_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "keepdims", AttrSlot::Int },
-        // Pre-18 form, consumed by the loader's opset normalizer.
+        // Pre-18 form; the loader admits it only below schema 18 and the
+        // shared reduce-axes resolver reads it in place.
         { "axes", AttrSlot::IntList },
+        // Schema 18+ attribute, decoded so the form validator can report the
+        // tracked capability gap instead of the generic allowlist error.
+        { "noop_with_empty_axes", AttrSlot::Int },
     };
     return k;
 }
@@ -759,7 +765,7 @@ const std::unordered_map<std::string, AttrSlot>& softmax_attrs()
 const std::unordered_map<std::string, AttrSlot>& squeeze_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "axes", AttrSlot::IntList },
     };
     return k;
@@ -768,7 +774,7 @@ const std::unordered_map<std::string, AttrSlot>& squeeze_attrs()
 const std::unordered_map<std::string, AttrSlot>& unsqueeze_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "axes", AttrSlot::IntList },
     };
     return k;
@@ -778,7 +784,7 @@ const std::unordered_map<std::string, AttrSlot>& split_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "axis", AttrSlot::Int },
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "split", AttrSlot::IntList },
     };
     return k;
@@ -836,7 +842,7 @@ const std::unordered_map<std::string, AttrSlot>& einsum_attrs()
 const std::unordered_map<std::string, AttrSlot>& scatternd_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Added at opset 16; the normalizer accepts only the default "none".
+        // Added at opset 16; form validation accepts only the default "none".
         { "reduction", AttrSlot::Str },
     };
     return k;
@@ -1240,7 +1246,7 @@ NodeRaw read_node_raw(const uint8_t* data, size_t size)
 
 } // namespace
 
-// Opset-18 value policies pinned to the surveyed detection surface. Attribute
+// Value policies pinned to the implemented detection surface. Attribute
 // names are already restricted by allowed_attributes(); here values outside
 // the fixture's surface reject with node + op context.
 void validate_attr_policy(Node& node)
@@ -1441,6 +1447,211 @@ void validate_attr_policy(Node& node)
     // tensor-scalar decode already pinned it to INT64, FLOAT, or BOOL.
 }
 
+// ReduceMean/ReduceL2/ReduceMax admit only the axes form legal for the
+// node's effective schema. The old attribute form stays in the graph; this
+// gate only rejects a form the source schema does not have. `declared_opset`
+// is carried separately from the effective schema because the message must
+// distinguish the model declaration from the resolved schema.
+void validate_reduce_axes_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ReduceMean" && node.op_type != "ReduceL2" &&
+        node.op_type != "ReduceMax") {
+        return;
+    }
+    auto find_attribute = [&node](const std::string& name) -> const Attribute* {
+        for (const Attribute& attribute : node.attributes) {
+            if (attribute.name == name) {
+                return &attribute;
+            }
+        }
+        return nullptr;
+    };
+    auto has_attribute = [&find_attribute](const std::string& name) {
+        return find_attribute(name) != nullptr;
+    };
+    // Any second operand is illegal before schema 18, including the empty
+    // string form an exporter may use for an omitted optional input.
+    const bool has_axes_input = node.inputs.size() > 1;
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kReduceAxesInputSchema) {
+        if (has_axes_input) {
+            throw ModelLoadException(prefix +
+                ": the 'axes' input requires schema " +
+                std::to_string(kReduceAxesInputSchema) + context);
+        }
+        if (has_attribute("noop_with_empty_axes")) {
+            throw ModelLoadException(prefix +
+                ": 'noop_with_empty_axes' requires schema " +
+                std::to_string(kReduceAxesInputSchema) + context);
+        }
+        return;
+    }
+    if (has_attribute("axes")) {
+        throw ModelLoadException(prefix +
+            ": the 'axes' attribute is only valid before schema " +
+            std::to_string(kReduceAxesInputSchema) + context);
+    }
+    if (node.op_type == "ReduceMax") {
+        const Attribute* noop = find_attribute("noop_with_empty_axes");
+        const int64_t* value = noop == nullptr
+            ? nullptr : std::get_if<int64_t>(&noop->value);
+        if (value != nullptr && *value != 0) {
+            throw ModelLoadException(prefix +
+                ": ReduceMax 'noop_with_empty_axes' is not implemented" +
+                context + " (tracked follow-up)");
+        }
+    }
+}
+
+// ReduceSum/Squeeze/Unsqueeze admit only the axes form legal for the node's
+// effective schema. The source form stays in the graph; this gate only rejects
+// a form the source schema does not have. `declared_opset` is carried
+// separately so the message can distinguish the model declaration from the
+// resolved schema.
+void validate_axes_op_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ReduceSum" && node.op_type != "Squeeze" &&
+        node.op_type != "Unsqueeze") {
+        return;
+    }
+    const Attribute* axes_attribute = FindNodeAttribute(node, "axes");
+    // Any second operand is illegal before schema 13, including the empty
+    // string form an exporter may use for an omitted optional input.
+    const bool has_axes_input = node.inputs.size() > 1;
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kAxesAsInputSchema) {
+        if (has_axes_input) {
+            throw ModelLoadException(prefix +
+                ": the 'axes' input requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (node.op_type == "ReduceSum" &&
+            FindNodeAttribute(node, "noop_with_empty_axes") != nullptr) {
+            throw ModelLoadException(prefix +
+                ": 'noop_with_empty_axes' requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (node.op_type == "Unsqueeze") {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(axes_attribute);
+            if (values == nullptr) {
+                throw ModelLoadException(prefix +
+                    ": 'axes' is required before schema " +
+                    std::to_string(kAxesAsInputSchema) + context);
+            }
+            if (values->empty()) {
+                throw ModelLoadException(prefix +
+                    ": 'axes' must not be empty before schema " +
+                    std::to_string(kAxesAsInputSchema) + context);
+            }
+        }
+        return;
+    }
+    if (axes_attribute != nullptr) {
+        throw ModelLoadException(prefix +
+            ": the 'axes' attribute is only valid before schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+    if (node.op_type == "Unsqueeze" &&
+        (!has_axes_input || node.inputs[1].empty())) {
+        throw ModelLoadException(prefix +
+            ": Unsqueeze requires an 'axes' input from schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+}
+
+// ScatterND's `reduction` attribute is legal only from schema 16, and only the
+// overwrite value `none` (also the default) is implemented. The attribute
+// stays in the graph; the kernels always overwrite.
+void validate_scatter_nd_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ScatterND") {
+        return;
+    }
+    const Attribute* reduction = FindNodeAttribute(node, "reduction");
+    if (reduction == nullptr) {
+        return;
+    }
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+    if (node.schema_version < kScatterReductionSchema) {
+        throw ModelLoadException(prefix +
+            ": 'reduction' requires schema " +
+            std::to_string(kScatterReductionSchema) + context);
+    }
+    const std::string* value = std::get_if<std::string>(&reduction->value);
+    if (value == nullptr) {
+        throw ModelLoadException(prefix +
+            ": 'reduction' must be a string" + context);
+    }
+    if (*value != "none") {
+        throw ModelLoadException(prefix + ": ScatterND reduction " +
+            quote(*value) + " is not implemented here (only 'none')" +
+            context);
+    }
+}
+
+// Split's `split` attribute moved to an optional input at schema 13. The
+// source form stays in the graph; an absent/empty input means equal parts.
+void validate_split_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "Split") {
+        return;
+    }
+    const Attribute* split_attribute = FindNodeAttribute(node, "split");
+    const bool has_split_input = node.inputs.size() > 1;
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kAxesAsInputSchema) {
+        if (has_split_input) {
+            throw ModelLoadException(prefix +
+                ": the 'split' input requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (split_attribute == nullptr) {
+            return;
+        }
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(split_attribute);
+        if (values == nullptr) {
+            throw ModelLoadException(prefix +
+                ": 'split' must be an integer list" + context);
+        }
+        if (values->empty()) {
+            throw ModelLoadException(prefix +
+                ": 'split' must not be empty before schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        return;
+    }
+    if (split_attribute != nullptr) {
+        throw ModelLoadException(prefix +
+            ": the 'split' attribute is only valid before schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+}
+
 Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
 {
     const NodeRaw raw = read_node_raw(data, size);
@@ -1475,7 +1686,11 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
     node.inputs = raw.inputs;
     node.outputs = raw.outputs;
 
-    // Decode every attribute name/value first. The newer-opset gate must see
+    // Resolve the effective ONNX schema for every source node. Shape
+    // inference and the kernels select the source form from this version.
+    node.schema_version = ResolveNodeSchemaVersion(node.name, node.op_type, declared_opset);
+
+    // Decode every attribute name/value first. The schema gate must see
     // attributes that the strict allowlist is about to reject (for example
     // Cast.saturate), so it can name the effective schema and capability.
     std::vector<AttrPatch> patches;
@@ -1496,21 +1711,19 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
         patches.push_back(std::move(a));
     }
 
-    if (declared_opset > 18) {
-        std::vector<OpsetAttributeView> views;
-        views.reserve(patches.size());
-        for (const AttrPatch& patch : patches) {
-            OpsetAttributeView view;
-            view.name = patch.name;
-            if (patch.type == kAttrType_String) {
-                view.is_string = true;
-                view.string_value = patch.s;
-            }
-            views.push_back(std::move(view));
+    std::vector<OpsetAttributeView> views;
+    views.reserve(patches.size());
+    for (const AttrPatch& patch : patches) {
+        OpsetAttributeView view;
+        view.name = patch.name;
+        if (patch.type == kAttrType_String) {
+            view.is_string = true;
+            view.string_value = patch.s;
         }
-        CheckNodeCompatibility(
-            node.name, node.op_type, views, declared_opset);
+        views.push_back(std::move(view));
     }
+    CheckNodeCompatibility(
+        node.name, node.op_type, views, declared_opset);
 
     for (const AttrPatch& a : patches) {
         const auto slot_it = allowed.find(a.name);
@@ -1524,6 +1737,10 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
             map_attribute(a, slot_it->second, node.name, node.op_type));
     }
     validate_attr_policy(node);
+    validate_reduce_axes_form(node, declared_opset);
+    validate_axes_op_form(node, declared_opset);
+    validate_scatter_nd_form(node, declared_opset);
+    validate_split_form(node, declared_opset);
     return node;
 }
 
@@ -1868,6 +2085,7 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
     }
 
     Graph graph;
+    graph.declared_opset = declared_opset;
     std::vector<std::pair<std::string, Initializer>> folded_constants;
     std::vector<std::string> folded_node_names;
     WireReader graph_reader(
@@ -1974,9 +2192,8 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         }
         graph.initializers[name] = std::move(folded_constants[i].second);
     }
-    // Canonicalize pre-18 node forms into the opset-18 IR before any consumer
-    // (TopK checks, shape inference, planning, kernels) sees the graph.
-    NormalizeGraphForOpset(graph, declared_opset);
+    // All supported legacy forms stay in the graph; consumers resolve them
+    // from the source node's effective schema.
     // TopK's K input is a shape constant: it must resolve to an Int64
     // initializer at load. A non-constant K is a load rejection here, never
     // a dynamic shape downstream.

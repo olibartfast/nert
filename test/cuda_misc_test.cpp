@@ -403,6 +403,34 @@ TEST(NertCudaMisc, ReduceMaxAxisExact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
+// A declared-13 ReduceMax carries axes in an attribute and no axes input. The
+// CUDA row reads that form in place and matches the CPU oracle.
+TEST(NertCudaMisc, ReduceMaxOldAttributeFormMatchesCpu) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 5.0F, 3.0F, 4.0F, 2.0F, 6.0F};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("rm_attr", "ReduceMax");
+    node.schema_version = 13;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceMax")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {2, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{5.0F, 6.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceMax")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
 // ReduceMax over all axes without keepdims: single max, both tables.
 TEST(NertCudaMisc, ReduceMaxGlobalNoKeepdims) {
     if (!HasCudaDevice()) {
@@ -485,6 +513,33 @@ TEST(NertCudaMisc, ReduceSumAxisExact) {
     gpuOut = Download(cuda, dy, 2);
     cuda.allocator().release(dx);
     cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
+// A pre-13 ReduceSum keeps axes in the attribute; CUDA and CPU agree.
+TEST(NertCudaMisc, ReduceSumOldAttributeForm) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    nert::Node node = MakeNode("rs_attr", "ReduceSum");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    node.attributes.push_back(nert::Attribute("axes", std::vector<int64_t>{1}));
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {2, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 15.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
     cuda.allocator().release(dy);
     EXPECT_EQ(gpuOut, cpuOut);
 }
@@ -1391,6 +1446,34 @@ TEST(NertCudaMisc, ReduceMeanAxisExact) {
     ExpectNear(gpuOut, cpuOut);
 }
 
+// A declared-13 ReduceMean carries axes in an attribute and no axes input. The
+// CUDA row reads that form in place and matches the CPU oracle.
+TEST(NertCudaMisc, ReduceMeanOldAttributeFormMatchesCpu) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::Node node = MakeNode("rmn_attr", "ReduceMean");
+    node.schema_version = 13;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceMean")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {2, 1})});
+    ExpectNear(cpuOut, (std::vector<float>{2.0F, 5.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceMean")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, cpuOut);
+}
+
 // ReduceMean rejects non-float32 data, naming node + op.
 TEST(NertCudaMisc, ReduceMeanRejectsInt64) {
     if (!HasCudaDevice()) {
@@ -1443,6 +1526,34 @@ TEST(NertCudaMisc, ReduceL2AxisExact) {
     gpuOut = Download(cuda, dy, 2);
     cuda.allocator().release(dx);
     cuda.allocator().release(da);
+    cuda.allocator().release(dy);
+    ExpectNear(gpuOut, cpuOut);
+}
+
+// A declared-13 ReduceL2 carries axes in an attribute and no axes input. The
+// CUDA row reads that form in place and matches the CPU oracle.
+TEST(NertCudaMisc, ReduceL2OldAttributeFormMatchesCpu) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {3.0F, 4.0F, 0.0F, 0.0F, 1.0F, 1.0F};
+    std::vector<float> cpuOut(3, -1.0F);
+    nert::Node node = MakeNode("rl2_attr", "ReduceL2");
+    node.schema_version = 13;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    nert::CpuDevice().kernels().find("ReduceL2")(node, {HostFloat(x, {3, 2})}, {HostFloat(cpuOut, {3, 1})});
+    ExpectNear(cpuOut, (std::vector<float>{5.0F, 0.0F, 1.41421356F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(3, -1.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceL2")(node, {DeviceFloat(dx, {3, 2})}, {DeviceFloat(dy, {3, 1})});
+    gpuOut = Download(cuda, dy, 3);
+    cuda.allocator().release(dx);
     cuda.allocator().release(dy);
     ExpectNear(gpuOut, cpuOut);
 }

@@ -1,11 +1,14 @@
 // ReduceMax on CUDA: max over axes, one thread per output element.
 //
-// Mirrors the CPU oracle: float32 only, keepdims attr default 1, absent (or
-// empty) axes input means every axis, unique normalized axes, output-shape
-// check. Each thread replays the oracle's input-order scan restricted to its
-// own output cell, so ties and -inf behavior match without atomics. Ranks
-// above 16 are rejected (pilot limit).
+// Mirrors the CPU oracle: float32 only, keepdims attr default 1, axes in the
+// form legal for the node's effective schema (attribute before 18, optional
+// int64 input from 18), an absent or empty axes value means every axis,
+// unique normalized axes, output-shape check. Each thread replays the
+// oracle's input-order scan restricted to its own output cell, so ties and
+// -inf behavior match without atomics. Ranks above 16 are rejected (pilot
+// limit).
 
+#include "../reduce_axes.hpp"
 #include "nert/device.hpp"
 
 #include <cstddef>
@@ -133,29 +136,36 @@ void ReduceMax(const Node& node, const std::vector<TensorView>& inputs, const st
     }
 
     const int64_t keepdims = IntAttribute(node, "keepdims", 1, context);
+    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
-    // Resolve the axes: an absent axes input means every axis.
+    // Resolve the axes once: the old attribute form and the input form both
+    // reduce every axis when the axes value is absent or empty.
     std::vector<int64_t> axes;
-    if (inputs.size() == 2) {
+    if (resolved_axes.form == ReduceAxesForm::Attribute) {
+        if (resolved_axes.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& axesView = inputs[1];
         if (axesView.dtype != DataType::Int64) {
             throw InferenceException(context + ": axes tensor must be int64");
         }
-        const int64_t axesCount = ElementCount(axesView.dims, context);
+        const int64_t axesCount = ReduceAxesElementCount(axesView.dims, context);
         if (axesCount > 0 && axesView.data == nullptr) {
             throw InferenceException(context + ": null axes buffer");
         }
-        if (axesCount == 0) {
-            for (int64_t i = 0; i < rank; ++i) {
-                axes.push_back(i);
-            }
-        } else {
+        if (axesCount > 0) {
             axes.assign(static_cast<std::size_t>(axesCount), 0);
             CheckCuda(cudaMemcpy(axes.data(), axesView.data, static_cast<std::size_t>(axesCount) * sizeof(int64_t),
                                  cudaMemcpyDeviceToHost),
                       "cudaMemcpy", context);
         }
-    } else {
+    }
+    if (axes.empty()) {
         for (int64_t i = 0; i < rank; ++i) {
             axes.push_back(i);
         }
