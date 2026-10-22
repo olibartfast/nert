@@ -83,6 +83,17 @@ struct Node {
     std::vector<std::string> inputs;
     std::vector<std::string> outputs;
     std::vector<Attribute> attributes;
+    // Effective ONNX schema version of the source node, resolved from the
+    // model's declared opset: the latest schema for `op_type` at or below the
+    // declaration. During the version-aware migration, a load-time rewrite can
+    // still change the node's attribute/input form (for example, reduce axes);
+    // this field remains the source schema and must not be used to infer the
+    // post-rewrite form until that operator's rewrite is removed. Zero means
+    // unspecified: a hand-built node, or a node synthesized by a load-time
+    // rewrite. Consumers must treat zero as the current implementation form;
+    // a source node from a loaded model is always nonzero. Never interpret
+    // zero as ONNX schema zero.
+    int64_t schema_version = 0;
 };
 
 // An embedded constant tensor. Weights are float32; integer constants carry
@@ -124,6 +135,9 @@ struct Graph {
     std::map<std::string, Initializer> initializers;      // embedded constants
     std::vector<std::pair<std::string, TensorInfo>> inputs;
     std::vector<std::pair<std::string, TensorInfo>> outputs;
+    // The model's declared ai.onnx opset version. Zero means the graph was
+    // built by hand rather than loaded from a model declaration.
+    int64_t declared_opset = 0;
 };
 
 } // namespace nert

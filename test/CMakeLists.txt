@@ -15,11 +15,11 @@ target_link_libraries(nert_loader_test PRIVATE
 # When unset, fall back to the well-known local export location if it exists;
 # the tests themselves ASSERT (fail, never skip) when the fixture is absent.
 set(NERT_FIXTURE "" CACHE PATH
-    "Path to the opset-18 ResNet-18 ONNX fixture for the NERT tests")
+    "Path to the provisioned ResNet-18 ONNX fixture for the NERT tests")
 if(NOT NERT_FIXTURE AND EXISTS
-    "/tmp/opencode/resnet18_export/resnet18.onnx")
+    "/tmp/opencode/resnet18_op19.onnx")
     set(NERT_FIXTURE
-        "/tmp/opencode/resnet18_export/resnet18.onnx")
+        "/tmp/opencode/resnet18_op19.onnx")
 endif()
 
 add_test(NAME nert_loader

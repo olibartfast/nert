@@ -9,9 +9,17 @@ Usage:
     python3 tools/gen_opset_compat.py --check  # fail if the table is stale
 
 The table covers every operator in `src/kernels/cpu_kernels.cpp`. For each
-operator it records the latest schema at or before opset 18 (the canonical
-implementation level) and every later schema version, with a compatibility
-class relative to the opset-18 implementation.
+operator it records every schema version in ONNX's history. Versions before
+the latest schema at or before opset 18 (the canonical implementation level)
+are labeled `Historical`: the resolver can select them for older declarations,
+but they are not claimed equivalent to the opset-18 implementation. The
+baseline entry is `Equivalent`, and every later schema version carries a
+compatibility class relative to the opset-18 implementation.
+
+Phase A is transitional: pre-baseline rows carry only their version, not
+reviewed attribute or value-domain deltas. Phase B/C port the old forms into
+version-aware shape and kernel code; Phase E replaces this baseline-relative
+classification with a full-history implementation manifest.
 """
 
 from __future__ import annotations
@@ -166,11 +174,17 @@ def build_entries() -> list[Entry]:
         if not baseline_candidates:
             raise GeneratorError(f"{op_type} has no schema at or before opset {BASELINE_OPSET}")
         baseline = baseline_candidates[-1]
-        entries.append(Entry(op_type, baseline.since_version, "Equivalent"))
+        baseline_version = baseline.since_version
         for schema in history:
-            if schema.since_version <= BASELINE_OPSET:
-                continue
-            entries.append(classify(op_type, baseline, schema))
+            version = schema.since_version
+            if version < baseline_version:
+                # Selectable by the resolver for older declarations, but not
+                # reviewed as equivalent to the opset-18 implementation.
+                entries.append(Entry(op_type, version, "Historical"))
+            elif version == baseline_version:
+                entries.append(Entry(op_type, version, "Equivalent"))
+            else:
+                entries.append(classify(op_type, baseline, schema))
     return entries
 
 

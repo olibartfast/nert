@@ -172,6 +172,17 @@ Follow-up capability slices (rejected explicitly today): `Cast.saturate`,
 `Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`, `Range.stash_type`,
 and `GridSample` opset-20 semantics.
 
+### Version-aware opsets (Phase A validated 2026-10-22; Phases B–E pending)
+
+`specs/2026-10-22-version-aware-opsets/` replaces the global opset-18
+canonical target with per-node effective schema metadata and version-aware
+shape/kernel resolution. Phase A adds `Graph.declared_opset` and
+`Node.schema_version` and extends the generated catalog to the full schema
+history while keeping the normalizer behavior-neutral. Later phases remove
+the reduce/axes/split rewrites, implement legacy `Softmax` directly, and
+delete the normalizer. This supersedes decisions `D-1` and `D-4` of the
+opset-range packet.
+
 ## Tooling — Memory Footprint Report (Planned)
 
 The planned model fit/sizing report adds `MemoryFootprint` to `Model` and an

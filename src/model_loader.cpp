@@ -1475,6 +1475,10 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
     node.inputs = raw.inputs;
     node.outputs = raw.outputs;
 
+    // Resolve the effective ONNX schema for every source node. This is
+    // metadata in Phase A; the normalizer still canonicalizes older forms.
+    node.schema_version = ResolveNodeSchemaVersion(node.name, node.op_type, declared_opset);
+
     // Decode every attribute name/value first. The newer-opset gate must see
     // attributes that the strict allowlist is about to reject (for example
     // Cast.saturate), so it can name the effective schema and capability.
@@ -1868,6 +1872,7 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
     }
 
     Graph graph;
+    graph.declared_opset = declared_opset;
     std::vector<std::pair<std::string, Initializer>> folded_constants;
     std::vector<std::string> folded_node_names;
     WireReader graph_reader(

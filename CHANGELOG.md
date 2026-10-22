@@ -15,9 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `src/kernels/instance_normalization.cpp`); CTest suites `engine_*` →
   `nert_*`. No behavior change. Consumers (Neuriplo adapter) update
   includes + namespace; the `neuriplo_engine` CMake alias is kept.
+- Public `Node` / `Graph` layout: appended `Node::schema_version` and
+  `Graph::declared_opset` with defaults. Aggregate initialization remains
+  source-compatible, but the object sizes change, so consumers must rebuild.
 
 ### Added
 
+- Effective-schema metadata: loaded graphs carry `Graph::declared_opset`,
+  and every source node carries `Node::schema_version`, resolved from the
+  full ONNX schema history (`Constant` nodes fold into initializers before a
+  `Node` exists). `tools/gen_opset_compat.py` now emits all schema
+  versions (288 entries), with pre-opset-18 rows marked `Historical`. This is
+  the first phase of replacing global opset-18 canonicalization with
+  version-aware shape and kernel semantics; the existing canonicalizer is
+  unchanged in this phase.
 - Native opset range 11–18: the loader accepts declared ONNX-domain opsets
   11–18 and canonicalizes the supported old forms to the opset-18 IR before
   shape inference. Pre-18 reduce `axes` attributes become int64 inputs;

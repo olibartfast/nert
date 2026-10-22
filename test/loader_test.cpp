@@ -1737,6 +1737,110 @@ TEST_F(EngineLoader, HermeticGridSampleAt19Accepted)
 }
 
 // ===========================================================================
+// Phase A — per-node effective schema metadata.
+// ===========================================================================
+
+// Every source node carries the effective ONNX schema selected by the
+// declaration: ReduceMean history is 1, 11, 13, 18. The graph records the
+// declaration itself.
+TEST_F(EngineLoader, HermeticNodeSchemaVersionTracksDeclaredOpset)
+{
+    auto load = [](int64_t declared) {
+        std::string body;
+        if (declared < 18) {
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x"}, {"y"},
+                              {encode_attribute_ints("axes", {1})}));
+        } else {
+            put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+            put_sub(body, 1, encode_node("reduce0", "ReduceMean", {"x", "axes"},
+                              {"y"}, {}));
+        }
+        put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+        put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+        return nert::LoadGraphFromFile(write_model_bytes(
+            "schema_meta_" + std::to_string(declared) + ".onnx",
+            encode_model(body, declared)));
+    };
+
+    const std::vector<std::pair<int64_t, int64_t>> cases = {
+        {11, 11}, {13, 13}, {18, 18}, {19, 18}, {27, 18}};
+    for (const auto& entry : cases) {
+        const nert::Graph graph = load(entry.first);
+        EXPECT_EQ(graph.declared_opset, entry.first)
+            << "declared " << entry.first;
+        ASSERT_EQ(graph.nodes.size(), 1U) << "declared " << entry.first;
+        EXPECT_EQ(graph.nodes.front().op_type, "ReduceMean");
+        EXPECT_EQ(graph.nodes.front().schema_version, entry.second)
+            << "declared " << entry.first;
+        // Phase A still normalizes the source form: every case leaves the
+        // reduce axes as the second input and removes the old attribute. The
+        // schema_version above remains the source schema until Phase B
+        // removes this rewrite.
+        EXPECT_EQ(graph.nodes.front().inputs.size(), 2U)
+            << "declared " << entry.first;
+        EXPECT_TRUE(graph.nodes.front().attributes.empty())
+            << "declared " << entry.first;
+    }
+}
+
+// A declared-11 Relu resolves to schema 6: the full-history catalog must
+// select a version below the old opset-18 baseline.
+TEST_F(EngineLoader, HermeticEffectiveSchemaBelowEleven)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("relu0", "Relu", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_relu_11.onnx", encode_model(body, 11)));
+    EXPECT_EQ(graph.declared_opset, 11);
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Relu");
+    EXPECT_EQ(graph.nodes.front().schema_version, 6);
+}
+
+// Add's effective schema at declared 27 is 14, not 27.
+TEST_F(EngineLoader, HermeticNewerAddResolvesSchemaFourteen)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("b", {2}, {1.0F, 2.0F}));
+    put_sub(body, 1, encode_node("add0", "Add", {"x", "b"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2}));
+    put_sub(body, 12, encode_value_info("y", 1, {2}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_add_27.onnx", encode_model(body, 27)));
+    EXPECT_EQ(graph.declared_opset, 27);
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "Add");
+    EXPECT_EQ(graph.nodes.front().schema_version, 14);
+}
+
+// The remaining legacy Softmax rewrite still expands at declared 11. Its
+// synthesized nodes are not source nodes, so they keep schema_version 0 in
+// Phase A.
+TEST_F(EngineLoader, HermeticLegacySoftmaxExpansionKeepsMetadata)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("sm0", "Softmax", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("schema_softmax_11.onnx", encode_model(body, 11)));
+    EXPECT_EQ(graph.declared_opset, 11);
+    ASSERT_EQ(graph.nodes.size(), 4U);
+    EXPECT_EQ(graph.nodes[0].op_type, "Shape");
+    EXPECT_EQ(graph.nodes[1].op_type, "Flatten");
+    EXPECT_EQ(graph.nodes[2].op_type, "Softmax");
+    EXPECT_EQ(graph.nodes[3].op_type, "Reshape");
+    for (const nert::Node& node : graph.nodes) {
+        EXPECT_EQ(node.schema_version, 0) << node.op_type;
+    }
+}
+
+// ===========================================================================
 // EngineLoaderNegative.* — rejections whose messages must name the node and
 // op type.
 // ===========================================================================
@@ -2294,6 +2398,29 @@ TEST_F(EngineLoaderNegative, MissingOpsetDeclarationRejected)
     const std::string message =
         load_error_message(model, "missing_opset.onnx");
     EXPECT_NE(message.find("does not declare"), std::string::npos)
+        << "message: " << message;
+}
+
+// A source node whose operator has no schema at or below the declaration has
+// no effective schema. LayerNormalization first appears at schema 17.
+TEST_F(EngineLoaderNegative, NoEffectiveSchemaAtDeclaredOpsetRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("ln0", "LayerNormalization", {"x"}, {"y"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 3, 4}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 11), "layernorm_11.onnx");
+    EXPECT_NE(message.find("ln0"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("LayerNormalization"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("no effective schema"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("first schema is 17"), std::string::npos)
         << "message: " << message;
 }
 

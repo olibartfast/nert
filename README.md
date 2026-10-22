@@ -24,6 +24,14 @@ they exist so device layers can be checked for numerical agreement rather
 than re-derive operator semantics. Each device layer runs the same model
 with the same plan and must match the CPU oracle within tolerance.
 
+## Design reference
+
+The typed-graph direction, static shape inference, constant folding, and
+operator-level semantics are informed by OpenCV 5's new DNN engine:
+[OpenCV 5 — A Brand-New DNN Engine](https://opencv.org/opencv-5/#h-the-headline-a-brand-new-dnn-engine).
+NERT does not depend on OpenCV and does not copy its automatic engine
+fallback or ONNX Runtime escape hatch; unsupported semantics fail explicitly.
+
 ## Status
 
 Version 0.2.0 is unreleased; the breaking namespace, header, filename,
@@ -118,9 +126,11 @@ cmake --build build-cuda --target nert_bench_runtime
 
 ## Test
 
-The CPU tests read an opset-18 ResNet-18 model from `NERT_FIXTURE` (environment
-variable or CMake cache variable). Provision it with torch and torchvision
-0.27.0 installed, then run ctest:
+The CPU tests read a provisioned ResNet-18 model from `NERT_FIXTURE`
+(environment variable or CMake cache variable). The provided provisioning tool
+exports the opset-18 model; a native opset-19 export with the same graph is
+also accepted. Provision it with torch and torchvision 0.27.0 installed, then
+run ctest:
 
 ```bash
 python3 tools/provision_resnet18.py fixtures

@@ -83,7 +83,33 @@ const OpsetSchemaInfo* find_effective_schema(const std::string& op_type, int64_t
     return best;
 }
 
+int64_t first_schema_version(const std::string& op_type) {
+    int64_t first = -1;
+    for (size_t i = 0; i < kOpsetSchemaTableSize; ++i) {
+        const OpsetSchemaInfo& entry = kOpsetSchemaTable[i];
+        if (op_type != entry.op_type) {
+            continue;
+        }
+        if (first < 0 || entry.since_version < first) {
+            first = entry.since_version;
+        }
+    }
+    return first;
+}
+
 } // namespace
+
+int64_t ResolveNodeSchemaVersion(const std::string& node_name, const std::string& op_type, int64_t declared_opset) {
+    const OpsetSchemaInfo* schema = find_effective_schema(op_type, declared_opset);
+    if (schema == nullptr) {
+        const int64_t first = first_schema_version(op_type);
+        const std::string detail = first < 0 ? std::string(" (operator is not in the schema catalog)")
+                                             : " (operator's first schema is " + std::to_string(first) + ")";
+        throw ModelLoadException(node_prefix(node_name, op_type) + ": no effective schema at or below declared opset " +
+                                 std::to_string(declared_opset) + detail);
+    }
+    return schema->since_version;
+}
 
 void CheckNodeCompatibility(const std::string& node_name, const std::string& op_type,
                             const std::vector<OpsetAttributeView>& attributes, int64_t declared_opset) {
@@ -96,6 +122,14 @@ void CheckNodeCompatibility(const std::string& node_name, const std::string& op_
                                  std::to_string(declared_opset) + ")");
     }
     const std::string versions = version_text(declared_opset, schema->since_version);
+
+    if (schema->compatibility == OpsetCompatibility::Historical) {
+        // Historical rows are catalog entries, not admission verdicts. The
+        // above-18 gate should never select one (the baseline is also <=18);
+        // fail closed if a future caller routes an old declaration here.
+        throw ModelLoadException(prefix + ": historical schema " + std::to_string(schema->since_version) +
+                                 " reached the compatibility gate" + versions);
+    }
 
     if (schema->compatibility == OpsetCompatibility::BehaviorChange) {
         throw ModelLoadException(prefix + ": schema " + std::to_string(schema->since_version) + " " +
