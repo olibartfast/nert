@@ -40,7 +40,6 @@ struct ReduceAxes {
     ReduceAxesForm form = ReduceAxesForm::Input;
     // The node's `axes` attribute when present (attribute form), else null.
     const Attribute* axes_attribute = nullptr;
-    bool has_noop_with_empty_axes = false;
     bool noop_with_empty_axes = false;
 };
 
@@ -90,7 +89,6 @@ inline ReduceAxes ResolveReduceAxes(const Node& node) {
     resolved.axes_attribute = FindReduceAttribute(node, "axes");
     const Attribute* noop = FindReduceAttribute(node, "noop_with_empty_axes");
     if (noop != nullptr) {
-        resolved.has_noop_with_empty_axes = true;
         if (const int64_t* value = std::get_if<int64_t>(&noop->value)) {
             resolved.noop_with_empty_axes = *value != 0;
         }

@@ -43,7 +43,7 @@ assertions.
   the documented rejection of an operator introduced after the declaration;
   the ResNet-18 gate still loads and executes. Verified 2026-10-22 with
   `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx`: 13/13 CTest entries
-  passed, including `nert_loader` (101/101), `nert_executor`, and
+  passed, including `nert_loader` (104/104), `nert_executor`, and
   `nert_opset_table`. Environment note:
   `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export
   (`GlobalAveragePool`/`Flatten`, 42 initializers) and is not the pinned
@@ -73,7 +73,7 @@ assertions.
   identity behavior is a tracked follow-up), not as an unknown attribute.
   Verified 2026-10-22 by the five `EngineLoaderNegative` reduce-form tests;
   messages name the node, operator, offending form, declared opset 13 (or
-  18), and effective schema 13 (or 18). `nert_loader` passes 101/101.
+  18), and effective schema 13 (or 18). `nert_loader` passes 104/104; the explicit `noop_with_empty_axes=0` form is accepted.
 - [x] [V-8] Device parity belongs to [R-7]: CPU and every enabled GPU device
   that has the reduce row produce matching results for both forms; missing
   HIP rows are recorded as gaps, not passes. Verified 2026-10-22: CUDA
@@ -127,9 +127,9 @@ assertions.
 | V-1 | `python3 tools/gen_opset_compat.py --check` | pass | 2026-10-22 | `opset compatibility table is current (288 entries)`; every ONNX history version is present for all 72 implemented operators. |
 | V-2 | `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_filter='EngineLoader.HermeticNodeSchemaVersionTracksDeclaredOpset:EngineLoader.HermeticEffectiveSchemaBelowEleven:EngineLoader.HermeticNewerAddResolvesSchemaFourteen:EngineLoader.HermeticLegacySoftmaxExpansionKeepsMetadata'` | pass (4/4) | 2026-10-22 | ReduceMean declared 11/13/18/19/27 resolves to 11/13/18/18/18; declared-11 Relu resolves to 6; declared-27 `Add` resolves to 14; `Graph.declared_opset` matches each declaration. The ReduceMean test also records the Phase A post-normalization form. |
 | V-3 | `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_filter='EngineLoaderNegative.NoEffectiveSchemaAtDeclaredOpsetRejected'` | pass (1/1) | 2026-10-22 | `LayerNormalization` at declared 11 names `ln0`, `LayerNormalization`, `declared opset 11`, `no effective schema`, and `first schema is 17`. |
-| V-4 | `cmake -S . -B build -DNERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx && cmake --build build --parallel "$(nproc)" && NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ctest --test-dir build --output-on-failure` | pass (13/13) | 2026-10-22 | `nert_loader` 101/101, `nert_executor`, and `nert_opset_table` included. Environment note: the older `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export (GlobalAveragePool/Flatten, 42 initializers) and fails fixture-content assertions in the loader and shape suites; it is not the pinned reference. |
-| V-5 | `git diff --stat`; `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_color=no` | pass (101/101) | 2026-10-22 | `src/opset_normalize.{hpp,cpp}` are unmodified; the legacy Softmax expansion and all negative normalizer tests pass. |
-| V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 101/101; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
+| V-4 | `cmake -S . -B build -DNERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx && cmake --build build --parallel "$(nproc)" && NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ctest --test-dir build --output-on-failure` | pass (13/13) | 2026-10-22 | `nert_loader` 104/104, `nert_executor`, and `nert_opset_table` included. Environment note: the older `/tmp/opencode/resnet18_export/resnet18.onnx` is a different export (GlobalAveragePool/Flatten, 42 initializers) and fails fixture-content assertions in the loader and shape suites; it is not the pinned reference. |
+| V-5 | `git diff --stat`; `NERT_FIXTURE=/tmp/opencode/resnet18_op19.onnx ./build/test/nert_loader_test --gtest_color=no` | pass (104/104) | 2026-10-22 | `src/opset_normalize.{hpp,cpp}` are unmodified; the legacy Softmax expansion and all negative normalizer tests pass. |
+| V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 104/104; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
 | V-7 | `nert_loader_negative` reduce-form tests | pass | 2026-10-22 | Five tests: pre-18 input, empty-string input, attribute at 18, noop before 18, and ReduceMax noop at 18 as a capability gap; each names node/op/declared/effective. |
 | V-8 | `ctest --test-dir build-gpu -R 'nert_cuda_misc|nert_cuda_kernels|nert_opencl_kernels|nert_opencl_reduce_extra|nert_opencl_index_extra|nert_opencl_owlv2_rows'` | pass (6/6) | 2026-10-22 | CUDA Mean/L2/Max and OpenCL Mean/L2/Max attribute forms match the CPU oracle. HIP has no reduce rows; recorded gap. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

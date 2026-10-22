@@ -1096,7 +1096,7 @@ TEST_F(EngineLoader, HermeticOpsetRangeElevenToEighteen)
 // Opset-13 ReduceMean/ReduceL2/ReduceMax keep axes in an attribute. The loader
 // leaves the source form in place: one input, the `axes` attribute, and no
 // synthesized axes initializer.
-TEST_F(EngineLoader, HermeticReduceAxesAttributeCanonicalized)
+TEST_F(EngineLoader, HermeticReduceAxesAttributePreserved)
 {
     for (const std::string& op :
         { std::string("ReduceMean"), std::string("ReduceL2"),
@@ -1163,9 +1163,9 @@ TEST_F(EngineLoader, HermeticReduceAxesNameCollision)
     EXPECT_EQ(second.initializers.count("reduce0/axes"), 1U);
 }
 
-// An empty axes list and invalid axes keep their normal reduce semantics:
+// An empty axes attribute and invalid axes keep their normal reduce semantics:
 // empty means every axis; duplicates and out-of-range values are rejected by
-// shape inference after the attribute has become an input.
+// shape inference while the attribute is still in place.
 TEST_F(EngineLoader, HermeticReduceAxesEmptyAndInvalid)
 {
     auto load = [](const std::vector<int64_t>& axes, const std::vector<int64_t>& out_dims) {
@@ -1194,7 +1194,7 @@ TEST_F(EngineLoader, HermeticReduceAxesEmptyAndInvalid)
     EXPECT_THROW(nert::Model(out_of_range, {{"x", {2, 3, 4}}}, nert::CpuDevice()), nert::ModelLoadException);
 }
 
-// The canonicalized opset-13 graph executes exactly like the opset-18 form.
+// The opset-13 graph executes exactly like the opset-18 form.
 TEST_F(EngineLoader, HermeticOpset13ReduceMeanMatchesOpset18)
 {
     std::vector<float> values;
@@ -2511,6 +2511,23 @@ TEST_F(EngineLoaderNegative, ReduceEmptyAxesInputBeforeOpset18Rejected)
         << "message: " << message;
     EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
+}
+
+// The explicit default noop=0 on ReduceMax is valid and needs no capability
+// rejection; only the nonzero identity form is a tracked gap.
+TEST_F(EngineLoader, HermeticReduceMaxNoopZeroAtOpset18Accepted)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer_int64("axes", {1}, {1}));
+    put_sub(body, 1, encode_node("rmax0", "ReduceMax", {"x", "axes"}, {"y"},
+                      {encode_attribute_int("noop_with_empty_axes", 0)}));
+    put_sub(body, 11, encode_value_info("x", 1, {2, 3, 4}));
+    put_sub(body, 12, encode_value_info("y", 1, {2, 1, 4}));
+
+    const nert::Graph graph = nert::LoadGraphFromFile(
+        write_model_bytes("reduce_max_noop0_18.onnx", encode_model(body, 18)));
+    ASSERT_EQ(graph.nodes.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().op_type, "ReduceMax");
 }
 
 // ReduceMax schema 18 defines noop_with_empty_axes, but the identity behavior

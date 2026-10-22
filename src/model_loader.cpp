@@ -1458,18 +1458,23 @@ void validate_reduce_axes_form(const Node& node, int64_t declared_opset)
         node.op_type != "ReduceMax") {
         return;
     }
-    auto has_attribute = [&node](const std::string& name) {
+    auto find_attribute = [&node](const std::string& name) -> const Attribute* {
         for (const Attribute& attribute : node.attributes) {
             if (attribute.name == name) {
-                return true;
+                return &attribute;
             }
         }
-        return false;
+        return nullptr;
+    };
+    auto has_attribute = [&find_attribute](const std::string& name) {
+        return find_attribute(name) != nullptr;
     };
     // Any second operand is illegal before schema 18, including the empty
     // string form an exporter may use for an omitted optional input.
     const bool has_axes_input = node.inputs.size() > 1;
-    const std::string prefix = attr_msg_prefix(node.name, node.op_type);
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
     const std::string context = " (declared opset " +
         std::to_string(declared_opset) + ", effective schema " +
         std::to_string(node.schema_version) + ")";
@@ -1492,11 +1497,15 @@ void validate_reduce_axes_form(const Node& node, int64_t declared_opset)
             ": the 'axes' attribute is only valid before schema " +
             std::to_string(kReduceAxesInputSchema) + context);
     }
-    if (node.op_type == "ReduceMax" &&
-        has_attribute("noop_with_empty_axes")) {
-        throw ModelLoadException(prefix +
-            ": ReduceMax 'noop_with_empty_axes' is not implemented" + context +
-            " (tracked follow-up)");
+    if (node.op_type == "ReduceMax") {
+        const Attribute* noop = find_attribute("noop_with_empty_axes");
+        const int64_t* value = noop == nullptr
+            ? nullptr : std::get_if<int64_t>(&noop->value);
+        if (value != nullptr && *value != 0) {
+            throw ModelLoadException(prefix +
+                ": ReduceMax 'noop_with_empty_axes' is not implemented" +
+                context + " (tracked follow-up)");
+        }
     }
 }
 

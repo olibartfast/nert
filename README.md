@@ -189,7 +189,8 @@ declared opset, effective version, and the missing capability. Operators and
 dtypes outside the implemented set keep their existing explicit rejections.
 Current guards include
 `Cast.saturate` (19+), `Cast.round_mode` (24+), `Pad.mode="wrap"` (19+),
-`AveragePool.dilations` (19+), and `Range.stash_type` (27+). `GridSample` at
+`AveragePool.dilations` (19+), `Range.stash_type` (27+), and nonzero
+`ReduceMax.noop_with_empty_axes` at schema 18. `GridSample` at
 effective 20+ is rejected because its mode default and value domain changed;
 the opset-16 behavior is implemented. Nothing is silently ignored.
 
