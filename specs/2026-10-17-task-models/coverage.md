@@ -107,8 +107,9 @@ RT-DETRv4-s full-model CUDA gate.
 
 - **Opset policy.** NERT loads declared opsets 11 and above. Every source
   node records its effective schema; shape inference and the device rows
-  resolve the supported version-dependent forms in place, and the generated
-  schema table rejects unimplemented attributes, values, or behaviors.
+  resolve the supported version-dependent forms in place, and the full-history
+  schema catalog generated from `tools/opset_manifest.py` rejects
+  unimplemented attributes, values, or behaviors. There is no canonical opset.
   Models below 11 are still pinned or converted, and conversion does not
   prove semantic equivalence. See `specs/2026-10-22-version-aware-opsets/`;
   the older range/newer-than-18 packets are historical.

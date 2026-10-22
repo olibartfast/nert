@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "axes_form.hpp" // private src-local shared axes/reduction form resolver
-#include "opset_compat.hpp" // private src-local newer-opset gate
+#include "opset_compat.hpp" // private src-local schema implementation gate
 #include "reduce_axes.hpp" // private src-local shared reduce-form resolver
 #include "wire_reader.hpp" // private src-local reader
 
@@ -630,8 +630,8 @@ const std::unordered_map<std::string, AttrSlot>& reducemean_attrs()
 }
 
 // ReduceSum took axes as an input at opset 13; the pre-13 form uses the
-// attribute. The normalizer rejects whichever form the declared version does
-// not allow.
+// attribute. The form validator rejects whichever form the effective schema
+// does not allow, and consumers resolve the source form in place.
 const std::unordered_map<std::string, AttrSlot>& reducesum_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
@@ -765,7 +765,7 @@ const std::unordered_map<std::string, AttrSlot>& softmax_attrs()
 const std::unordered_map<std::string, AttrSlot>& squeeze_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "axes", AttrSlot::IntList },
     };
     return k;
@@ -774,7 +774,7 @@ const std::unordered_map<std::string, AttrSlot>& squeeze_attrs()
 const std::unordered_map<std::string, AttrSlot>& unsqueeze_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "axes", AttrSlot::IntList },
     };
     return k;
@@ -784,7 +784,7 @@ const std::unordered_map<std::string, AttrSlot>& split_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "axis", AttrSlot::Int },
-        // Pre-13 form, consumed by the loader's opset normalizer.
+        // Pre-13 form, resolved in place from the effective schema.
         { "split", AttrSlot::IntList },
     };
     return k;
@@ -842,7 +842,7 @@ const std::unordered_map<std::string, AttrSlot>& einsum_attrs()
 const std::unordered_map<std::string, AttrSlot>& scatternd_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
-        // Added at opset 16; the normalizer accepts only the default "none".
+        // Added at opset 16; form validation accepts only the default "none".
         { "reduction", AttrSlot::Str },
     };
     return k;
@@ -1246,7 +1246,7 @@ NodeRaw read_node_raw(const uint8_t* data, size_t size)
 
 } // namespace
 
-// Opset-18 value policies pinned to the surveyed detection surface. Attribute
+// Value policies pinned to the implemented detection surface. Attribute
 // names are already restricted by allowed_attributes(); here values outside
 // the fixture's surface reject with node + op context.
 void validate_attr_policy(Node& node)
@@ -1686,11 +1686,11 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
     node.inputs = raw.inputs;
     node.outputs = raw.outputs;
 
-    // Resolve the effective ONNX schema for every source node. This is
-    // metadata in Phase A; the normalizer still canonicalizes older forms.
+    // Resolve the effective ONNX schema for every source node. Shape
+    // inference and the kernels select the source form from this version.
     node.schema_version = ResolveNodeSchemaVersion(node.name, node.op_type, declared_opset);
 
-    // Decode every attribute name/value first. The newer-opset gate must see
+    // Decode every attribute name/value first. The schema gate must see
     // attributes that the strict allowlist is about to reject (for example
     // Cast.saturate), so it can name the effective schema and capability.
     std::vector<AttrPatch> patches;

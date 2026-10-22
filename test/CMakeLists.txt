@@ -352,7 +352,7 @@ if(NERT_ENABLE_OPENCL)
     add_test(NAME nert_opencl_conv_transpose COMMAND nert_opencl_conv_transpose_test)
 endif()
 
-# Generated opset compatibility table freshness. The generator is a
+# Generated full-history schema catalog freshness. The generator is a
 # development-only Python tool; add the check only when Python and the pinned
 # ONNX package are available, so runtime-only builds do not acquire a Python
 # dependency.

@@ -172,7 +172,7 @@ Follow-up capability slices (rejected explicitly today): `Cast.saturate`,
 `Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`, `Range.stash_type`,
 and `GridSample` opset-20 semantics.
 
-### Version-aware opsets (Phases A–D validated 2026-10-22; Phase E pending)
+### Version-aware opsets (Phases A–E validated 2026-10-22)
 
 `specs/2026-10-22-version-aware-opsets/` replaces the global opset-18
 canonical target with per-node effective schema metadata and version-aware
@@ -185,8 +185,9 @@ inference plus the CPU/CUDA/OpenCL reduce rows. Phase C does the same for
 `ScatterND.reduction`. Phase D implements legacy `Softmax`'s 2-D coercion
 directly in the CPU/CUDA/OpenCL/HIP rows and deletes the normalizer; there is
 no global load-time canonicalization pass left. Phase E removes the
-baseline-18 catalog policy and finishes the docs. This supersedes decisions
-`D-1` and `D-4` of the opset-range packet.
+baseline-18 catalog policy, replaces it with the reviewed per-operator
+implementation manifest in `tools/opset_manifest.py`, and updates the docs.
+This supersedes decisions `D-1` and `D-4` of the opset-range packet.
 
 ## Tooling — Memory Footprint Report (Planned)
 

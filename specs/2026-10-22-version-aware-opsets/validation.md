@@ -112,21 +112,33 @@ assertions.
   decomposition and remains a recorded hardware gap.
 - [x] [V-14] Normalizer removal belongs to [R-3]/[T-19]: no
   `opset_normalize` source, build entry, include, call, or test remains.
-- [ ] [V-15] No global opset constant belongs to [R-3]: no
+- [x] [V-15] No global opset constant belongs to [R-3]: no
   `BASELINE_OPSET` or `opset-18 IR` policy remains in runtime or generator.
-  Runtime progress: the compatibility gate now applies to every declaration,
-  not only `>18`; historical rows are accepted after form validation.
-  Remaining: the generator still uses its baseline-18 catalog classification
-  and `BASELINE_OPSET`; this is the Phase E2 catalog-manifest work.
+  Verified 2026-10-22: `tools/gen_opset_compat.py` has no baseline constant
+  or baseline-relative classification; it reads the reviewed
+  `tools/opset_manifest.py`, and `rg` finds no `BASELINE_OPSET`,
+  `Historical`, `Equivalent`, `AdditiveAttributes`, or `opset-18 IR` in
+  `tools/`, `src/`, `include/`, or `test/`.
 
 ## Phase E — catalog/docs cleanup
 
-- [ ] [V-16] Catalog policy belongs to [R-2]/[D-4]: the table resolves the
+- [x] [V-16] Catalog policy belongs to [R-2]/[D-4]: the table resolves the
   effective schema and gates implemented capabilities without a baseline-18
-  comparison; freshness still fails after a deliberate edit.
-- [ ] [V-17] Documentation belongs to [R-8]: README, tech-stack Q-1, roadmap,
+  comparison; freshness still fails after a deliberate edit. Verified
+  2026-10-22: the generated table uses `Implemented`, `GuardedAttributes`,
+  `ValueDomain`, and `BehaviorChange`; the manifest guards historical
+  attributes (`ConvTranspose.output_shape`), schema-18 attributes
+  (`Resize.axes`, `Split.num_outputs`), values (`ScatterND` non-`none`), and
+  behavior changes (`GridSample` 20+, pre-11 `Resize`, pre-6 `Tile`).
+  `--check` passes for the committed table and fails after a deliberate row
+  edit.
+- [x] [V-17] Documentation belongs to [R-8]: README, tech-stack Q-1, roadmap,
   coverage, and CHANGELOG describe per-node effective schemas and the
-  remaining rejected post-18 capabilities.
+  remaining rejected post-18 capabilities. Verified 2026-10-22: README's
+  opset policy and legacy-Softmax note were corrected; tech-stack Q-1 and
+  the ONNX input row describe the implementation manifest; roadmap marks
+  Phase E; coverage already describes the in-place policy; CHANGELOG
+  replaces the historical-row wording and names the manifest.
 - [x] [V-18] Formatting and warnings: `scripts/format.sh --check` exits 0;
   the build uses the existing `-Wall -Wextra -Wpedantic` policy. Verified
   2026-10-22: 239 files formatted; build warnings are pre-existing test
@@ -149,7 +161,10 @@ assertions.
 | V-12 | `HermeticLegacySoftmaxDirect`, `HermeticLegacySoftmaxIntermediateInput`; CPU `SoftmaxLegacyDefaultAxisCoerces2D` | pass | 2026-10-22 | One Softmax node in the graph; no rank metadata needed for the intermediate input. |
 | V-13 | GPU `nert_cuda_activations` + `nert_opencl_kernels`; CPU legacy Softmax test | pass | 2026-10-22 | [2,2,3] default-axis legacy output is 1/6 per element on all built devices. HIP not built. |
 | V-14 | `rg opset_normalize`; `git ls-files`; CMake source list | pass | 2026-10-22 | Files removed; no include/call/build entry remains. |
-| V-15a | loader runs compatibility gate for declared 11/13/18/19/27; full CPU/GPU suites | pass | 2026-10-22 | Historical rows accepted after form validation; no `declared_opset > 18` branch. Generator baseline remains for Phase E2. |
+| V-15a | loader runs compatibility gate for declared 11/13/18/19/27; full CPU/GPU suites | pass | 2026-10-22 | The gate runs for every declaration; no `declared_opset > 18` branch. Historical rows are now classified by the manifest instead of accepted as a baseline-relative category. |
+| V-15 | `rg -n -e 'BASELINE_OPSET' -e 'Historical' -e 'Equivalent' -e 'AdditiveAttributes' -e 'opset-18 IR' tools src include test`; `python3 tools/gen_opset_compat.py --check` | pass (no matches; 288 entries) | 2026-10-22 | Generator reads `tools/opset_manifest.py`; no baseline constant or baseline-relative class remains. |
+| V-16 | `python3 tools/gen_opset_compat.py --check`; `EngineLoaderNegative.ConvTransposeOutputShapeRejectedByManifest`, `.ResizeAxesAtSchemaEighteenRejected`, `.SplitNumOutputsAtSchemaEighteenRejected`; `ctest --test-dir build` | pass (13/13; 3/3 targeted) | 2026-10-22 | Table classes are `Implemented`/`GuardedAttributes`/`ValueDomain`/`BehaviorChange`. A deliberate row edit makes `--check` fail (restored immediately). New guards reject `ConvTranspose.output_shape` at effective 11 and `Resize.axes`/`Split.num_outputs` at effective 18 with node/op/version context. |
+| V-17 | documentation review: `README.md`, `specs/tech-stack.md`, `specs/roadmap.md`, `specs/2026-10-17-task-models/coverage.md`, `CHANGELOG.md` | pass | 2026-10-22 | Per-node effective schemas and the implementation manifest are documented; legacy Softmax no longer claims a static-rank requirement. |
 | V-10 | loader `ScatterNDReductionNonePreserved` and negative pre-16/non-none tests | pass | 2026-10-22 | `reduction` attribute remains; only `none`/absent accepted. |
 | V-11 | code review + `UnsqueezeOldAttributeForm` CPU/device tests | pass | 2026-10-22 | Squeeze copies bytes; Unsqueeze resolves axes at entry, not per element. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

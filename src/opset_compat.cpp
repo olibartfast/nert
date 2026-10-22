@@ -1,5 +1,5 @@
-// Load-time opset compatibility table lookup and guards.
-// See opset_compat.hpp and tools/gen_opset_compat.py.
+// Load-time full-history schema catalog lookup and implementation guards.
+// See opset_compat.hpp, tools/gen_opset_compat.py, and tools/opset_manifest.py.
 
 #include "opset_compat.hpp"
 
@@ -17,14 +17,14 @@ struct OpsetSchemaInfo {
     const char* op_type;
     int64_t since_version;
     OpsetCompatibility compatibility;
-    const char* added_attributes;
+    const char* unsupported_attributes;
     const char* guarded_values;
     const char* reason;
 };
 
 static constexpr OpsetSchemaInfo kOpsetSchemaTable[] = {
-#define NERT_OPSET_ENTRY(op, version, compatibility, added, guards, why)                                               \
-    {op, version, OpsetCompatibility::compatibility, added, guards, why},
+#define NERT_OPSET_ENTRY(op, version, compatibility, unsupported, guards, why)                                         \
+    {op, version, OpsetCompatibility::compatibility, unsupported, guards, why},
 #include "opset_compat_table.inc"
 #undef NERT_OPSET_ENTRY
 };
@@ -123,10 +123,7 @@ void CheckNodeCompatibility(const std::string& node_name, const std::string& op_
     }
     const std::string versions = version_text(declared_opset, schema->since_version);
 
-    if (schema->compatibility == OpsetCompatibility::Historical) {
-        // Supported historical schema. The loader's version-aware form
-        // validation covers the old attribute/input forms; the table has no
-        // post-baseline guards to apply here.
+    if (schema->compatibility == OpsetCompatibility::Implemented) {
         return;
     }
 
@@ -136,7 +133,7 @@ void CheckNodeCompatibility(const std::string& node_name, const std::string& op_
                                  "; this behavior is not implemented" + versions + " (tracked follow-up)");
     }
 
-    for (const std::string& attribute : split_csv(schema->added_attributes)) {
+    for (const std::string& attribute : split_csv(schema->unsupported_attributes)) {
         if (find_attribute(attributes, attribute) != nullptr) {
             throw ModelLoadException(prefix + ": attribute " + quote(attribute) + " is not implemented" + versions +
                                      " (tracked follow-up: " + op_type + "." + attribute + ")");

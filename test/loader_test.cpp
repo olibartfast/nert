@@ -2899,6 +2899,66 @@ TEST_F(EngineLoaderNegative, NewerRangeStashTypeRejected)
         << "message: " << message;
 }
 
+// A historical schema that carries an unimplemented attribute is guarded by
+// the full-history manifest. ConvTranspose.output_shape is legal at schema 11
+// but has no kernel or shape-inference implementation.
+TEST_F(EngineLoaderNegative, ConvTransposeOutputShapeRejectedByManifest)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("w", {1, 1, 2, 2}, {1.0F, 1.0F, 1.0F, 1.0F}));
+    put_sub(body, 1, encode_node("ct0", "ConvTranspose", {"x", "w"}, {"y"},
+                      {encode_attribute_ints("output_shape", {2, 2})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 1, 2, 2}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 1, 3, 3}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 11), "convtranspose_output_shape_11.onnx");
+    EXPECT_NE(message.find("ct0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("ConvTranspose"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("output_shape"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 11"), std::string::npos) << "message: " << message;
+}
+
+// Resize.axes is a schema-18 attribute but the kernel and shape inference do
+// not consume it, so the manifest guards it instead of silently ignoring it.
+TEST_F(EngineLoaderNegative, ResizeAxesAtSchemaEighteenRejected)
+{
+    std::string body;
+    put_sub(body, 5, encode_initializer("scales", {4}, {1.0F, 1.0F, 1.0F, 1.0F}));
+    put_sub(body, 1, encode_node("resize0", "Resize", {"x", "", "scales"}, {"y"},
+                      {encode_attribute_ints("axes", {2, 3})}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 3, 8, 8}));
+    put_sub(body, 12, encode_value_info("y", 1, {1, 3, 8, 8}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "resize_axes_18.onnx");
+    EXPECT_NE(message.find("resize0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("Resize"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("axes"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos) << "message: " << message;
+}
+
+// Split.num_outputs is legal at schema 18 but is not implemented by the
+// source-form Split path.
+TEST_F(EngineLoaderNegative, SplitNumOutputsAtSchemaEighteenRejected)
+{
+    std::string body;
+    put_sub(body, 1, encode_node("split0", "Split", {"x"}, {"y0", "y1"},
+                      {encode_attribute_int("axis", 1),
+                          encode_attribute_int("num_outputs", 2)}));
+    put_sub(body, 11, encode_value_info("x", 1, {1, 4}));
+    put_sub(body, 12, encode_value_info("y0", 1, {1, 2}));
+    put_sub(body, 12, encode_value_info("y1", 1, {1, 2}));
+
+    const std::string message =
+        load_error_message(encode_model(body, 18), "split_num_outputs_18.onnx");
+    EXPECT_NE(message.find("split0"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("Split"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("num_outputs"), std::string::npos) << "message: " << message;
+    EXPECT_NE(message.find("effective schema 18"), std::string::npos) << "message: " << message;
+}
+
 // GridSample's schema-20 mode default/value change is a behavior change, so
 // every GridSample node at effective 20+ is rejected until implemented.
 TEST_F(EngineLoaderNegative, NewerGridSampleBehaviorChangeRejected)

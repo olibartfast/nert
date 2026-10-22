@@ -2,3 +2,5 @@ build*/
 fixtures/
 *.onnx
 *.onnx.data
+__pycache__/
+*.pyc
