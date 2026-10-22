@@ -1913,8 +1913,23 @@ std::vector<TensorInfo> split_shapes(const StaticContext& ctx, const Node& node,
         fail(node, "Split must produce at least one output");
     }
     std::vector<int64_t> parts;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    bool parts_supplied = false;
+    const SplitForm split_form = ResolveSplitForm(node);
+    if (split_form.source == AxesSource::Attribute) {
+        if (split_form.split_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(split_form.split_attribute);
+            if (values == nullptr) {
+                fail(node, "Split 'split' attribute must be an integer list");
+            }
+            parts = *values;
+            parts_supplied = true;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         parts = int64_constant(ctx, node, node.inputs[1]);
+        parts_supplied = true;
+    }
+    if (parts_supplied) {
         if (parts.size() != count) {
             fail(node, "Split split sizes must match the output count");
         }

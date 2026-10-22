@@ -1517,8 +1517,8 @@ TEST_F(EngineLoader, HermeticLegacyUnsqueezePreserved)
     }
 }
 
-// Split's `split` attribute becomes the optional int64 input.
-TEST_F(EngineLoader, HermeticLegacySplitCanonicalized)
+// Split's pre-13 `split` attribute stays in the graph and is read in place.
+TEST_F(EngineLoader, HermeticLegacySplitPreserved)
 {
     std::vector<float> values;
     for (int i = 0; i < 24; ++i) {
@@ -1536,13 +1536,10 @@ TEST_F(EngineLoader, HermeticLegacySplitCanonicalized)
     const nert::Graph graph = nert::LoadGraphFromFile(
         write_model_bytes("split_attr_11.onnx", encode_model(body, 11)));
     ASSERT_EQ(graph.nodes.size(), 1U);
-    ASSERT_EQ(graph.nodes.front().inputs.size(), 2U);
-    EXPECT_EQ(graph.nodes.front().inputs[1], "sp0/split");
-    ASSERT_EQ(graph.nodes.front().attributes.size(), 1U);
-    EXPECT_EQ(graph.nodes.front().attributes.front().name, "axis");
-    const auto init = graph.initializers.find(graph.nodes.front().inputs[1]);
-    ASSERT_NE(init, graph.initializers.end());
-    EXPECT_EQ(std::get<std::vector<int64_t>>(init->second.values), (std::vector<int64_t>{1, 2}));
+    ASSERT_EQ(graph.nodes.front().inputs.size(), 1U);
+    EXPECT_EQ(graph.nodes.front().schema_version, 11);
+    ASSERT_EQ(graph.nodes.front().attributes.size(), 2U);
+    EXPECT_EQ(graph.initializers.count("sp0/split"), 0U);
 
     nert::Model model(graph, { { "x", { 2, 3, 4 } } }, nert::CpuDevice());
     const nert::InferenceResult result = model.Run({ { "x", values } });
@@ -2675,7 +2672,11 @@ TEST_F(EngineLoaderNegative, LegacySplitAttributeAtThirteenRejected)
         << "message: " << message;
     EXPECT_NE(message.find("split"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("opset 13"), std::string::npos)
+    EXPECT_NE(message.find("schema 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 13"), std::string::npos)
         << "message: " << message;
 }
 
@@ -2718,7 +2719,11 @@ TEST_F(EngineLoaderNegative, LegacySplitInputBeforeThirteenRejected)
         << "message: " << message;
     EXPECT_NE(message.find("split"), std::string::npos)
         << "message: " << message;
-    EXPECT_NE(message.find("only valid from opset 13"), std::string::npos)
+    EXPECT_NE(message.find("requires schema 13"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("declared opset 11"), std::string::npos)
+        << "message: " << message;
+    EXPECT_NE(message.find("effective schema 11"), std::string::npos)
         << "message: " << message;
 }
 

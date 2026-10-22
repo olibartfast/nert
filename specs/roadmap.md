@@ -172,7 +172,7 @@ Follow-up capability slices (rejected explicitly today): `Cast.saturate`,
 `Cast.round_mode`, `Pad.wrap`, `AveragePool.dilations`, `Range.stash_type`,
 and `GridSample` opset-20 semantics.
 
-### Version-aware opsets (Phases A–B validated 2026-10-22; Phases C–E pending)
+### Version-aware opsets (Phases A–C validated 2026-10-22; Phases D–E pending)
 
 `specs/2026-10-22-version-aware-opsets/` replaces the global opset-18
 canonical target with per-node effective schema metadata and version-aware
@@ -180,10 +180,11 @@ shape/kernel resolution. Phase A adds `Graph.declared_opset` and
 `Node.schema_version` and extends the generated catalog to the full schema
 history while keeping the normalizer behavior-neutral. Phase B keeps the
 pre-18 reduce `axes` attribute in the graph and resolves it in shape
-inference plus the CPU/CUDA/OpenCL reduce rows; the reduce rewrite is gone.
-Later phases remove the remaining axes/split rewrites, implement legacy
-`Softmax` directly, and delete the normalizer. This supersedes decisions
-`D-1` and `D-4` of the opset-range packet.
+inference plus the CPU/CUDA/OpenCL reduce rows. Phase C does the same for
+`ReduceSum`/`Squeeze`/`Unsqueeze` axes, Split's `split`, and
+`ScatterND.reduction`; only legacy `Softmax` still expands at load. Phase D
+implements legacy `Softmax` directly and deletes the normalizer. This
+supersedes decisions `D-1` and `D-4` of the opset-range packet.
 
 ## Tooling — Memory Footprint Report (Planned)
 

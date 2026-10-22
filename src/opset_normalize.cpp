@@ -18,7 +18,6 @@
 namespace nert {
 namespace {
 
-constexpr int64_t kAxesAsInputOpset = 13;
 constexpr int64_t kSoftmaxCoercionOpset = 13;
 
 std::string node_label(const Node& node) {
@@ -37,15 +36,6 @@ const Attribute* find_attribute(const Node& node, const std::string& name) {
     return nullptr;
 }
 
-void erase_attribute(Node& node, const std::string& name) {
-    for (auto it = node.attributes.begin(); it != node.attributes.end(); ++it) {
-        if (it->name == name) {
-            node.attributes.erase(it);
-            return;
-        }
-    }
-}
-
 int64_t int_attribute_or(const Node& node, const std::string& name, int64_t fallback, const std::string& who) {
     const Attribute* attribute = find_attribute(node, name);
     if (attribute == nullptr) {
@@ -56,14 +46,6 @@ int64_t int_attribute_or(const Node& node, const std::string& name, int64_t fall
         throw ModelLoadException(who + ": '" + name + "' must be an integer");
     }
     return *value;
-}
-
-std::vector<int64_t> int_list_attribute(const Attribute& attribute, const std::string& who) {
-    const std::vector<int64_t>* values = std::get_if<std::vector<int64_t>>(&attribute.value);
-    if (values == nullptr) {
-        throw ModelLoadException(who + ": '" + attribute.name + "' must be an integer list");
-    }
-    return *values;
 }
 
 // Stable, collision-free names for synthesized nodes, tensors, and
@@ -144,49 +126,6 @@ std::optional<int64_t> known_rank(const Graph& graph, const std::string& name) {
     return static_cast<int64_t>(dims->size());
 }
 
-// Appends an Int64 initializer as the next node input and records it in the
-// tensor table. The caller erases the old attribute.
-void append_int64_input(Graph& graph, NameAllocator& names, Node& node, const std::vector<int64_t>& values,
-                        const std::string& suffix) {
-    const std::string name = names.Fresh(node_base(node) + "/" + suffix);
-    Initializer initializer;
-    initializer.dtype = DataType::Int64;
-    initializer.dims = {static_cast<int64_t>(values.size())};
-    initializer.values = values;
-    graph.initializers.emplace(name, std::move(initializer));
-    graph.tensors[name] = TensorInfo{DataType::Int64, {static_cast<int64_t>(values.size())}};
-    node.inputs.push_back(name);
-}
-
-// Split's `split` moved from an attribute (11) to an optional input (13). An
-// empty list cannot describe any output partition and is rejected.
-void canonicalize_split(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    const std::string who = node_label(node);
-    const Attribute* split_attribute = find_attribute(node, "split");
-
-    if (declared_opset >= kAxesAsInputOpset) {
-        if (split_attribute != nullptr) {
-            throw ModelLoadException(who + ": 'split' must be an input at opset " + std::to_string(declared_opset) +
-                                     ", not an attribute");
-        }
-        return;
-    }
-    if (node.inputs.size() > 1) {
-        throw ModelLoadException(who + ": the 'split' input is only valid from opset 13; this model declares " +
-                                 "opset " + std::to_string(declared_opset));
-    }
-    if (split_attribute == nullptr) {
-        return;
-    }
-
-    const std::vector<int64_t> split = int_list_attribute(*split_attribute, who);
-    if (split.empty()) {
-        throw ModelLoadException(who + ": 'split' must not be empty at opset " + std::to_string(declared_opset));
-    }
-    append_int64_input(graph, names, node, split, "split");
-    erase_attribute(node, "split");
-}
-
 // Softmax before opset 13 coerced the input to 2D at `axis` and normalized
 // over the second dimension. Opset 13 changed both the default (1 -> -1) and
 // the semantics to a single-axis softmax. Preserve the old behavior with
@@ -258,12 +197,6 @@ void rewrite_legacy_softmax(const Graph& graph, NameAllocator& names, Node& node
     out.push_back(std::move(reshape));
 }
 
-void normalize_node(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    if (node.op_type == "Split") {
-        canonicalize_split(graph, names, node, declared_opset);
-    }
-}
-
 } // namespace
 
 void NormalizeGraphForOpset(Graph& graph, int64_t declared_opset) {
@@ -274,7 +207,6 @@ void NormalizeGraphForOpset(Graph& graph, int64_t declared_opset) {
         if (node.op_type == "Softmax" && declared_opset < kSoftmaxCoercionOpset) {
             rewrite_legacy_softmax(graph, names, node, declared_opset, rewritten);
         } else {
-            normalize_node(graph, names, node, declared_opset);
             rewritten.push_back(std::move(node));
         }
     }

@@ -96,6 +96,21 @@ inline AxesForm ResolveAxesForm(const Node& node) {
 // operand is the exporter's omitted-input placeholder, not a tensor.
 inline bool AxesInputPresent(const Node& node) { return node.inputs.size() > 1 && !node.inputs[1].empty(); }
 
+// Split moved `split` from an optional attribute (schema <13) to an optional
+// input (schema 13+). Its source form follows the same boundary as axes.
+struct SplitForm {
+    AxesSource source = AxesSource::Input;
+    const Attribute* split_attribute = nullptr;
+};
+
+inline SplitForm ResolveSplitForm(const Node& node) {
+    SplitForm resolved;
+    resolved.source = node.schema_version != 0 && node.schema_version < kAxesAsInputSchema ? AxesSource::Attribute
+                                                                                           : AxesSource::Input;
+    resolved.split_attribute = FindNodeAttribute(node, "split");
+    return resolved;
+}
+
 // Element count for an axes tensor. Unlike a data-tensor count, a zero
 // dimension is valid here: it is ONNX's present-but-empty axes operand and
 // must reach the noop/empty-axes logic rather than fail as a bad dimension.

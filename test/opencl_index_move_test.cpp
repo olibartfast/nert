@@ -117,6 +117,43 @@ TEST(NertOpenCLIndexMove, SplitUneven) {
     EXPECT_EQ(Download(ocl, dy1, 6), ref1);
 }
 
+// A pre-13 Split carries split sizes in an attribute; OpenCL and CPU agree.
+TEST(NertOpenCLIndexMove, SplitOldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F, 7.0F, 8.0F};
+    nert::Node node = MakeNode("split_attr", "Split");
+    node.schema_version = 11;
+    node.inputs = {"x"};
+    node.outputs = {"y0", "y1"};
+    SetAttr(node, "axis", 1);
+    nert::Attribute split;
+    split.name = "split";
+    split.value = std::vector<int64_t>{1, 3};
+    node.attributes.push_back(split);
+
+    std::vector<float> ref0(2, 0.0F);
+    std::vector<float> ref1(6, 0.0F);
+    nert::CpuDevice().kernels().find("Split")(node, {HostFloat(x, {2, 4})},
+                                              {HostFloat(ref0, {2, 1}), HostFloat(ref1, {2, 3})});
+    EXPECT_EQ(ref0, (std::vector<float>{1.0F, 5.0F}));
+    EXPECT_EQ(ref1, (std::vector<float>{2.0F, 3.0F, 4.0F, 6.0F, 7.0F, 8.0F}));
+
+    void* dx = Upload(ocl, x);
+    ScopedBuffer gx(ocl, dx);
+    std::vector<float> g0(2, 0.0F);
+    std::vector<float> g1(6, 0.0F);
+    void* dy0 = Upload(ocl, g0);
+    ScopedBuffer gy0(ocl, dy0);
+    void* dy1 = Upload(ocl, g1);
+    ScopedBuffer gy1(ocl, dy1);
+    nert::opencl_kernels::Split(node, {DeviceFloat(dx, {2, 4})}, {DeviceFloat(dy0, {2, 1}), DeviceFloat(dy1, {2, 3})});
+    EXPECT_EQ(Download(ocl, dy0, 2), ref0);
+    EXPECT_EQ(Download(ocl, dy1, 6), ref1);
+}
+
 // Split on axis -1 with no sizes input: int64 rows split evenly in two.
 TEST(NertOpenCLIndexMove, SplitEvenInt64) {
     if (!HasOpenCLDevice()) {

@@ -1608,6 +1608,51 @@ void validate_scatter_nd_form(const Node& node, int64_t declared_opset)
     }
 }
 
+// Split's `split` attribute moved to an optional input at schema 13. The
+// source form stays in the graph; an absent/empty input means equal parts.
+void validate_split_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "Split") {
+        return;
+    }
+    const Attribute* split_attribute = FindNodeAttribute(node, "split");
+    const bool has_split_input = node.inputs.size() > 1;
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kAxesAsInputSchema) {
+        if (has_split_input) {
+            throw ModelLoadException(prefix +
+                ": the 'split' input requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (split_attribute == nullptr) {
+            return;
+        }
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(split_attribute);
+        if (values == nullptr) {
+            throw ModelLoadException(prefix +
+                ": 'split' must be an integer list" + context);
+        }
+        if (values->empty()) {
+            throw ModelLoadException(prefix +
+                ": 'split' must not be empty before schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        return;
+    }
+    if (split_attribute != nullptr) {
+        throw ModelLoadException(prefix +
+            ": the 'split' attribute is only valid before schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+}
+
 Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
 {
     const NodeRaw raw = read_node_raw(data, size);
@@ -1698,6 +1743,7 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
     validate_reduce_axes_form(node, declared_opset);
     validate_axes_op_form(node, declared_opset);
     validate_scatter_nd_form(node, declared_opset);
+    validate_split_form(node, declared_opset);
     return node;
 }
 

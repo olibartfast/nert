@@ -90,8 +90,9 @@ assertions.
   execute in place and match their input-form equivalents. Verified
   2026-10-22: loader source-form preservation/execution tests, CPU kernel
   old-form tests, and CUDA/OpenCL `ReduceSum`/`Unsqueeze` parity.
-- [ ] [V-9b] `Split`'s old attribute form executes in place and matches the
-  input form. Deferred to Phase C2.
+- [x] [V-9b] `Split`'s old attribute form executes in place and matches the
+  input form. Verified 2026-10-22: loader source-form preservation/execution,
+  CPU kernel old-form test, CUDA/OpenCL parity, and loader negative tests.
 - [x] [V-10] `ScatterND.reduction="none"` remains accepted from schema 16;
   other values and pre-16 use are rejected. The attribute stays in the graph.
 - [x] [V-11] `Squeeze` / `Unsqueeze` kernels remain layout-only for the data
@@ -138,6 +139,7 @@ assertions.
 | V-7 | `nert_loader_negative` reduce-form tests | pass | 2026-10-22 | Five tests: pre-18 input, empty-string input, attribute at 18, noop before 18, and ReduceMax noop at 18 as a capability gap; each names node/op/declared/effective. |
 | V-8 | `ctest --test-dir build-gpu -R 'nert_cuda_misc|nert_cuda_kernels|nert_opencl_kernels|nert_opencl_reduce_extra|nert_opencl_index_extra|nert_opencl_owlv2_rows'` | pass (6/6) | 2026-10-22 | CUDA Mean/L2/Max and OpenCL Mean/L2/Max attribute forms match the CPU oracle. HIP has no reduce rows; recorded gap. |
 | V-9a | CPU `ctest`; loader legacy-form tests; kernel `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; CUDA `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; OpenCL counterparts | pass | 2026-10-22 | Source form stays in the graph; CPU 13/13, GPU filtered 8/8. |
+| V-9b | loader `HermeticLegacySplitPreserved` + Split negatives; CPU `SplitOldAttributeForm`; CUDA/OpenCL Split old-form | pass | 2026-10-22 | Source `split` attribute stays; CPU 13/13, GPU `nert_cuda_concat` + `nert_opencl_index_move` pass. |
 | V-10 | loader `ScatterNDReductionNonePreserved` and negative pre-16/non-none tests | pass | 2026-10-22 | `reduction` attribute remains; only `none`/absent accepted. |
 | V-11 | code review + `UnsqueezeOldAttributeForm` CPU/device tests | pass | 2026-10-22 | Squeeze copies bytes; Unsqueeze resolves axes at entry, not per element. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

@@ -1692,6 +1692,27 @@ TEST(NertKernels, SplitUnequalSizes) {
     EXPECT_EQ(out1, (std::vector<float>{2.0f, 3.0f, 4.0f, 6.0f, 7.0f, 8.0f}));
 }
 
+// A pre-13 Split carries split sizes in an attribute, not an input.
+TEST(NertKernels, SplitOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Split");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<float> out0(2, 0.0f);
+    std::vector<float> out1(6, 0.0f);
+    nert::Node node = MakeNode("split_attr", "Split");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axis", int64_t{1});
+    node.attributes.emplace_back("split", std::vector<int64_t>{1, 3});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 4})};
+    std::vector<nert::TensorView> outputs = {FloatView(out0, {2, 1}), FloatView(out1, {2, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out0, (std::vector<float>{1.0f, 5.0f}));
+    EXPECT_EQ(out1, (std::vector<float>{2.0f, 3.0f, 4.0f, 6.0f, 7.0f, 8.0f}));
+}
+
 // Split with no sizes input divides evenly; negative axis, int64 data.
 TEST(NertKernels, SplitEvenNegativeAxisInt64) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Split");

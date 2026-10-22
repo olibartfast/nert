@@ -5,6 +5,7 @@
 // (downloaded from device when present). Each (output, outer-row) block is
 // one cudaMemcpy device-to-device, exactly the oracle's memcpy structure.
 
+#include "../axes_form.hpp"
 #include "nert/device.hpp"
 
 #include <cstddef>
@@ -99,7 +100,18 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
     const int64_t dim = in.dims[static_cast<std::size_t>(axis)];
 
     std::vector<int64_t> parts;
-    if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
+    bool parts_supplied = false;
+    const SplitForm split_form = ResolveSplitForm(node);
+    if (split_form.source == AxesSource::Attribute) {
+        if (split_form.split_attribute != nullptr) {
+            const std::vector<int64_t>* values = NodeAttributeIntList(split_form.split_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'split' must be an integer list");
+            }
+            parts = *values;
+            parts_supplied = true;
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& sizes = inputs[1];
         if (sizes.dtype != DataType::Int64) {
             throw InferenceException(context + ": split sizes must be int64");
@@ -114,6 +126,9 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
                                  cudaMemcpyDeviceToHost),
                       "cudaMemcpy", context);
         }
+        parts_supplied = true;
+    }
+    if (parts_supplied) {
         if (parts.size() != outputs.size()) {
             throw InferenceException(context + ": Split split sizes must match the output count");
         }
