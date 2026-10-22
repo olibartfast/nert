@@ -371,8 +371,8 @@ if(Python3_Interpreter_FOUND)
     endif()
 endif()
 
-# HIP device scaffold test (N1c-M1 on NVIDIA). Built only when the HIP device
-# layer is enabled; SKIPs at run time without a HIP-usable GPU.
+# HIP device and first-party kernel tests (N1c on NVIDIA). Built only when the
+# HIP device layer is enabled; SKIPs at run time without a HIP-usable GPU.
 if(NERT_ENABLE_HIP)
     add_executable(nert_hip_device_test hip_device_test.cpp)
     target_compile_features(nert_hip_device_test PRIVATE cxx_std_17)

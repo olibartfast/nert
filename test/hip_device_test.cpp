@@ -1,5 +1,5 @@
-// HIP device scaffold (N1c-M1 on NVIDIA): allocator, transfers, empty
-// kernel table.
+// HIP device (N1c on NVIDIA): allocator, transfers, and the 68-row
+// first-party kernel table.
 //
 // Needs a HIP-usable GPU at run time; without one every test SKIPs (never
 // fails). Presence is probed through the seam (constructing the device
@@ -31,23 +31,89 @@ TEST(NertHIPDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(hip).transfer());
 }
 
-// M2 pilot rows resolve; anything else is still null so the executor
-// rejects the node naming op + node.
-TEST(NertHIPDevice, KernelTableServesPilotRows) {
+// The first-party table resolves every hipified row. Library-backed rows
+// (rocBLAS/hipBLAS/MIOpen) remain absent so the executor rejects them.
+TEST(NertHIPDevice, KernelTableServesFirstPartyRows) {
     if (!HasHIPDevice()) {
         GTEST_SKIP() << "no HIP device";
     }
     const nert::Device& hip = nert::HipDevice();
-    EXPECT_NE(hip.kernels().find("Relu"), nullptr);
-    EXPECT_NE(hip.kernels().find("Add"), nullptr);
-    EXPECT_NE(hip.kernels().find("Mul"), nullptr);
-    EXPECT_NE(hip.kernels().find("Sub"), nullptr);
-    EXPECT_NE(hip.kernels().find("Div"), nullptr);
-    EXPECT_NE(hip.kernels().find("Sigmoid"), nullptr);
-    EXPECT_NE(hip.kernels().find("Tanh"), nullptr);
-    EXPECT_NE(hip.kernels().find("Softmax"), nullptr);
-    EXPECT_NE(hip.kernels().find("Reshape"), nullptr);
-    EXPECT_EQ(hip.kernels().find("Gemm"), nullptr);
+    const char* rows[] = {
+        "Relu",
+        "Add",
+        "Mul",
+        "Sub",
+        "Div",
+        "MaxPool",
+        "AveragePool",
+        "GlobalAveragePool",
+        "Sigmoid",
+        "Tanh",
+        "Sqrt",
+        "Erf",
+        "LayerNormalization",
+        "Sin",
+        "Cos",
+        "Exp",
+        "Elu",
+        "Log",
+        "Floor",
+        "IsNaN",
+        "Abs",
+        "Neg",
+        "Pow",
+        "Greater",
+        "Less",
+        "GreaterOrEqual",
+        "LessOrEqual",
+        "And",
+        "Or",
+        "Not",
+        "Max",
+        "Min",
+        "Clip",
+        "Identity",
+        "Squeeze",
+        "Tile",
+        "Range",
+        "EyeLike",
+        "Pad",
+        "ReduceMean",
+        "ReduceL2",
+        "ArgMax",
+        "CumSum",
+        "ScatterND",
+        "GridSample",
+        "InstanceNormalization",
+        "Einsum",
+        "Softmax",
+        "Reshape",
+        "Unsqueeze",
+        "Flatten",
+        "Expand",
+        "Concat",
+        "Split",
+        "Slice",
+        "Transpose",
+        "Gather",
+        "GatherElements",
+        "Cast",
+        "Equal",
+        "Where",
+        "Shape",
+        "ConstantOfShape",
+        "Mod",
+        "ReduceMax",
+        "ReduceSum",
+        "TopK",
+        "Resize",
+    };
+    for (const char* row : rows) {
+        EXPECT_NE(hip.kernels().find(row), nullptr) << row;
+    }
+    for (const char* row : {"Gemm", "MatMul", "Conv", "ConvTranspose"}) {
+        EXPECT_EQ(hip.kernels().find(row), nullptr) << row;
+    }
 }
 
 // Non-positive sizes allocate null without touching the driver.

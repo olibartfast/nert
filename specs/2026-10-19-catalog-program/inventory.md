@@ -1,6 +1,6 @@
 # Neuriplo catalog inventory
 
-Date: 2026-10-20. Release scope: **30 in-scope ONNX entries** out of 32
+Date: 2026-10-22. Release scope: **30 in-scope ONNX entries** out of 32
 catalog groups. NERT is ONNX-only; image understanding (GGUF/llama.cpp) and
 Gaussian Splatting are approved out of scope. The full census is retained at
 `$HERMES_CACHE/cache/scratch/nert-specs-slim-2026-10-19/inventory-full.md`.
@@ -9,8 +9,8 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS on CPU/CUDA/OpenCL | 23 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small, entry 29 (VideoMAE/ViViT/TimeSformer) |
-| Open | 1 | Grounding DINO (OpenCL backend gap) |
+| PASS on CPU/CUDA/OpenCL | 24 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, Grounding DINO (GD deviation), YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small, entry 29 (VideoMAE/ViViT/TimeSformer) |
+| Open | 0 | — |
 | Missing ONNX export | 6 | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
 | **Total** | **32** | |
@@ -19,7 +19,7 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 sub-0.001 confidence tail; confident detections are identical. RF-DETR
 seg-nano-576 carries the documented rank-99 TopK near-tie deviation (`SN-DEV`).
 
-23 + 1 + 6 = 30 in-scope entries. The PASS count assumes one gated
+24 + 0 + 6 = 30 in-scope entries. The PASS count assumes one gated
 representative per entry closes it (YOLOv8n for entry 17, YOLO11m-seg for
 entry 18, OWL-ViT for entry 25, ResNet-50 for entry 30, RAFT-small for entry
 31); other sizes are not gated and do not move the scoreboard — an open
@@ -40,7 +40,7 @@ other sizes) have no provisioned artifact.
 | 3 | OWLv2-base-patch16 | PASS | — |
 | 4 | RF-DETR seg-small | PASS | — |
 | 5 | RAFT-large | PASS | Real torchvision opset-18 export. |
-| 6 | Grounding DINO | Open | CPU/CUDA PASS under the task-equivalence deviation (decoded-set check closed 2026-10-20); OpenCL is a backend GAP after the arena-view revert. |
+| 6 | Grounding DINO | PASS | CPU/CUDA/OpenCL PASS under the task-equivalence deviation; OpenCL live-buffer remedy closed 2026-10-22 (exit 0, 19,224 nodes, peak 2,215 MiB, canonicalized gate 0/3,600 boxes). |
 | 7 | RF-DETR keypoint-preview | PASS | — |
 | 8 | RF-DETR seg-nano-576 | PASS\* | Passes with the documented rank-99 TopK near-tie deviation (`SN-DEV`): a 1.43e-06 tie against 4.82e-05 of fp32 reduction-order noise, not a kernel defect. |
 | 9 | RF-DETR nano-1101 | PASS | — |
@@ -96,8 +96,9 @@ DINO 17, ViTPose/Depth/video 14, RAFT/RT-DETR 16, ViT classifier 17.
 - Op-table presence is OPS, not correctness. The current OpenCL table has 68
   rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`) are
   unused by currently loadable entries.
-- HIP is unsupported for 0.2.0: the table has nine rows and the host has no
-  ROCm toolchain or AMD device.
+- HIP is outside the 0.2.0 gate. The first-party table is now 68 rows,
+  validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`, and
+  `ConvTranspose` remain blocked on rocBLAS/hipBLAS/MIOpen and an AMD device.
 - Host postprocessing (tokenizer, NMS, mask/flow resize) is outside the ONNX
   gate and must be recorded separately.
 - No release while any in-scope entry is Open or Missing-export.

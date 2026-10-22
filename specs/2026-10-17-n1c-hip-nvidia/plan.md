@@ -14,14 +14,19 @@ headers from scratch until a packaged install exists).
 - `test/hip_device_test.cpp` (same shape as the OpenCL M1 test;
   presence probe over `HipDevice()` construction, GTEST_SKIP in body).
 
-## M2+ — kernels (queued, own slices)
+## M2+ — kernels
 
 - `hipify-perl` over the matching `src/cuda/` source into `src/hip/`,
   hand-reviewed (warp-size assumptions, `__shfl` variants, library
   calls never survive translation). Relu/Add first (mirror the CUDA
-  and OpenCL pilots), then the YOLO set in N1g order. Parity vs CPU
+  and OpenCL pilots), then the first-party table. Parity vs CPU
   oracle within `1e-3·(1+|ref|)`; per-slice evidence in N1c-NVIDIA
   validation.
+- **M6 (2026-10-22): 68-row first-party table.** All non-library CUDA
+  kernels are hipified into `src/hip/`; the table excludes `Gemm`,
+  `MatMul`, `Conv`, and `ConvTranspose`, which need rocBLAS/hipBLAS/
+  MIOpen. The table probe and adapted CUDA first-party suites run on
+  the RTX 3060 through the NVIDIA HIP backend.
 
 ## AMD half (still queued on the AMD runner)
 
