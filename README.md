@@ -1,11 +1,10 @@
 # NERT (Neuriplo Engine Runtime)
 
 NERT is a first-party ONNX inference runtime: an interpreter for ONNX
-opsets 11 and above. Each node resolves its effective schema; the reduce
-axes forms are handled in place, while the remaining pre-18 forms are still
-canonicalized during the migration. Newer declarations are accepted only
-when every node resolves to a schema version the current kernels can execute.
-It computes in float32, with
+opsets 11 and above. Each node resolves its effective schema, and the
+version-dependent operator forms are handled in place. Newer declarations are
+accepted only when every node resolves to a schema version the current kernels
+can execute. It computes in float32, with
 int64/bool shape data and I/O, and is standard-library-only by default (tests
 use GoogleTest; opt-in device layers add their own toolkit dependency, linked
 PRIVATE).
