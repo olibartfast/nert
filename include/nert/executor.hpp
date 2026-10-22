@@ -2,10 +2,13 @@
 // The sequential graph executor.
 //
 // A Model binds one loaded graph to one concrete device and one concrete set of
-// input shapes. Construction resolves shapes, plans the arena, and reserves it
-// once; Run then executes the nodes in order through the device's kernel table,
-// binding graph inputs and initializers to their storage and intermediates to
-// the single arena. Later runs reuse the same arena.
+// input shapes. Construction resolves shapes and plans the arena. Pointer-offset
+// devices reserve the arena once; handle-based devices (OpenCL) allocate each
+// live intermediate separately and release it when its last consumer has run,
+// so peak memory follows the live set rather than the whole plan. Run then
+// executes the nodes in order through the device's kernel table, binding graph
+// inputs and initializers to their storage and intermediates to their live
+// buffers.
 //
 // Must not include or reference the backend abstraction layer.
 
@@ -75,12 +78,13 @@ class Model {
   private:
     // Execute the nodes with the graph inputs already bound in `views`, then
     // bind initializers and node outputs; on return `views` resolves every
-    // graph output (arena-backed views stay valid until the next run). On a
-    // non-host device the initializers are already resident (uploaded once
-    // in the constructor), so only the graph inputs are staged to device
-    // memory per run — one upload each, no per-op round-trips — and the
-    // graph outputs are downloaded into `host_outputs` (caller-owned), so
-    // output views stay host-readable.
+    // graph output (pointer-offset arena views stay valid until the next run).
+    // On a non-host device the initializers are already resident (uploaded
+    // once in the constructor), so only the graph inputs are staged to device
+    // memory per run — one upload each, no per-op round-trips — and the graph
+    // outputs are downloaded into `host_outputs` (caller-owned), so output
+    // views stay host-readable. Handle-based intermediates are released as
+    // soon as their last consumer has run.
     void Execute(std::map<std::string, TensorView>& views, std::map<std::string, std::vector<uint8_t>>& host_outputs);
 
     // The view bound to graph output `name` after Execute.
@@ -97,17 +101,17 @@ class Model {
     void ReleaseResidents();
 
     // Releases every per-offset arena buffer; safe to call when none were
-    // allocated (handle-based devices only).
+    // allocated. Retained for the handle-device layout; the live-buffer path
+    // no longer preallocates these slots.
     void ReleaseArenaSlots();
 
     const Graph& graph_; // borrowed; must outlive the model
     Device* device_;     // the device chosen once for this graph
     InferredShapes shapes_;
     MemoryPlan plan_;
-    void* arena_ = nullptr; // one allocation, shared by every arena tensor
-    // Handle-based devices (OpenCL) cannot offset a base allocation, so each
-    // distinct planned offset gets its own buffer sized to the largest tensor
-    // placed there. Empty on pointer-offset devices.
+    void* arena_ = nullptr; // one allocation on pointer-offset devices
+    // Retained for Model layout compatibility. Empty on pointer-offset devices
+    // and no longer populated by the live-buffer handle path.
     std::map<int64_t, void*> arena_slots_;
     // Device buffers holding the initializers, uploaded once in the
     // constructor on non-host devices; empty on host devices (which read
