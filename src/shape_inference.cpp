@@ -13,6 +13,7 @@
 #include "nert/shapes.hpp"
 
 #include "nert/einsum.hpp"
+#include "axes_form.hpp"
 #include "reduce_axes.hpp"
 
 #include <algorithm>
@@ -1398,9 +1399,19 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
     const int64_t rank = static_cast<int64_t>(in.size());
     const bool keepdims = attr_int(node, "keepdims", 1) != 0;
     const bool noop_empty = attr_int(node, "noop_with_empty_axes", 0) != 0;
+    const AxesForm axes_form = ResolveAxesForm(node);
 
     std::vector<int64_t> axes;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+    if (axes_form.source == AxesSource::Attribute) {
+        if (axes_form.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(axes_form.axes_attribute);
+            if (values == nullptr) {
+                fail(node, "ReduceSum 'axes' attribute must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
         axes = int64_constant(ctx, node, node.inputs[1]);
     }
     std::set<int64_t> seen;
@@ -1418,6 +1429,8 @@ TensorInfo reducesum_shape(const StaticContext& ctx, const Node& node,
 
     std::vector<int64_t> out = in;
     if (axes.empty()) {
+        // For ReduceSum, noop_with_empty_axes makes an empty/absent axes
+        // input an identity copy; the old attribute form has no noop flag.
         if (noop_empty) {
             return TensorInfo{dtype, out};
         }
@@ -1939,11 +1952,25 @@ TensorInfo unsqueeze_shape(const StaticContext& ctx, const Node& node,
     if (inputs.empty() || inputs[0] == nullptr) {
         fail(node, "Unsqueeze requires an input");
     }
-    if (node.inputs.size() < 2 || node.inputs[1].empty()) {
-        fail(node, "Unsqueeze requires an axes input");
+    const AxesForm axes_form = ResolveAxesForm(node);
+    std::vector<int64_t> axes;
+    if (axes_form.source == AxesSource::Attribute) {
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(axes_form.axes_attribute);
+        if (values == nullptr) {
+            fail(node, "Unsqueeze requires an axes attribute");
+        }
+        axes = *values;
+    } else {
+        if (node.inputs.size() < 2 || node.inputs[1].empty()) {
+            fail(node, "Unsqueeze requires an axes input");
+        }
+        axes = int64_constant(ctx, node, node.inputs[1]);
+    }
+    if (axes.empty()) {
+        fail(node, "Unsqueeze axes must not be empty");
     }
     const std::vector<int64_t>& in = inputs[0]->dims;
-    std::vector<int64_t> axes = int64_constant(ctx, node, node.inputs[1]);
     const int64_t rank_out =
         static_cast<int64_t>(in.size() + axes.size());
     std::set<int64_t> seen;
@@ -2469,20 +2496,34 @@ TensorInfo squeeze_shape(const StaticContext& ctx, const Node& node,
     }
     const std::vector<int64_t>& in = inputs[0]->dims;
     const int64_t rank = static_cast<int64_t>(in.size());
+    const AxesForm axes_form = ResolveAxesForm(node);
+    std::vector<int64_t> axes;
+    if (axes_form.source == AxesSource::Attribute) {
+        const std::vector<int64_t>* values =
+            NodeAttributeIntList(axes_form.axes_attribute);
+        if (values == nullptr) {
+            // An absent attribute means every size-1 axis.
+            axes.clear();
+        } else {
+            axes = *values;
+        }
+    } else if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
+        axes = int64_constant(ctx, node, node.inputs[1]);
+    }
     std::set<int64_t> drop;
-    if (node.inputs.size() > 1 && !node.inputs[1].empty()) {
-        for (const int64_t axis : int64_constant(ctx, node, node.inputs[1])) {
+    if (axes.empty()) {
+        for (int64_t a = 0; a < rank; ++a) {
+            if (in[static_cast<size_t>(a)] == 1) {
+                drop.insert(a);
+            }
+        }
+    } else {
+        for (const int64_t axis : axes) {
             const int64_t a = normalize_axis(node, axis, rank, "Squeeze");
             if (in[static_cast<size_t>(a)] != 1) {
                 fail(node, "Squeeze axis does not have size 1");
             }
             drop.insert(a);
-        }
-    } else {
-        for (int64_t a = 0; a < rank; ++a) {
-            if (in[static_cast<size_t>(a)] == 1) {
-                drop.insert(a);
-            }
         }
     }
     std::vector<int64_t> out;

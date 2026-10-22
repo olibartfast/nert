@@ -149,20 +149,20 @@ Check formatting with `scripts/format.sh --check` (or `--fix`).
 ## Opset policy
 
 NERT loads ONNX-domain opsets 11 and above. For 11–18, each node carries its
-effective schema. The reduce family is already version-aware and keeps the
-source form in the graph; the remaining supported old forms are still
-canonicalized to the opset-18 IR before shape inference:
+effective schema. The reduce and axes families are already version-aware and
+keep the source form in the graph; the remaining supported old forms are
+still canonicalized to the opset-18 IR before shape inference:
 
 - `ReduceMean`, `ReduceL2`, `ReduceMax`: pre-18 `axes` attribute is used in
   place (shape inference and the CPU/CUDA/OpenCL rows select the form from
   `Node::schema_version`); schema 18+ uses the optional int64 input.
-- `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute → int64 input.
+- `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute is used in
+  place; schema 13+ uses the input form.
 - `Split`: pre-13 `split` attribute → int64 input.
 - `Softmax`: pre-13 2-D coercion semantics → `Shape` → `Flatten` →
   `Softmax(axis=1)` → `Reshape`, with the old default axis of 1 preserved.
-- `ScatterND`: an explicit `reduction="none"` is accepted and dropped; other
-  reductions are rejected because the kernel implements only the overwrite
-  form.
+- `ScatterND`: `reduction="none"` is accepted in place; other reductions are
+  rejected because the kernel implements only the overwrite form.
 
 Models below opset 11 are rejected at load; convert them first:
 

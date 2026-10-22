@@ -517,6 +517,33 @@ TEST(NertCudaMisc, ReduceSumAxisExact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
+// A pre-13 ReduceSum keeps axes in the attribute; CUDA and CPU agree.
+TEST(NertCudaMisc, ReduceSumOldAttributeForm) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    nert::Node node = MakeNode("rs_attr", "ReduceSum");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    node.attributes.push_back(nert::Attribute("axes", std::vector<int64_t>{1}));
+    std::vector<float> cpuOut(2, 0.0F);
+    nert::CpuDevice().kernels().find("ReduceSum")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {2, 1})});
+    EXPECT_EQ(cpuOut, (std::vector<float>{6.0F, 15.0F}));
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(2, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("ReduceSum")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {2, 1})});
+    gpuOut = Download(cuda, dy, 2);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
 // ReduceSum int64 over all axes without keepdims: absent axes input, scalar out.
 TEST(NertCudaMisc, ReduceSumGlobalNoKeepdimsInt64) {
     if (!HasCudaDevice()) {

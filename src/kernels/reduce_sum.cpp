@@ -1,6 +1,7 @@
 // ReduceSum: sum over the requested axes; float32 (double accumulation, rounded
 // once to float32) or int64 data.
 
+#include "../axes_form.hpp"
 #include "kernels.hpp"
 
 #include <cstdint>
@@ -23,19 +24,9 @@ int64_t ElementCount(const std::vector<int64_t>& dims, const std::string& contex
     return count;
 }
 
-// Reads an int64 attribute, or returns the fallback when the attribute is absent.
-int64_t IntAttribute(const Node& node, const std::string& name, int64_t fallback) {
-    for (const Attribute& attr : node.attributes) {
-        if (attr.name == name) {
-            const int64_t* value = std::get_if<int64_t>(&attr.value);
-            if (value == nullptr) {
-                throw InferenceException("ReduceSum: attribute '" + name + "' must be an integer (node '" + node.name +
-                                         "')");
-            }
-            return *value;
-        }
-    }
-    return fallback;
+// Reads an int64 attribute through the shared helper.
+int64_t IntAttribute(const Node& node, const std::string& name, int64_t fallback, const std::string& context) {
+    return NodeAttributeIntOr(node, name, fallback, context);
 }
 
 template <typename T>
@@ -99,21 +90,29 @@ void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const st
         throw InferenceException(context + ": null buffer");
     }
 
-    const bool keepdims = IntAttribute(node, "keepdims", 1) != 0;
-    const bool noopEmpty = IntAttribute(node, "noop_with_empty_axes", 0) != 0;
+    const bool keepdims = IntAttribute(node, "keepdims", 1, context) != 0;
+    const bool noopEmpty = IntAttribute(node, "noop_with_empty_axes", 0, context) != 0;
+    const AxesForm axesForm = ResolveAxesForm(node);
 
-    // An absent or empty axes input means every axis unless noop_with_empty_axes asks for identity.
+    // An absent or empty axes operand means every axis unless
+    // noop_with_empty_axes asks for identity. For ReduceSum this applies to
+    // an empty/absent axes input; the attribute form has no noop flag.
     std::vector<int64_t> axes;
     bool identity = false;
-    if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
+    if (axesForm.source == AxesSource::Attribute) {
+        if (axesForm.axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = NodeAttributeIntList(axesForm.axes_attribute);
+            if (values == nullptr) {
+                throw InferenceException(context + ": attribute 'axes' must be an integer list");
+            }
+            axes = *values;
+        }
+    } else if (inputs.size() == 2 && inputs[1].dtype != DataType::Unknown) {
         const TensorView& axesView = inputs[1];
         if (axesView.dtype != DataType::Int64) {
             throw InferenceException(context + ": axes tensor must be int64");
         }
-        int64_t axesCount = 1;
-        for (int64_t dim : axesView.dims) {
-            axesCount *= dim;
-        }
+        const int64_t axesCount = AxesElementCount(axesView.dims, context);
         if (axesCount > 0) {
             if (axesView.data == nullptr) {
                 throw InferenceException(context + ": null axes buffer");

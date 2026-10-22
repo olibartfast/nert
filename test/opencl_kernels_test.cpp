@@ -782,6 +782,33 @@ TEST(NertOpenCLKernels, UnsqueezeNegAxesExact) {
     EXPECT_EQ(gpuOut, cpuOut);
 }
 
+// A pre-13 Unsqueeze keeps axes in the attribute; OpenCL and CPU agree.
+TEST(NertOpenCLKernels, UnsqueezeOldAttributeForm) {
+    if (!HasOpenCLDevice()) {
+        GTEST_SKIP() << "no OpenCL GPU platform";
+    }
+    nert::Device& ocl = const_cast<nert::Device&>(nert::OpenCLDevice());
+
+    std::vector<float> x = {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
+    nert::Node node = MakeNode("us_attr", "Unsqueeze");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    node.attributes.push_back(nert::Attribute("axes", std::vector<int64_t>{0, -1}));
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::CpuDevice().kernels().find("Unsqueeze")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {1, 2, 3, 1})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = Upload(ocl, x);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(ocl, gpuOut);
+    nert::OpenCLDevice().kernels().find("Unsqueeze")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {1, 2, 3, 1})});
+    gpuOut = Download(ocl, dy, 6);
+    ocl.allocator().release(dx);
+    ocl.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
 // Unsqueeze rejects duplicate axes, naming node + op.
 TEST(NertOpenCLKernels, UnsqueezeRejectsDupAxes) {
     if (!HasOpenCLDevice()) {

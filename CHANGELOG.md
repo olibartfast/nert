@@ -32,12 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep the pre-18 `axes` attribute in the graph and resolve it in shape
   inference plus the CPU/CUDA/OpenCL rows; schema 18+ uses the optional input
   form. The old reduce-axis rewrite is removed.
+- Axes-family version awareness: `ReduceSum`, `Squeeze`, and `Unsqueeze`
+  keep the pre-13 `axes` attribute in the graph and resolve it in shape
+  inference plus the CPU/CUDA/OpenCL rows; `ScatterND.reduction="none"` stays
+  in place. The old axes/ScatterND rewrites are removed.
 - Native opset range 11–18: the loader accepts declared ONNX-domain opsets
   11–18 and still canonicalizes the remaining supported old forms to the
-  opset-18 IR before shape inference. Pre-13 `ReduceSum` / `Squeeze` /
-  `Unsqueeze` axes and `Split` split become inputs; legacy `Softmax` expands
-  to `Shape` → `Flatten` → `Softmax(axis=1)` → `Reshape` with the old axis-1
-  default; an explicit `ScatterND.reduction="none"` is dropped. Legacy
+  opset-18 IR before shape inference. Split's pre-13 `split` attribute
+  becomes an input; legacy `Softmax` expands to `Shape` → `Flatten` →
+  `Softmax(axis=1)` → `Reshape` with the old axis-1 default. Legacy
   `Softmax` needs the input rank in `value_info` and fails fast without it.
   Models below opset 11 fail at load. Opset-18 graphs are unchanged.
 - Verified newer-than-18 declarations: the loader has no upper opset

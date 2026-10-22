@@ -86,12 +86,17 @@ assertions.
 
 ## Phase C — axes, Split, and ScatterND
 
-- [ ] [V-9] Old attribute forms for `ReduceSum`, `Squeeze`, `Unsqueeze`, and
-  `Split` execute in place and match their input-form equivalents.
-- [ ] [V-10] `ScatterND.reduction="none"` remains accepted from schema 16;
-  other values and pre-16 use are rejected.
-- [ ] [V-11] `Squeeze` / `Unsqueeze` kernels remain layout-only; only shape
-  inference resolves axes.
+- [x] [V-9a] Old attribute forms for `ReduceSum`, `Squeeze`, and `Unsqueeze`
+  execute in place and match their input-form equivalents. Verified
+  2026-10-22: loader source-form preservation/execution tests, CPU kernel
+  old-form tests, and CUDA/OpenCL `ReduceSum`/`Unsqueeze` parity.
+- [ ] [V-9b] `Split`'s old attribute form executes in place and matches the
+  input form. Deferred to Phase C2.
+- [x] [V-10] `ScatterND.reduction="none"` remains accepted from schema 16;
+  other values and pre-16 use are rejected. The attribute stays in the graph.
+- [x] [V-11] `Squeeze` / `Unsqueeze` kernels remain layout-only for the data
+  copy; `Unsqueeze` resolves axes only to validate/insert shape positions in
+  shape inference. No per-element version branch.
 
 ## Phase D — legacy Softmax and normalizer removal
 
@@ -132,4 +137,7 @@ assertions.
 | V-6 | CPU `ctest`; loader `EngineLoader.Hermetic*Reduce*`; kernel old/new/empty form tests; shape `Reduce*AttributeFormDeclaredThirteen` and `ReduceMeanEmptyAxesNoopIdentity` | pass | 2026-10-22 | `nert_loader` 104/104; CPU reduce tests 20/20 in the filtered reduce suite; shape reduce tests 8/8; old form keeps one input + `axes` attr and creates no `reduce0/axes*` initializer; empty/noop cases pass. |
 | V-7 | `nert_loader_negative` reduce-form tests | pass | 2026-10-22 | Five tests: pre-18 input, empty-string input, attribute at 18, noop before 18, and ReduceMax noop at 18 as a capability gap; each names node/op/declared/effective. |
 | V-8 | `ctest --test-dir build-gpu -R 'nert_cuda_misc|nert_cuda_kernels|nert_opencl_kernels|nert_opencl_reduce_extra|nert_opencl_index_extra|nert_opencl_owlv2_rows'` | pass (6/6) | 2026-10-22 | CUDA Mean/L2/Max and OpenCL Mean/L2/Max attribute forms match the CPU oracle. HIP has no reduce rows; recorded gap. |
+| V-9a | CPU `ctest`; loader legacy-form tests; kernel `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; CUDA `ReduceSumOldAttributeForm` / `UnsqueezeOldAttributeForm`; OpenCL counterparts | pass | 2026-10-22 | Source form stays in the graph; CPU 13/13, GPU filtered 8/8. |
+| V-10 | loader `ScatterNDReductionNonePreserved` and negative pre-16/non-none tests | pass | 2026-10-22 | `reduction` attribute remains; only `none`/absent accepted. |
+| V-11 | code review + `UnsqueezeOldAttributeForm` CPU/device tests | pass | 2026-10-22 | Squeeze copies bytes; Unsqueeze resolves axes at entry, not per element. |
 | V-18 | `scripts/format.sh --check` | pass | 2026-10-22 | 239 files formatted; no new production warnings. |

@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include "axes_form.hpp" // private src-local shared axes/reduction form resolver
 #include "opset_compat.hpp" // private src-local newer-opset gate
 #include "opset_normalize.hpp" // private src-local canonicalizer
 #include "reduce_axes.hpp" // private src-local shared reduce-form resolver
@@ -1509,6 +1510,104 @@ void validate_reduce_axes_form(const Node& node, int64_t declared_opset)
     }
 }
 
+// ReduceSum/Squeeze/Unsqueeze admit only the axes form legal for the node's
+// effective schema. The source form stays in the graph; this gate only rejects
+// a form the source schema does not have. `declared_opset` is carried
+// separately so the message can distinguish the model declaration from the
+// resolved schema.
+void validate_axes_op_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ReduceSum" && node.op_type != "Squeeze" &&
+        node.op_type != "Unsqueeze") {
+        return;
+    }
+    const Attribute* axes_attribute = FindNodeAttribute(node, "axes");
+    // Any second operand is illegal before schema 13, including the empty
+    // string form an exporter may use for an omitted optional input.
+    const bool has_axes_input = node.inputs.size() > 1;
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+
+    if (node.schema_version < kAxesAsInputSchema) {
+        if (has_axes_input) {
+            throw ModelLoadException(prefix +
+                ": the 'axes' input requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (node.op_type == "ReduceSum" &&
+            FindNodeAttribute(node, "noop_with_empty_axes") != nullptr) {
+            throw ModelLoadException(prefix +
+                ": 'noop_with_empty_axes' requires schema " +
+                std::to_string(kAxesAsInputSchema) + context);
+        }
+        if (node.op_type == "Unsqueeze") {
+            const std::vector<int64_t>* values =
+                NodeAttributeIntList(axes_attribute);
+            if (values == nullptr) {
+                throw ModelLoadException(prefix +
+                    ": 'axes' is required before schema " +
+                    std::to_string(kAxesAsInputSchema) + context);
+            }
+            if (values->empty()) {
+                throw ModelLoadException(prefix +
+                    ": 'axes' must not be empty before schema " +
+                    std::to_string(kAxesAsInputSchema) + context);
+            }
+        }
+        return;
+    }
+    if (axes_attribute != nullptr) {
+        throw ModelLoadException(prefix +
+            ": the 'axes' attribute is only valid before schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+    if (node.op_type == "Unsqueeze" &&
+        (!has_axes_input || node.inputs[1].empty())) {
+        throw ModelLoadException(prefix +
+            ": Unsqueeze requires an 'axes' input from schema " +
+            std::to_string(kAxesAsInputSchema) + context);
+    }
+}
+
+// ScatterND's `reduction` attribute is legal only from schema 16, and only the
+// overwrite value `none` (also the default) is implemented. The attribute
+// stays in the graph; the kernels always overwrite.
+void validate_scatter_nd_form(const Node& node, int64_t declared_opset)
+{
+    if (node.op_type != "ScatterND") {
+        return;
+    }
+    const Attribute* reduction = FindNodeAttribute(node, "reduction");
+    if (reduction == nullptr) {
+        return;
+    }
+    const std::string prefix = "node " +
+        (node.name.empty() ? std::string("<unnamed>") : quote(node.name)) +
+        " op_type " + quote(node.op_type);
+    const std::string context = " (declared opset " +
+        std::to_string(declared_opset) + ", effective schema " +
+        std::to_string(node.schema_version) + ")";
+    if (node.schema_version < kScatterReductionSchema) {
+        throw ModelLoadException(prefix +
+            ": 'reduction' requires schema " +
+            std::to_string(kScatterReductionSchema) + context);
+    }
+    const std::string* value = std::get_if<std::string>(&reduction->value);
+    if (value == nullptr) {
+        throw ModelLoadException(prefix +
+            ": 'reduction' must be a string" + context);
+    }
+    if (*value != "none") {
+        throw ModelLoadException(prefix + ": ScatterND reduction " +
+            quote(*value) + " is not implemented here (only 'none')" +
+            context);
+    }
+}
+
 Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
 {
     const NodeRaw raw = read_node_raw(data, size);
@@ -1597,6 +1696,8 @@ Node decode_node(const uint8_t* data, size_t size, int64_t declared_opset)
     }
     validate_attr_policy(node);
     validate_reduce_axes_form(node, declared_opset);
+    validate_axes_op_form(node, declared_opset);
+    validate_scatter_nd_form(node, declared_opset);
     return node;
 }
 
@@ -2048,8 +2149,9 @@ Graph decode_model(const std::string& model_dir, const uint8_t* data,
         }
         graph.initializers[name] = std::move(folded_constants[i].second);
     }
-    // Canonicalize pre-18 node forms into the opset-18 IR before any consumer
-    // (TopK checks, shape inference, planning, kernels) sees the graph.
+    // Apply the remaining load-time rewrites (legacy Split input form and
+    // pre-13 Softmax) before any consumer (TopK checks, shape inference,
+    // planning, kernels) sees the graph. Version-aware forms stay in place.
     NormalizeGraphForOpset(graph, declared_opset);
     // TopK's K input is a shape constant: it must resolve to an Int64
     // initializer at load. A non-constant K is a load rejection here, never

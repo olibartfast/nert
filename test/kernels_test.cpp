@@ -1745,6 +1745,24 @@ TEST(NertKernels, UnsqueezeNegativeAxisInt64) {
     EXPECT_EQ(out, (std::vector<int64_t>{10, 20}));
 }
 
+// A pre-13 Unsqueeze carries axes in an attribute and has no axes input.
+TEST(NertKernels, UnsqueezeOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("Unsqueeze");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> out(6, 0.0f);
+    nert::Node node = MakeNode("unsqueeze_attr", "Unsqueeze");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1, 3})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, in);
+}
+
 // Expand broadcasts [1,3] to [2,3] by repeating the leading axis.
 TEST(NertKernels, ExpandLeadingAxis) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Expand");
@@ -3597,8 +3615,7 @@ TEST(NertKernels, ClipInt64Identity) {
     nert::KernelFn kernel = nert::CpuDevice().kernels().find("Clip");
     ASSERT_NE(kernel, nullptr);
 
-    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(),
-        std::numeric_limits<int64_t>::max()};
+    std::vector<int64_t> x = {-5, 0, 7, 20, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max()};
     std::vector<int64_t> out(x.size(), 0);
     nert::Node node = MakeNode("clip_i64_id", "Clip");
     std::vector<nert::TensorView> inputs = {Int64View(x, {static_cast<int64_t>(x.size())})};
@@ -3903,6 +3920,24 @@ TEST(NertKernels, ReduceSumKeepdimsDefault) {
     std::vector<int64_t> axes = {1};
     nert::Node node = MakeNode("rsum0", "ReduceSum");
     std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3}), Int64View(axes, {1})};
+    std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1})};
+
+    kernel(node, inputs, outputs);
+
+    EXPECT_EQ(out, (std::vector<float>{6.0f, 15.0f}));
+}
+
+// A pre-13 ReduceSum carries axes in an attribute and has no axes input.
+TEST(NertKernels, ReduceSumOldAttributeForm) {
+    nert::KernelFn kernel = nert::CpuDevice().kernels().find("ReduceSum");
+    ASSERT_NE(kernel, nullptr);
+
+    std::vector<float> in = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    std::vector<float> out(2, 0.0f);
+    nert::Node node = MakeNode("rsum_attr", "ReduceSum");
+    node.schema_version = 11;
+    node.attributes.emplace_back("axes", std::vector<int64_t>{1});
+    std::vector<nert::TensorView> inputs = {FloatView(in, {2, 3})};
     std::vector<nert::TensorView> outputs = {FloatView(out, {2, 1})};
 
     kernel(node, inputs, outputs);

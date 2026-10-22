@@ -228,6 +228,33 @@ TEST(NertCudaShape, ReshapeRejectsBadProduct) {
     cuda.allocator().release(dy);
 }
 
+// A pre-13 Unsqueeze keeps axes in the attribute; CUDA and CPU agree.
+TEST(NertCudaShape, UnsqueezeOldAttributeForm) {
+    if (!HasCudaDevice()) {
+        GTEST_SKIP() << "no CUDA device";
+    }
+    nert::Device& cuda = const_cast<nert::Device&>(nert::CudaDevice());
+
+    std::vector<float> x = Iota(6);
+    nert::Node node = MakeNode("us_attr", "Unsqueeze");
+    node.inputs = {"x"};
+    node.outputs = {"y"};
+    node.schema_version = 11;
+    node.attributes.push_back(nert::Attribute("axes", std::vector<int64_t>{-1, 0}));
+    std::vector<float> cpuOut(6, 0.0F);
+    nert::CpuDevice().kernels().find("Unsqueeze")(node, {HostFloat(x, {2, 3})}, {HostFloat(cpuOut, {1, 2, 3, 1})});
+    EXPECT_EQ(cpuOut, x);
+
+    void* dx = Upload(cuda, x);
+    std::vector<float> gpuOut(6, 0.0F);
+    void* dy = Upload(cuda, gpuOut);
+    nert::CudaDevice().kernels().find("Unsqueeze")(node, {DeviceFloat(dx, {2, 3})}, {DeviceFloat(dy, {1, 2, 3, 1})});
+    gpuOut = Download(cuda, dy, 6);
+    cuda.allocator().release(dx);
+    cuda.allocator().release(dy);
+    EXPECT_EQ(gpuOut, cpuOut);
+}
+
 // Unsqueeze rejects duplicate axes, naming node + op.
 TEST(NertCudaShape, UnsqueezeRejectsDuplicateAxes) {
     if (!HasCudaDevice()) {

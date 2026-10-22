@@ -14,6 +14,7 @@
 // is capped at rank 16 like the neighbour rows. The OpenCL C sources
 // compile once per process via the shared runtime.
 
+#include "../axes_form.hpp"
 #include "../reduce_axes.hpp"
 #include "nert/device.hpp"
 #include "runtime.hpp"
@@ -273,16 +274,31 @@ ReducePlan PlanReduction(const Node& node, const std::vector<TensorView>& inputs
 
     const bool keepdims = IntAttribute(node, "keepdims", 1, context) != 0;
     const bool noopEmpty = allowNoop && IntAttribute(node, "noop_with_empty_axes", 0, context) != 0;
-    const ReduceAxes resolved_axes = ResolveReduceAxes(node);
 
-    // An absent, Unknown, or empty axes input means every axis unless
+    // Resolve the axes form once. ReduceSum's boundary is schema 13;
+    // ReduceMax's remaining attribute form is pre-18.
+    const Attribute* axes_attribute = nullptr;
+    bool attribute_form = false;
+    if (version_aware_axes) {
+        if (allowNoop) {
+            const AxesForm resolved_axes = ResolveAxesForm(node);
+            attribute_form = resolved_axes.source == AxesSource::Attribute;
+            axes_attribute = resolved_axes.axes_attribute;
+        } else {
+            const ReduceAxes resolved_axes = ResolveReduceAxes(node);
+            attribute_form = resolved_axes.form == ReduceAxesForm::Attribute;
+            axes_attribute = resolved_axes.axes_attribute;
+        }
+    }
+
+    // An absent, Unknown, or empty axes operand means every axis unless
     // noop_with_empty_axes asks for identity (ReduceSum; ReduceMax's noop is
-    // rejected at load as a tracked gap). ReduceMax additionally accepts the
-    // pre-18 attribute form in place.
+    // rejected at load as a tracked gap). The noop flag applies only to a
+    // present-but-empty input.
     std::vector<int64_t> axes;
-    if (version_aware_axes && resolved_axes.form == ReduceAxesForm::Attribute) {
-        if (resolved_axes.axes_attribute != nullptr) {
-            const std::vector<int64_t>* values = ReduceAttributeIntList(resolved_axes.axes_attribute);
+    if (attribute_form) {
+        if (axes_attribute != nullptr) {
+            const std::vector<int64_t>* values = NodeAttributeIntList(axes_attribute);
             if (values == nullptr) {
                 throw InferenceException(context + ": attribute 'axes' must be an integer list");
             }
@@ -293,7 +309,7 @@ ReducePlan PlanReduction(const Node& node, const std::vector<TensorView>& inputs
         if (axesView.dtype != DataType::Int64) {
             throw InferenceException(context + ": axes tensor must be int64");
         }
-        const int64_t axesCount = ReduceAxesElementCount(axesView.dims, context);
+        const int64_t axesCount = AxesElementCount(axesView.dims, context);
         if (axesCount > 0) {
             if (axesView.data == nullptr) {
                 throw InferenceException(context + ": null axes buffer");
@@ -433,7 +449,7 @@ void LaunchReduction(const std::string& op, const char* source, const char* entr
 void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     const std::string context = "ReduceSum (node '" + node.name + "')";
     ReducePlan plan = PlanReduction(node, inputs, outputs, /*allowNoop=*/true, /*allowInt64=*/true,
-                                    /*version_aware_axes=*/false, context);
+                                    /*version_aware_axes=*/true, context);
     if (plan.outCount == 0) {
         return;
     }

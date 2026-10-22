@@ -1,5 +1,9 @@
-// Load-time canonicalization of older ONNX node forms into the opset-18 IR.
+// Load-time canonicalization of the remaining older ONNX node forms.
 // See opset_normalize.hpp.
+//
+// The version-aware operators (ReduceSum/Squeeze/Unsqueeze axes, ScatterND
+// reduction) keep their source form in the graph; the loader gates legality
+// and each consumer resolves the form from the node's effective schema.
 
 #include "opset_normalize.hpp"
 
@@ -14,7 +18,6 @@
 namespace nert {
 namespace {
 
-constexpr int64_t kScatterReductionOpset = 16;
 constexpr int64_t kAxesAsInputOpset = 13;
 constexpr int64_t kSoftmaxCoercionOpset = 13;
 
@@ -155,124 +158,6 @@ void append_int64_input(Graph& graph, NameAllocator& names, Node& node, const st
     node.inputs.push_back(name);
 }
 
-// ScatterND gained an optional `reduction` attribute at opset 16. The kernels
-// implement the overwrite form only, which is `none` (also the default), so an
-// explicit "none" is dropped and every other value is rejected.
-void canonicalize_scatter_nd(Node& node, int64_t declared_opset) {
-    const Attribute* reduction = find_attribute(node, "reduction");
-    if (reduction == nullptr) {
-        return;
-    }
-    const std::string who = node_label(node);
-    if (declared_opset < kScatterReductionOpset) {
-        throw ModelLoadException(who + ": 'reduction' is only valid from opset 16; this model declares " + "opset " +
-                                 std::to_string(declared_opset));
-    }
-    const std::string* value = std::get_if<std::string>(&reduction->value);
-    if (value == nullptr) {
-        throw ModelLoadException(who + ": 'reduction' must be a string");
-    }
-    if (*value == "none") {
-        erase_attribute(node, "reduction");
-        return;
-    }
-    throw ModelLoadException(who + ": ScatterND reduction '" + *value + "' is not implemented here (only 'none')");
-}
-
-// ReduceSum took axes as an input from opset 13. Before that it was an
-// optional attribute; an empty list means reduce every axis, which is the
-// absent-input form in the canonical graph.
-void canonicalize_reduce_sum(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    const std::string who = node_label(node);
-    const Attribute* axes_attribute = find_attribute(node, "axes");
-
-    if (declared_opset >= kAxesAsInputOpset) {
-        if (axes_attribute != nullptr) {
-            throw ModelLoadException(who + ": 'axes' must be an input at opset " + std::to_string(declared_opset) +
-                                     ", not an attribute");
-        }
-        return;
-    }
-    if (node.inputs.size() > 1) {
-        throw ModelLoadException(who + ": the 'axes' input is only valid from opset 13; this model declares opset " +
-                                 std::to_string(declared_opset));
-    }
-    if (find_attribute(node, "noop_with_empty_axes") != nullptr) {
-        throw ModelLoadException(who + ": 'noop_with_empty_axes' is only valid from opset 13; this model " +
-                                 "declares opset " + std::to_string(declared_opset));
-    }
-    if (axes_attribute == nullptr) {
-        return;
-    }
-
-    const std::vector<int64_t> axes = int_list_attribute(*axes_attribute, who);
-    if (axes.empty()) {
-        erase_attribute(node, "axes");
-        return;
-    }
-    append_int64_input(graph, names, node, axes, "axes");
-    erase_attribute(node, "axes");
-}
-
-// Squeeze's axes moved from an attribute (11) to an optional input (13). An
-// empty attribute list means "all size-1 axes", the same as omitting axes.
-void canonicalize_squeeze(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    const std::string who = node_label(node);
-    const Attribute* axes_attribute = find_attribute(node, "axes");
-
-    if (declared_opset >= kAxesAsInputOpset) {
-        if (axes_attribute != nullptr) {
-            throw ModelLoadException(who + ": 'axes' must be an input at opset " + std::to_string(declared_opset) +
-                                     ", not an attribute");
-        }
-        return;
-    }
-    if (node.inputs.size() > 1) {
-        throw ModelLoadException(who + ": the 'axes' input is only valid from opset 13; this model declares opset " +
-                                 std::to_string(declared_opset));
-    }
-    if (axes_attribute == nullptr) {
-        return;
-    }
-
-    const std::vector<int64_t> axes = int_list_attribute(*axes_attribute, who);
-    if (axes.empty()) {
-        erase_attribute(node, "axes");
-        return;
-    }
-    append_int64_input(graph, names, node, axes, "axes");
-    erase_attribute(node, "axes");
-}
-
-// Unsqueeze's axes moved from a required attribute (11) to a required input
-// (13). An empty attribute list is rejected: ONNX has no no-op form here.
-void canonicalize_unsqueeze(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    const std::string who = node_label(node);
-    const Attribute* axes_attribute = find_attribute(node, "axes");
-
-    if (declared_opset >= kAxesAsInputOpset) {
-        if (axes_attribute != nullptr) {
-            throw ModelLoadException(who + ": 'axes' must be an input at opset " + std::to_string(declared_opset) +
-                                     ", not an attribute");
-        }
-        return;
-    }
-    if (node.inputs.size() > 1) {
-        throw ModelLoadException(who + ": the 'axes' input is only valid from opset 13; this model declares opset " +
-                                 std::to_string(declared_opset));
-    }
-    if (axes_attribute == nullptr) {
-        throw ModelLoadException(who + ": 'axes' is required at opset " + std::to_string(declared_opset));
-    }
-
-    const std::vector<int64_t> axes = int_list_attribute(*axes_attribute, who);
-    if (axes.empty()) {
-        throw ModelLoadException(who + ": 'axes' must not be empty at opset " + std::to_string(declared_opset));
-    }
-    append_int64_input(graph, names, node, axes, "axes");
-    erase_attribute(node, "axes");
-}
-
 // Split's `split` moved from an attribute (11) to an optional input (13). An
 // empty list cannot describe any output partition and is rejected.
 void canonicalize_split(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
@@ -374,16 +259,8 @@ void rewrite_legacy_softmax(const Graph& graph, NameAllocator& names, Node& node
 }
 
 void normalize_node(Graph& graph, NameAllocator& names, Node& node, int64_t declared_opset) {
-    if (node.op_type == "ReduceSum") {
-        canonicalize_reduce_sum(graph, names, node, declared_opset);
-    } else if (node.op_type == "Squeeze") {
-        canonicalize_squeeze(graph, names, node, declared_opset);
-    } else if (node.op_type == "Unsqueeze") {
-        canonicalize_unsqueeze(graph, names, node, declared_opset);
-    } else if (node.op_type == "Split") {
+    if (node.op_type == "Split") {
         canonicalize_split(graph, names, node, declared_opset);
-    } else if (node.op_type == "ScatterND") {
-        canonicalize_scatter_nd(node, declared_opset);
     }
 }
 
