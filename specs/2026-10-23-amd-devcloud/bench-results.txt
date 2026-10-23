@@ -1,0 +1,51 @@
+op                  case                        device       cpu_ms    dev_ms   speedup     maxdiff
+Gemm                [512x512]x[512x512]         HIP           96.45      0.15    656.5x    0.00e+00  PASS
+Relu                [4194304]                   HIP            1.03      0.35      3.0x    0.00e+00  PASS
+Sigmoid             [4194304]                   HIP           11.31      0.35     32.6x    1.19e-07  PASS
+Tanh                [4194304]                   HIP           52.42      0.37    141.5x    1.19e-07  PASS
+Add                 [2048x2048]+[2048]          HIP           21.27      0.37     58.0x    0.00e+00  PASS
+Mul                 [2048x2048]+[2048]          HIP           21.57      0.38     56.9x    0.00e+00  PASS
+Sub                 [2048x2048]+[2048]          HIP           21.17      0.38     56.3x    0.00e+00  PASS
+Div                 [4194304]                   HIP           13.10      0.35     37.4x    0.00e+00  PASS
+MaxPool             [8x64x112x112] k3 s2        HIP            9.66      0.16     60.0x    0.00e+00  PASS
+AveragePool         [8x64x112x112] k3 s2        HIP            7.80      0.16     49.0x    0.00e+00  PASS
+Softmax             [256x4096]                  HIP            9.52      5.38      1.8x    0.00e+00  PASS
+Reshape             [2x3x4] -> [6x4]            HIP            0.00      0.03      0.0x    0.00e+00  PASS
+Conv                [8x16x64x64] k3+bias        HIP          188.61      0.21    878.5x    0.00e+00  PASS
+Sin                 [1048576]                   HIP            8.19      0.10     79.3x    5.96e-08  PASS
+Cos                 [1048576]                   HIP            7.55      0.10     73.1x    5.96e-08  PASS
+Exp                 [1048576]                   HIP            2.40      0.10     23.3x    1.91e-06  PASS
+Elu                 [1048576]                   HIP            6.74      0.10     64.9x    5.96e-08  PASS
+Log                 [1048576]                   HIP            2.66      0.10     25.8x    2.38e-07  PASS
+Floor               [1048576]                   HIP            1.04      0.10     10.1x    0.00e+00  PASS
+Abs                 [1048576]                   HIP            0.25      0.10      2.4x    0.00e+00  PASS
+Neg                 [1048576]                   HIP            0.25      0.10      2.4x    0.00e+00  PASS
+Sqrt                [1048576]                   HIP            0.80      0.10      7.8x    0.00e+00  PASS
+Erf                 [1048576]                   HIP           14.93      0.10    143.0x    5.96e-08  PASS
+IsNaN               [1048576]                   HIP            0.16      0.04      3.7x    0.00e+00  PASS
+Greater             [1024x1024] vs [1024]       HIP            6.15      0.05    133.1x    0.00e+00  PASS
+Less                [1024x1024] vs [1024]       HIP            5.29      0.05    116.5x    0.00e+00  PASS
+GreaterOrEqual      [1024x1024] vs [1024]       HIP            5.30      0.05    116.4x    0.00e+00  PASS
+LessOrEqual         [1024x1024] vs [1024]       HIP            5.29      0.05    117.0x    0.00e+00  PASS
+And                 [1024x1024] bcast           HIP           12.51      0.05    267.4x    0.00e+00  PASS
+Or                  [1024x1024] bcast           HIP           13.46      0.05    294.8x    0.00e+00  PASS
+Not                 [1048576]                   HIP            0.31      0.04      6.8x    0.00e+00  PASS
+Pow                 [1024x1024]^[1024]          HIP           10.67      0.11     98.8x    1.19e-07  PASS
+Max                 [1024x1024] fold3           HIP           18.56      0.14    136.0x    0.00e+00  PASS
+Min                 [1024x1024] fold3           HIP           18.49      0.14    135.6x    0.00e+00  PASS
+Clip                [1048576] [0,1]             HIP            0.26      0.13      2.1x    0.00e+00  PASS
+Identity            [1048576]                   HIP            0.23      0.10      2.3x    0.00e+00  PASS
+Squeeze             [1x1024x1] -> [1024]        HIP            0.00      0.01      0.0x    0.00e+00  PASS
+Tile                [1024x1] x{2,3}             HIP            0.06      0.04      1.8x    0.00e+00  PASS
+Range               0..1M step 1                HIP            0.56      0.14      4.1x    0.00e+00  PASS
+EyeLike             [1024x1024]                 HIP            0.30      0.10      2.9x    0.00e+00  PASS
+Pad                 [1024x1024] +1              HIP            5.33      0.11     46.5x    0.00e+00  PASS
+ReduceSum           [1024x1024] axis1           HIP            5.29      0.59      8.9x    0.00e+00  PASS
+ReduceMean          [1024x1024] axis1           HIP            5.29      0.59      9.0x    0.00e+00  PASS
+ReduceL2            [1024x1024] axis1           HIP            5.29      0.59      9.0x    0.00e+00  PASS
+ArgMax              [1024x1024] axis1           HIP            1.01      0.27      3.7x    0.00e+00  PASS
+CumSum              [1024x1024] axis1           HIP            0.55      0.95      0.6x    0.00e+00  PASS
+ScatterND           [1024x1024] rows            HIP            0.49      2.54      0.2x    0.00e+00  PASS
+LayerNormalization  [1024x1024] axis1           HIP            2.01      1.45      1.4x    0.00e+00  PASS
+GlobalAveragePool   [8x64x112x112]              HIP            3.24      3.35      1.0x    0.00e+00  PASS
+PASSED 49 cases (0 skipped, 0 failed)

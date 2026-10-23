@@ -32,5 +32,19 @@ the version-aware changes inspected in the earlier review.
 
 `.github/workflows/gpu.yml` adds separate CUDA and HIP/NVIDIA jobs, selected
 by a matrix. Device suites must exist and execute without GoogleTest skips.
-See `GPU_CI.md` for runner provisioning and activation. The workflow is
-prepared in the main checkout; it has not been published or dispatched.
+See `GPU_CI.md` for runner provisioning and activation. The workflow was
+published to main in `d906f7f`; runner activation remains pending.
+
+## Main integration follow-up
+
+The four compute kernels and their 14 parity/negative tests from OpenCode
+commit `0279876` are now integrated in the main working tree. A clean
+Release HIP build in `/tmp/nert-hip-complete` replaces the earlier evidence
+based on existing binaries. The P2 coverage finding for the other hipified
+operator families remains open.
+
+Native AMD follow-up (2026-10-23): MI300X build, 4 device + 28 kernel tests,
+49 shipped-runtime parity cases and install/consumer smoke passed. This
+supersedes the earlier AMD-build limitation, but does not close full-model
+or exhaustive operator-family coverage. See
+`specs/2026-10-23-amd-devcloud/runbook.md` for reproducible steps and hashes.

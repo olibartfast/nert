@@ -1,0 +1,36 @@
+Internal ctest changing into directory: /tmp/nert-amd-validation.fWdnKI/build
+Test project /tmp/nert-amd-validation.fWdnKI/build
+      Start  1: nert_loader
+ 1/15 Test  #1: nert_loader ......................   Passed    0.20 sec
+      Start  2: nert_loader_negative
+ 2/15 Test  #2: nert_loader_negative .............   Passed    0.03 sec
+      Start  3: nert_shapes
+ 3/15 Test  #3: nert_shapes ......................   Passed    0.02 sec
+      Start  4: nert_shapes_negative
+ 4/15 Test  #4: nert_shapes_negative .............   Passed    0.02 sec
+      Start  5: nert_plan
+ 5/15 Test  #5: nert_plan ........................   Passed    0.02 sec
+      Start  6: nert_plan_negative
+ 6/15 Test  #6: nert_plan_negative ...............   Passed    0.02 sec
+      Start  7: nert_device
+ 7/15 Test  #7: nert_device ......................   Passed    0.02 sec
+      Start  8: nert_kernels
+ 8/15 Test  #8: nert_kernels .....................   Passed    0.02 sec
+      Start  9: nert_kernels_negative
+ 9/15 Test  #9: nert_kernels_negative ............   Passed    0.02 sec
+      Start 10: nert_executor
+10/15 Test #10: nert_executor ....................   Passed    2.39 sec
+      Start 11: nert_executor_negative
+11/15 Test #11: nert_executor_negative ...........   Passed    0.02 sec
+      Start 12: nert_constant_folding
+12/15 Test #12: nert_constant_folding ............   Passed    0.02 sec
+      Start 13: nert_hip_device
+13/15 Test #13: nert_hip_device ..................   Passed    0.10 sec
+      Start 14: nert_hip_kernels
+14/15 Test #14: nert_hip_kernels .................   Passed    0.11 sec
+      Start 15: bench_runtime
+15/15 Test #15: bench_runtime ....................   Passed    5.00 sec
+
+100% tests passed, 0 tests failed out of 15
+
+Total Test time (real) =   8.01 sec

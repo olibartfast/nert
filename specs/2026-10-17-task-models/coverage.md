@@ -18,7 +18,13 @@ Full pre-slim matrix:
 - **OUT-OF-SCOPE** — no ONNX runtime contract.
 
 Node counts in the detailed packets are NERT post-constant-folding counts.
-HIP is not part of the 0.2.0 release gate.
+HIP on AMD/ROCm is mandatory for the 0.2.0 release gate (2026-10-23).
+Native AMD build and focused device parity have passed on MI300X. AMD raw
+full-model gates now pass for catalog YOLOv8n and Depth-Anything-V2-Small;
+ResNet-18 opset 19 also passed as an additional artifact-specific gate.
+Other AMD model legs are UNRUN. Details and hashes are in
+`../2026-10-23-amd-devcloud/runbook.md`. The three-device PASS entries below
+must not be interpreted as satisfying the new AMD gate.
 
 ## Kernel tables
 
@@ -26,8 +32,8 @@ HIP is not part of the 0.2.0 release gate.
 | --- | ---: | --- |
 | CPU (oracle) | 72 | Complete reference set. |
 | CUDA | 72 | Complete set; `Conv` and `ConvTranspose` require cuDNN. Strict float32 (`CUBLAS_PEDANTIC_MATH`, `CUDNN_FMA_MATH`). |
-| OpenCL | 68 | Complete for every currently loadable catalog entry. Missing `Abs`, `Floor`, `GreaterOrEqual`, `Neg`, none used by those entries. |
-| HIP | 68 | First-party rows hipified from CUDA and validated on the NVIDIA HIP backend. `Gemm`, `MatMul`, `Conv`, and `ConvTranspose` remain the rocBLAS/hipBLAS/MIOpen slice; **not part of the 0.2.0 release gate**. |
+| OpenCL | 72 | Reference operator set complete, including `Abs`, `Floor`, `GreaterOrEqual`, `Neg`; local CTest 30/30. |
+| HIP | 72 | NVIDIA and MI300X native AMD build/device tests pass. Full-model AMD legs and CI remain **required for 0.2.0 and UNRUN**. |
 
 The CUDA 72 rows assume a cuDNN-enabled build: `Conv` and `ConvTranspose` sit
 behind `#ifdef NERT_HAS_CUDNN`, so a non-cuDNN CUDA build would not have those
@@ -75,7 +81,8 @@ Video fixture/reference provenance: one frozen canonical `(1,32,3,224,224)` buff
 twenty-second PASS, entry 29 (video) is the twenty-third, and Grounding DINO
 is the twenty-fourth: the video entry closes once, with VideoMAE, ViViT and
 TimeSformer recorded as its three gated models. The release gate is zero open
-entries and zero missing exports among those 30; HIP is outside the gate. The
+entries and zero missing exports among those 30, plus AMD/HIP validation
+for every in-scope entry. Most AMD model legs are still UNRUN. The
 catalog is not complete and 0.2.0 is not release-ready.
 
 The PASS count assumes one gated representative per catalog entry closes that
@@ -113,10 +120,12 @@ SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
   rendering are host-side and outside the ONNX gate.
 - **Consumer adapter.** Neuriplo selects CPU or opt-in CUDA for NERT; there is
   no OpenCL/HIP consumer selection. OpenCL/HIP columns are engine capability.
-- **HIP.** Not part of the 0.2.0 release gate. The first-party table is now 68
-  rows, hipified from CUDA and validated through the NVIDIA HIP backend. The
-  four library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) still
-  need rocBLAS/hipBLAS/MIOpen on an AMD runner; no AMD device is present here.
+- **HIP.** AMD/ROCm validation is mandatory for the 0.2.0 release gate. The first-party table is now 72
+  rows, validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`,
+  and `ConvTranspose` are naive first-party device kernels with no library
+  dependency. Native AMD build and focused device parity passed on a cloud
+  MI300X; full-model AMD legs and persistent CI remain open. Reproduction:
+  `../2026-10-23-amd-devcloud/runbook.md`.
 
 ## Sources
 

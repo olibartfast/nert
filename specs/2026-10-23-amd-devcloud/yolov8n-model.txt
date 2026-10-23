@@ -1,0 +1,3 @@
+nodes=260 declared_opset=18 construct_ms=82.1014
+run=1 elements=705600 over_tolerance=0 max_abs=0.000686646 max_ratio=0.0101757 run_ms=91.0775
+run=2 elements=705600 over_tolerance=0 max_abs=0.000686646 max_ratio=0.0101757 run_ms=57.3728

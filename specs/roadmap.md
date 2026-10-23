@@ -108,6 +108,12 @@ Specification: `specs/2026-10-16-phase5-rename/`. No behavior changed.
 
 ## Phase N1 — Device Layers (In Progress)
 
+Release decision (2026-10-23): HIP on AMD/ROCm is mandatory for 0.2.0.
+Native AMD build and focused device parity passed on MI300X. Every in-scope
+model gate on AMD and persistent AMD CI are still required. NVIDIA HIP
+evidence does not close this gate. See `2026-10-23-amd-devcloud/runbook.md`.
+Acceptance: `2026-10-16-n1c-hip/validation.md`.
+
 The device-layer goal is simple to state: the same model and the same plan run
 on a device and match the CPU oracle within tolerance, with the device chosen
 once at load. The vendor strategy is hybrid and libraries-first: cuDNN and
@@ -130,18 +136,18 @@ What is complete:
 - OpenCL device support and the movement, pool, reshape, `Conv`, `Flatten`,
   and `Gemm` rows. The OpenCL table is still being expanded; the live
   model-by-device matrix is in `specs/2026-10-17-task-models/coverage.md`.
-- HIP first-party parity: 68 rows are hipified from the CUDA sources and
-  validated through the NVIDIA HIP backend on the RTX 3060. `Gemm`, `MatMul`,
-  `Conv`, and `ConvTranspose` remain blocked on rocBLAS/hipBLAS/MIOpen and an
-  AMD runner.
+- HIP first-party parity: 72 rows validated through the NVIDIA HIP backend
+  on the RTX 3060 — the 68 rows hipified from the CUDA sources plus naive
+  first-party `Gemm`, `MatMul`, `Conv`, and `ConvTranspose` device kernels
+  with no rocBLAS/hipBLAS/MIOpen dependency.
 
 The development environment is the `.devcontainer` 26.08 stack; the host stays
 toolkit-minimal.
 
-Still queued: the remaining OpenCL transformer and reduction rows, the
-HIP library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`),
-bias fusion and executor activation fusion, additional bench fixtures, a
-Vulkan shader toolchain, and an AMD runner built on rocBLAS and MIOpen.
+Still queued: the remaining OpenCL transformer and reduction rows, an AMD
+runner to validate the HIP table on the AMD backend, bias fusion and
+executor activation fusion, additional bench fixtures, and a Vulkan shader
+toolchain.
 
 The opt-in `bench/` harness exists under
 `specs/2026-10-16-kernel-bench-harness/`. It provides per-kernel CPU-oracle

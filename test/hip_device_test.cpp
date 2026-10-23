@@ -1,4 +1,4 @@
-// HIP device (N1c on NVIDIA): allocator, transfers, and the 68-row
+// HIP device (N1c on NVIDIA): allocator, transfers, and the 72-row
 // first-party kernel table.
 //
 // Needs a HIP-usable GPU at run time; without one every test SKIPs (never
@@ -31,8 +31,8 @@ TEST(NertHIPDevice, NamesItself) {
     (void)static_cast<nert::Transfer&>(const_cast<nert::Device&>(hip).transfer());
 }
 
-// The first-party table resolves every hipified row. Library-backed rows
-// (rocBLAS/hipBLAS/MIOpen) remain absent so the executor rejects them.
+// The first-party table resolves every row, matching the 72-row CPU oracle
+// with no library-backed exceptions.
 TEST(NertHIPDevice, KernelTableServesFirstPartyRows) {
     if (!HasHIPDevice()) {
         GTEST_SKIP() << "no HIP device";
@@ -107,12 +107,13 @@ TEST(NertHIPDevice, KernelTableServesFirstPartyRows) {
         "ReduceSum",
         "TopK",
         "Resize",
+        "Gemm",
+        "MatMul",
+        "Conv",
+        "ConvTranspose",
     };
     for (const char* row : rows) {
         EXPECT_NE(hip.kernels().find(row), nullptr) << row;
-    }
-    for (const char* row : {"Gemm", "MatMul", "Conv", "ConvTranspose"}) {
-        EXPECT_EQ(hip.kernels().find(row), nullptr) << row;
     }
 }
 

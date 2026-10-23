@@ -38,13 +38,13 @@ fallback or ONNX Runtime escape hatch; unsupported semantics fail explicitly.
 Version 0.2.0 is unreleased; the breaking namespace, header, filename,
 and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
 
-CPU and CUDA tables are complete at 72 op rows each. OpenCL has 68
-rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`)
-are unused by the catalog entries that currently load. HIP has 68
-first-party rows hipified from the CUDA sources; `Gemm`, `MatMul`,
-`Conv`, and `ConvTranspose` remain deferred to the rocBLAS/hipBLAS/
-MIOpen slice. HIP is not part of the 0.2.0 release gate, and the
-reference host has no AMD device for the AMD half.
+CPU, CUDA (with cuDNN), OpenCL and HIP have 72 op rows each. OpenCL now
+includes `Abs`, `Floor`, `GreaterOrEqual`, and `Neg`.
+HIP includes first-party `Gemm`, `MatMul`, `Conv`, and `ConvTranspose`
+without hipBLAS or MIOpen. Native AMD build and focused device parity
+passed on MI300X. Full-model AMD validation and persistent CI are mandatory
+for release 0.2.0 and remain outstanding. See the
+[AMD validation runbook](specs/2026-10-23-amd-devcloud/runbook.md).
 
 Full-model gates, not op-table presence, define coverage. As of 2026-10-22,
 24 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; no
@@ -69,11 +69,11 @@ is incomplete and 0.2.0 is not release-ready; see the
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
 `HipDevice()` exist only when the matching build flag is on. CPU and
 CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
-require cuDNN. OpenCL implements 68 rows as the portable backend. HIP
-implements the same 68 first-party rows as hipified sources; its four
-library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) are the
-next slice. The HIP sources are validated on the NVIDIA HIP backend;
-the AMD/ROCm build still needs an AMD runner.
+require cuDNN. OpenCL implements 72 rows as the portable backend. HIP
+implements all 72 rows, including first-party `Gemm`, `MatMul`, `Conv`,
+and `ConvTranspose` without hipBLAS or MIOpen. The HIP sources are validated
+on NVIDIA and a cloud MI300X through native AMD HIP; full-model AMD gates
+remain pending. Select AMD with `NERT_HIP_PLATFORM=amd` (CMake 3.21+).
 
 A device can load only graphs whose op types all have a row. Op-table
 presence is a coverage statement, not a correctness claim; full-model

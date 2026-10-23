@@ -141,6 +141,16 @@ __kernel void less_equal_i(__global const long* a, __global const long* b, __glo
     DECODE_OFFSETS(c)
     y[i] = a[ao] <= b[bo] ? 1 : 0;
 }
+__kernel void greater_equal_f(__global const float* a, __global const float* b, __global uchar* y, long count,
+                              StrideSet outStrides, StrideSet aStrides, StrideSet bStrides, int rank) {
+    DECODE_OFFSETS(c)
+    y[i] = a[ao] >= b[bo] ? 1 : 0;
+}
+__kernel void greater_equal_i(__global const long* a, __global const long* b, __global uchar* y, long count,
+                              StrideSet outStrides, StrideSet aStrides, StrideSet bStrides, int rank) {
+    DECODE_OFFSETS(c)
+    y[i] = a[ao] >= b[bo] ? 1 : 0;
+}
 __kernel void and_b(__global const uchar* a, __global const uchar* b, __global uchar* y, long count,
                     StrideSet outStrides, StrideSet aStrides, StrideSet bStrides, int rank) {
     DECODE_OFFSETS(c)
@@ -199,6 +209,9 @@ void Run(const Node& node, const std::vector<TensorView>& inputs, const std::vec
     } else if (op_name == "Greater") {
         entry = a.dtype == DataType::Float32 ? "greater_f" : "greater_i";
         cache_key = a.dtype == DataType::Float32 ? "GreaterF" : "GreaterI";
+    } else if (op_name == "GreaterOrEqual") {
+        entry = a.dtype == DataType::Float32 ? "greater_equal_f" : "greater_equal_i";
+        cache_key = a.dtype == DataType::Float32 ? "GreaterEqualF" : "GreaterEqualI";
     } else {
         entry = a.dtype == DataType::Float32 ? "less_equal_f" : "less_equal_i";
         cache_key = a.dtype == DataType::Float32 ? "LessEqualF" : "LessEqualI";
@@ -230,6 +243,10 @@ void Greater(const Node& node, const std::vector<TensorView>& inputs, const std:
 
 void LessOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     Run(node, inputs, outputs, "LessOrEqual", false);
+}
+
+void GreaterOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
+    Run(node, inputs, outputs, "GreaterOrEqual", false);
 }
 
 void And(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {

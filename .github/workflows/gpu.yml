@@ -13,6 +13,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  amd:
+    if: vars.NERT_AMD_GPU_CI == 'true'
+    name: HIP / AMD ROCm
+    runs-on: [self-hosted, linux, x64, nert-amd]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check AMD GPU and toolchain
+        run: |
+          /opt/rocm/bin/rocminfo
+          /opt/rocm/bin/hipcc --version
+      - name: Configure AMD backend
+        run: >-
+          cmake -S . -B build-hip-amd
+          -DCMAKE_BUILD_TYPE=Release -DNERT_BUILD_TESTS=ON
+          -DNERT_ENABLE_HIP=ON -DNERT_HIP_PLATFORM=amd
+          -DCMAKE_PREFIX_PATH=/opt/rocm
+          -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++
+      - name: Build
+        run: cmake --build build-hip-amd --parallel 4
+      - name: Test and reject skipped device cases
+        run: |
+          ctest --test-dir build-hip-amd -R '^nert_hip_' --no-tests=error \
+            --output-on-failure --output-junit hip-results.xml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('build-hip-amd/hip-results.xml').getroot()
+          assert root.findall('.//testcase'), 'No HIP test cases executed'
+          assert not root.findall('.//skipped'), 'Skipped CTest case'
+          assert '[  SKIPPED ]' not in ''.join(root.itertext()), 'Skipped GoogleTest case'
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gpu-HIP-AMD
+          path: |
+            build-hip-amd/hip-results.xml
+            build-hip-amd/Testing/Temporary/LastTest.log
   gpu:
     # Opt in only after registering a trusted NVIDIA runner. Pull-request
     # code must not execute automatically on a persistent self-hosted host.

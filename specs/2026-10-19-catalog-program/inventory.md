@@ -93,12 +93,16 @@ DINO 17, ViTPose/Depth/video 14, RAFT/RT-DETR 16, ViT classifier 17.
 
 - A model is PASS only with a full-model run against the reference on CPU,
   CUDA and OpenCL, reviewer PASS, and a commit ID.
-- Op-table presence is OPS, not correctness. The current OpenCL table has 68
-  rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`) are
-  unused by currently loadable entries.
-- HIP is outside the 0.2.0 gate. The first-party table is now 68 rows,
-  validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`, and
-  `ConvTranspose` remain blocked on rocBLAS/hipBLAS/MIOpen and an AMD device.
+- Op-table presence is OPS, not correctness. OpenCL now has 72 rows,
+  including `Abs`, `Floor`, `GreaterOrEqual`, `Neg` (local CTest 30/30).
+- HIP on AMD/ROCm is a mandatory 0.2.0 release gate (maintainer decision,
+  2026-10-23). It requires native AMD build wiring, the full 72-row table,
+  device parity tests with no skips, and reproducible full-model evidence
+  for each in-scope catalog entry on AMD. Existing CPU/CUDA/OpenCL PASS
+  counts remain evidence for those devices only; HIP/NVIDIA is not AMD
+  evidence. Native AMD build and focused tests passed on MI300X; full-model
+  legs and persistent CI remain UNRUN and block release. See
+  `../2026-10-16-n1c-hip/validation.md` for the acceptance checklist.
 - Host postprocessing (tokenizer, NMS, mask/flow resize) is outside the ONNX
   gate and must be recorded separately.
 - No release while any in-scope entry is Open or Missing-export.

@@ -211,6 +211,7 @@ if(NERT_ENABLE_OPENCL)
     target_sources(nert PRIVATE src/opencl/cast.cpp)
     target_sources(nert PRIVATE src/opencl/constant_of_shape.cpp)
     target_sources(nert PRIVATE src/opencl/compare_ops.cpp)
+    target_sources(nert PRIVATE src/opencl/unary_numeric.cpp)
     target_sources(nert PRIVATE src/opencl/unary_ops.cpp)
     target_sources(nert PRIVATE src/opencl/reduce_ops.cpp)
     target_sources(nert PRIVATE src/opencl/einsum.cpp)
@@ -228,30 +229,46 @@ if(NERT_ENABLE_OPENCL)
     target_link_libraries(nert PRIVATE OpenCL::OpenCL)
 endif()
 
-# HIP device layer (Phase N1c, NVIDIA target), opt-in like CUDA/OpenCL:
-# NERT_ENABLE_HIP=ON requires a CUDA compiler (the NVIDIA backend drives
-# nvcc) plus the HIP headers (HIP_INCLUDE_DIR or $HIP_PATH, e.g. from the
-# hip-dev package); OFF (default) leaves the link closure
-# standard-library-only. Independent of the other device flags. The table
-# covers the 68 first-party rows; Gemm/MatMul/Conv/ConvTranspose need the
-# rocBLAS/hipBLAS/MIOpen AMD slice.
-option(NERT_ENABLE_HIP "Build NERT with the HIP device layer (NVIDIA target)" OFF)
+# HIP is opt-in. NVIDIA keeps the nvcc + HIP-header path; AMD uses native
+# CMake HIP language support and ROCm. No BLAS or convolution library needed.
+option(NERT_ENABLE_HIP "Build NERT with the HIP device layer" OFF)
+set(NERT_HIP_PLATFORM "nvidia" CACHE STRING "HIP backend: nvidia or amd")
+set_property(CACHE NERT_HIP_PLATFORM PROPERTY STRINGS nvidia amd)
 if(NERT_ENABLE_HIP)
-    include(CheckLanguage)
-    check_language(CUDA)
-    if(NOT CMAKE_CUDA_COMPILER)
-        message(FATAL_ERROR
-            "NERT_ENABLE_HIP=ON requires a CUDA compiler (nvcc) for the NVIDIA target; none was found.")
+    if(NOT NERT_HIP_PLATFORM STREQUAL "nvidia" AND NOT NERT_HIP_PLATFORM STREQUAL "amd")
+        message(FATAL_ERROR "NERT_HIP_PLATFORM must be nvidia or amd")
     endif()
-    enable_language(CUDA)
-    find_package(CUDAToolkit REQUIRED)
-    find_path(HIP_INCLUDE_DIR hip/hip_runtime_api.h
-        HINTS $ENV{HIP_PATH} /opt/rocm
-        PATH_SUFFIXES include
-        DOC "HIP headers (hip-dev package or HIP_PATH)")
-    if(NOT HIP_INCLUDE_DIR)
-        message(FATAL_ERROR
-            "NERT_ENABLE_HIP=ON requires the HIP headers (set HIP_INCLUDE_DIR or HIP_PATH); none were found.")
+    if(NERT_HIP_PLATFORM STREQUAL "amd")
+        if(CMAKE_VERSION VERSION_LESS 3.21)
+            message(FATAL_ERROR "The AMD HIP backend requires CMake 3.21 or newer")
+        endif()
+        enable_language(HIP)
+        find_package(hip CONFIG REQUIRED)
+        set_property(TARGET nert PROPERTY HIP_STANDARD 17)
+        set_property(TARGET nert PROPERTY HIP_STANDARD_REQUIRED ON)
+        target_compile_definitions(nert PRIVATE __HIP_PLATFORM_AMD__)
+        target_link_libraries(nert PRIVATE hip::host)
+    else()
+        include(CheckLanguage)
+        check_language(CUDA)
+        if(NOT CMAKE_CUDA_COMPILER)
+            message(FATAL_ERROR
+                "NERT_ENABLE_HIP=ON with NERT_HIP_PLATFORM=nvidia requires nvcc; none was found.")
+        endif()
+        enable_language(CUDA)
+        find_package(CUDAToolkit REQUIRED)
+        find_path(HIP_INCLUDE_DIR hip/hip_runtime_api.h
+            HINTS $ENV{HIP_PATH} /opt/rocm
+            PATH_SUFFIXES include
+            DOC "HIP headers (hip-dev package or HIP_PATH)")
+        if(NOT HIP_INCLUDE_DIR)
+            message(FATAL_ERROR
+                "NERT_ENABLE_HIP=ON requires HIP headers (set HIP_INCLUDE_DIR or HIP_PATH)")
+        endif()
+        set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp PROPERTY LANGUAGE CUDA)
+        target_compile_definitions(nert PRIVATE __HIP_PLATFORM_NVIDIA__)
+        target_include_directories(nert PRIVATE ${HIP_INCLUDE_DIR})
+        target_link_libraries(nert PRIVATE CUDA::cudart)
     endif()
     target_sources(nert PRIVATE src/hip_device.cpp src/hip/table.cpp)
     target_sources(nert PRIVATE src/hip/abs.cu src/hip/add.cu src/hip/and.cu src/hip/arg_max.cu src/hip/average_pool.cu src/hip/cast.cu)
@@ -266,17 +283,15 @@ if(NERT_ENABLE_HIP)
     target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/sin.cu src/hip/slice.cu src/hip/softmax.cu src/hip/split.cu src/hip/sqrt.cu)
     target_sources(nert PRIVATE src/hip/squeeze.cu src/hip/sub.cu src/hip/tanh.cu src/hip/tile.cu src/hip/top_k.cu src/hip/transpose.cu)
     target_sources(nert PRIVATE src/hip/unsqueeze.cu src/hip/where.cu)
-    # The HIP dialect compiles with nvcc on the NVIDIA target (what
-    # hipcc -platform=nvidia does). .cu files pick up CUDA automatically;
-    # the .cpp device file needs it set explicitly.
-    set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/hip_device.cpp PROPERTY LANGUAGE CUDA)
-    # PRIVATE: the NVIDIA backend selection + HIP headers stay inside `nert`,
-    # so consumers stay toolkit-free.
-    target_compile_definitions(nert PRIVATE __HIP_PLATFORM_NVIDIA__)
-    target_include_directories(nert PRIVATE ${HIP_INCLUDE_DIR})
-    # PRIVATE: no HIP type leaks through the public headers, so consumers
-    # stay toolkit-free.
-    target_link_libraries(nert PRIVATE CUDA::cudart)
+    target_sources(nert PRIVATE src/hip/gemm.cu src/hip/mat_mul.cu src/hip/conv.cu src/hip/conv_transpose.cu)
+    if(NERT_HIP_PLATFORM STREQUAL "amd")
+        get_target_property(nert_sources nert SOURCES)
+        foreach(hip_source IN LISTS nert_sources)
+            if(hip_source MATCHES "^src/hip/.*\\.cu$")
+                set_source_files_properties(${hip_source} PROPERTIES LANGUAGE HIP)
+            endif()
+        endforeach()
+    endif()
 endif()
 
 # Tests. BUILD_INFERENCE_ENGINE_TESTS is honoured for parent projects
@@ -303,8 +318,12 @@ if(NERT_IS_TOP_LEVEL)
         "${CMAKE_CURRENT_BINARY_DIR}/nertConfigVersion.cmake"
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion)
+    set(nert_config_dependencies "")
+    if(NERT_ENABLE_HIP AND NERT_HIP_PLATFORM STREQUAL "amd")
+        set(nert_config_dependencies "include(CMakeFindDependencyMacro)\nfind_dependency(hip CONFIG)\n")
+    endif()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/nertConfig.cmake"
-"include(\"\${CMAKE_CURRENT_LIST_DIR}/nertTargets.cmake\")
+"${nert_config_dependencies}include(\"\${CMAKE_CURRENT_LIST_DIR}/nertTargets.cmake\")
 ")
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/nertConfig.cmake"
