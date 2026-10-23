@@ -123,8 +123,8 @@ SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
 - **HIP.** AMD/ROCm validation is mandatory for the 0.2.0 release gate. The first-party table is now 72
   rows, validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`,
   and `ConvTranspose` are naive first-party device kernels with no library
-  dependency. Native AMD build and focused device parity passed on a cloud
-  MI300X; full-model AMD legs and persistent CI remain open. Reproduction:
+  dependency. Native AMD build and focused device parity passed on an AMD
+  Developer Cloud (AMD vendor program, not a neocloud) MI300X; full-model AMD legs and persistent CI remain open. Reproduction:
   `../2026-10-23-amd-devcloud/runbook.md`.
 
 ## Sources

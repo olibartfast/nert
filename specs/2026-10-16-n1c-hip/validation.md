@@ -6,7 +6,8 @@ have now run on MI300X; full-model and persistent CI gates remain open.
 ## Checks
 
 Mandatory 0.2.0 release gate, added by maintainer decision on 2026-10-23.
-AMD Developer Cloud is the intended hardware source; access and a VM are
+AMD Developer Cloud (AMD's vendor developer program, not a neocloud) is
+the intended hardware source; access and a VM are
 not provisioned by this specification. Current evidence is recorded below.
 NVIDIA HIP runs cannot substitute for any AMD execution evidence.
 

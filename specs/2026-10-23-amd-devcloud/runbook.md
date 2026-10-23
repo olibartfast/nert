@@ -4,6 +4,10 @@ Date: 2026-10-23. Base commit: `d906f7f`, with the local HIP compute,
 OpenCL parity and AMD CMake changes. This is validation of a working-tree
 snapshot, not a claim that those changes are committed or released.
 
+Hardware source: AMD Developer Cloud, AMD's vendor developer program for
+on-demand AMD GPU access. It is not an independent neocloud / GPU-cloud
+provider (e.g. CoreWeave, Nebius, Lambda, Crusoe).
+
 ## Access and VM
 
 1. Sign in to the AMD AI Developer Program / AMD Developer Cloud in your
@@ -253,6 +257,6 @@ for a different catalog artifact. The other catalog AMD legs are still UNRUN.
   exports. No tag or release was created.
 - At the owner's request, `sync; shutdown -h now` was sent via SSH after all
   logs were saved locally; SSH returned success. Cloud-resource deletion is
-  not verified. The owner was advised to delete the droplet in the console,
-  since power-off alone does not stop billing. No cloud API deletion was
-  performed by this run.
+  not verified. The owner was advised to delete the VM/instance in the AMD
+  Developer Cloud console, since power-off alone does not stop billing. No
+  cloud API deletion was performed by this run.

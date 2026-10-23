@@ -42,7 +42,8 @@ CPU, CUDA (with cuDNN), OpenCL and HIP have 72 op rows each. OpenCL now
 includes `Abs`, `Floor`, `GreaterOrEqual`, and `Neg`.
 HIP includes first-party `Gemm`, `MatMul`, `Conv`, and `ConvTranspose`
 without hipBLAS or MIOpen. Native AMD build and focused device parity
-passed on MI300X. Full-model AMD validation and persistent CI are mandatory
+passed on MI300X via AMD Developer Cloud (AMD's vendor developer program,
+not a neocloud). Full-model AMD validation and persistent CI are mandatory
 for release 0.2.0 and remain outstanding. See the
 [AMD validation runbook](specs/2026-10-23-amd-devcloud/runbook.md).
 
@@ -72,7 +73,8 @@ CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
 require cuDNN. OpenCL implements 72 rows as the portable backend. HIP
 implements all 72 rows, including first-party `Gemm`, `MatMul`, `Conv`,
 and `ConvTranspose` without hipBLAS or MIOpen. The HIP sources are validated
-on NVIDIA and a cloud MI300X through native AMD HIP; full-model AMD gates
+on NVIDIA and an AMD Developer Cloud (AMD vendor program, not a neocloud)
+MI300X through native AMD HIP; full-model AMD gates
 remain pending. Select AMD with `NERT_HIP_PLATFORM=amd` (CMake 3.21+).
 
 A device can load only graphs whose op types all have a row. Op-table
