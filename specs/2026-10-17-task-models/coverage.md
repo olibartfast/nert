@@ -27,7 +27,7 @@ HIP is not part of the 0.2.0 release gate.
 | CPU (oracle) | 72 | Complete reference set. |
 | CUDA | 72 | Complete set; `Conv` and `ConvTranspose` require cuDNN. Strict float32 (`CUBLAS_PEDANTIC_MATH`, `CUDNN_FMA_MATH`). |
 | OpenCL | 68 | Complete for every currently loadable catalog entry. Missing `Abs`, `Floor`, `GreaterOrEqual`, `Neg`, none used by those entries. |
-| HIP | 68 | First-party rows hipified from CUDA and validated on the NVIDIA HIP backend. `Gemm`, `MatMul`, `Conv`, and `ConvTranspose` remain the rocBLAS/hipBLAS/MIOpen slice; **not part of the 0.2.0 release gate**. |
+| HIP | 72 | Complete first-party set, validated on the NVIDIA HIP backend. `Gemm`, `MatMul`, `Conv`, and `ConvTranspose` are naive device kernels with no library dependency; **not part of the 0.2.0 release gate**. |
 
 The CUDA 72 rows assume a cuDNN-enabled build: `Conv` and `ConvTranspose` sit
 behind `#ifdef NERT_HAS_CUDNN`, so a non-cuDNN CUDA build would not have those
@@ -113,10 +113,11 @@ SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
   rendering are host-side and outside the ONNX gate.
 - **Consumer adapter.** Neuriplo selects CPU or opt-in CUDA for NERT; there is
   no OpenCL/HIP consumer selection. OpenCL/HIP columns are engine capability.
-- **HIP.** Not part of the 0.2.0 release gate. The first-party table is now 68
-  rows, hipified from CUDA and validated through the NVIDIA HIP backend. The
-  four library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) still
-  need rocBLAS/hipBLAS/MIOpen on an AMD runner; no AMD device is present here.
+- **HIP.** Not part of the 0.2.0 release gate. The first-party table is now 72
+  rows, validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`,
+  and `ConvTranspose` are naive first-party device kernels with no library
+  dependency. The AMD-backend build still needs an AMD runner; no AMD device
+  is present here.
 
 ## Sources
 

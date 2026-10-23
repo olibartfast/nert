@@ -2,9 +2,11 @@
 //
 // One function-local static maps exact op-type strings to their kernels;
 // unknown op types resolve to null so the executor rejects the node naming
-// op + node. These rows are hipified from src/cuda/ and hand-reviewed.
-// Gemm, MatMul, Conv, and ConvTranspose remain absent: they need rocBLAS,
-// hipBLAS, or MIOpen on the AMD backend and are the next HIP slice.
+// op + node. The 68 elementwise/shape/reduction rows are hipified from
+// src/cuda/ and hand-reviewed; Gemm, MatMul, Conv, and ConvTranspose are
+// hand-written first-party HIP (no rocBLAS, hipBLAS, or MIOpen dependency),
+// so the table matches the 72-row CPU oracle on both the NVIDIA and AMD HIP
+// backends.
 
 #include "nert/device.hpp"
 
@@ -84,6 +86,10 @@ void ReduceSum(const Node& node, const std::vector<TensorView>& inputs, const st
 void TopK(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Resize(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Einsum(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Gemm(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void MatMul(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Conv(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void ConvTranspose(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 KernelFn FindHIPKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
@@ -155,6 +161,10 @@ KernelFn FindHIPKernel(const std::string& op_type) {
         {"ReduceSum", &ReduceSum},
         {"TopK", &TopK},
         {"Resize", &Resize},
+        {"Gemm", &Gemm},
+        {"MatMul", &MatMul},
+        {"Conv", &Conv},
+        {"ConvTranspose", &ConvTranspose},
     };
     const auto it = table.find(op_type);
     return it == table.end() ? nullptr : it->second;

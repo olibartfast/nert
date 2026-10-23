@@ -27,11 +27,20 @@ headers from scratch until a packaged install exists).
   `MatMul`, `Conv`, and `ConvTranspose`, which need rocBLAS/hipBLAS/
   MIOpen. The table probe and adapted CUDA first-party suites run on
   the RTX 3060 through the NVIDIA HIP backend.
+- **M7 (2026-10-23): 72-row first-party table, no library slice.** The
+  four compute rows land as naive first-party HIP kernels with double
+  accumulation (`src/hip/gemm.cu`, `mat_mul.cu`, `conv.cu`,
+  `conv_transpose.cu`), mirroring the CPU oracle's validation exactly;
+  no rocBLAS/hipBLAS/MIOpen dependency, so the same sources build for
+  the AMD backend. The table probe asserts all 72 rows resolve, and the
+  kernel suite gains Gemm/MatMul/Conv/ConvTranspose parity + negative
+  tests vs the oracle on the RTX 3060.
 
 ## AMD half (still queued on the AMD runner)
 
-- `HIP_PLATFORM=amd` build (hipcc/clang), rocBLAS `Gemm`,
-  MIOpen `Conv`, full parity — per the 2026-10-16 N1c packet.
+- `HIP_PLATFORM=amd` build (hipcc/clang) of the 72-row table, full
+  parity — per the 2026-10-16 N1c packet. No library port is pending:
+  the compute rows are first-party, so only backend validation remains.
 
 ## Validation
 

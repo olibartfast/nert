@@ -77,12 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NERT_HAS_CUDNN` only, non-zero output_padding and asymmetric pads still
   rejected on CUDA `ConvTranspose`). Every CPU op now has a CUDA row (`ConvTranspose`
   only under `NERT_HAS_CUDNN`) — tables complete.
-- HIP first-party table: 68 rows hipified from `src/cuda/` and validated
-  through the NVIDIA HIP backend on the RTX 3060. `Gemm`, `MatMul`, `Conv`,
-  and `ConvTranspose` remain the rocBLAS/hipBLAS/MIOpen slice and are absent
-  from the HIP table, so the executor rejects them explicitly. HIP remains
-  outside the 0.2.0 release gate until the AMD runner validates the library
-  half.
+- HIP first-party table: 72 rows validated through the NVIDIA HIP backend
+  on the RTX 3060 — the 68 elementwise/shape/reduction rows hipified from
+  `src/cuda/`, plus naive first-party `Gemm`, `MatMul`, `Conv`, and
+  `ConvTranspose` device kernels (double accumulation, no rocBLAS/hipBLAS/
+  MIOpen dependency) matching the CPU oracle. The executor no longer
+  rejects those four ops on HIP. HIP remains outside the 0.2.0 release
+  gate until an AMD runner validates the AMD half.
 - OpenCL shared movement rows: `Transpose`, `Slice`, `Concat`,
   `Shape`, `Unsqueeze`, `Gather` (hand-written OpenCL C, oracle
   vs device green on the RTX 3060) — table 9→15; per-model portable

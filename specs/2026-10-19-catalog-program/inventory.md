@@ -96,9 +96,11 @@ DINO 17, ViTPose/Depth/video 14, RAFT/RT-DETR 16, ViT classifier 17.
 - Op-table presence is OPS, not correctness. The current OpenCL table has 68
   rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`) are
   unused by currently loadable entries.
-- HIP is outside the 0.2.0 gate. The first-party table is now 68 rows,
+- HIP is outside the 0.2.0 gate. The first-party table is now 72 rows,
   validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`, and
-  `ConvTranspose` remain blocked on rocBLAS/hipBLAS/MIOpen and an AMD device.
+  `ConvTranspose` are naive first-party device kernels, so no AMD library
+  is required to load them — only the AMD-backend build still needs an AMD
+  device.
 - Host postprocessing (tokenizer, NMS, mask/flow resize) is outside the ONNX
   gate and must be recorded separately.
 - No release while any in-scope entry is Open or Missing-export.

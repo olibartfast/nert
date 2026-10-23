@@ -40,11 +40,13 @@ and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
 
 CPU and CUDA tables are complete at 72 op rows each. OpenCL has 68
 rows; the four absent types (`Abs`, `Floor`, `GreaterOrEqual`, `Neg`)
-are unused by the catalog entries that currently load. HIP has 68
-first-party rows hipified from the CUDA sources; `Gemm`, `MatMul`,
-`Conv`, and `ConvTranspose` remain deferred to the rocBLAS/hipBLAS/
-MIOpen slice. HIP is not part of the 0.2.0 release gate, and the
-reference host has no AMD device for the AMD half.
+are unused by the catalog entries that currently load. HIP has 72
+first-party rows with no library dependency: the 68 elementwise, shape,
+and reduction rows are hipified from the CUDA sources, and `Gemm`,
+`MatMul`, `Conv`, and `ConvTranspose` are naive device kernels with
+double accumulation matching the CPU oracle. HIP is not part of the
+0.2.0 release gate, and the reference host has no AMD device for the
+AMD half.
 
 Full-model gates, not op-table presence, define coverage. As of 2026-10-23,
 24 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; no
@@ -74,13 +76,12 @@ is incomplete and 0.2.0 is not release-ready; see the
 ## Devices
 
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
-`HipDevice()` exist only when the matching build flag is on. CPU and
-CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
-require cuDNN. OpenCL implements 68 rows as the portable backend. HIP
-implements the same 68 first-party rows as hipified sources; its four
-library-backed rows (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) are the
-next slice. The HIP sources are validated on the NVIDIA HIP backend;
-the AMD/ROCm build still needs an AMD runner.
+`HipDevice()` exist only when the matching build flag is on. CPU, CUDA,
+and HIP implement the full 72-row table; CUDA `Conv` and
+`ConvTranspose` require cuDNN, while the HIP compute rows are naive
+first-party kernels with no library dependency. OpenCL implements 68
+rows as the portable backend. The HIP sources are validated on the
+NVIDIA HIP backend; the AMD/ROCm build still needs an AMD runner.
 
 A device can load only graphs whose op types all have a row. Op-table
 presence is a coverage statement, not a correctness claim; full-model
@@ -173,7 +174,7 @@ Last full local pass: 2026-10-23.
 | CUDA + cuDNN Frontend (`nert-gpu:26.08`, CUDA 13.4.59, cuDNN 9.25.0, Frontend v1.31.0) | 24/24; ResNet-18 full 49-node dispatch, top-1/top-5 identical, max abs `2.44e-03` (recorded device deviation) |
 | OpenCL CTest | 29/29 |
 | OpenCL full-model gate | Grounding DINO exit 0, 19,224 nodes, 2,215 MiB peak board memory, canonicalized task gate pass (recorded Grounding DINO deviation) |
-| HIP (NVIDIA backend, RTX 3060) | 15/15 CTest; 149/149 adapted first-party CUDA tests |
+| HIP (NVIDIA backend, RTX 3060) | 15/15 CTest; 72-row table probe; 14/14 Gemm/MatMul/Conv/ConvTranspose parity + negative tests |
 | Format | 298 files clean |
 
 The CUDA row is a Docker measurement, not a host-only result; the image and

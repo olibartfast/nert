@@ -233,8 +233,9 @@ endif()
 # nvcc) plus the HIP headers (HIP_INCLUDE_DIR or $HIP_PATH, e.g. from the
 # hip-dev package); OFF (default) leaves the link closure
 # standard-library-only. Independent of the other device flags. The table
-# covers the 68 first-party rows; Gemm/MatMul/Conv/ConvTranspose need the
-# rocBLAS/hipBLAS/MIOpen AMD slice.
+# covers the full 72 first-party rows with no library dependency: Gemm,
+# MatMul, Conv, and ConvTranspose are naive device kernels (not rocBLAS,
+# hipBLAS, or MIOpen), so the same sources build for the AMD backend.
 option(NERT_ENABLE_HIP "Build NERT with the HIP device layer (NVIDIA target)" OFF)
 if(NERT_ENABLE_HIP)
     include(CheckLanguage)
@@ -266,6 +267,7 @@ if(NERT_ENABLE_HIP)
     target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/sin.cu src/hip/slice.cu src/hip/softmax.cu src/hip/split.cu src/hip/sqrt.cu)
     target_sources(nert PRIVATE src/hip/squeeze.cu src/hip/sub.cu src/hip/tanh.cu src/hip/tile.cu src/hip/top_k.cu src/hip/transpose.cu)
     target_sources(nert PRIVATE src/hip/unsqueeze.cu src/hip/where.cu)
+    target_sources(nert PRIVATE src/hip/gemm.cu src/hip/mat_mul.cu src/hip/conv.cu src/hip/conv_transpose.cu)
     # The HIP dialect compiles with nvcc on the NVIDIA target (what
     # hipcc -platform=nvidia does). .cu files pick up CUDA automatically;
     # the .cpp device file needs it set explicitly.

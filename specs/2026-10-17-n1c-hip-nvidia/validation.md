@@ -12,6 +12,9 @@ Defined before implementation. Bars: OFF untouched, format clean, no
   NVIDIA backend; the adapted CUDA first-party suites pass; library-backed rows
   (`Gemm`, `MatMul`, `Conv`, `ConvTranspose`) remain null so the executor
   rejects them explicitly.
+- [V-4] M7: the 72-row first-party table builds and resolves through the HIP
+  NVIDIA backend; the four compute rows meet the CPU oracle (parity +
+  negatives); the OFF and OpenCL suites stay green; format clean.
 
 ## Evidence
 
@@ -23,3 +26,4 @@ Defined before implementation. Bars: OFF untouched, format clean, no
 | M2 | Relu/Add HIP (hipified, reviewed) vs CPU (exact, int64 bcast, Gemm permanent probe) + OFF 8/8 + HIP-leg 10/10 + format | pass | 2026-10-17 | Translation is API-names only; `<<<>>>` kept, nvcc-compiled. |
 | M1 | HipDevice names/seam/empty-table/1KiB round trip on RTX 3060 via HIP NVIDIA backend + OFF 8/8 + HIP-leg 9/9 + format | pass | 2026-10-17 | nvcc 12.0 + hip-dev 6.2 headers (rootless scratch); deprecated-CUDA warnings come from AMD headers, not our code. |
 | M6 | 59 additional hipified files; 68-row first-party table; `build-hip` on RTX 3060 via NVIDIA HIP; `ctest --test-dir build-hip` 15/15; adapted CUDA first-party suites 149/149; format 298 | pass | 2026-10-22 | `Gemm`, `MatMul`, `Conv`, `ConvTranspose` intentionally absent; AMD/ROCm half still pending. |
+| M7 | 4 first-party compute rows (`src/hip/gemm.cu`, `mat_mul.cu`, `conv.cu`, `conv_transpose.cu`: naive, double-accum, no library); 72-row table probe; `build-hip` on RTX 3060 via NVIDIA HIP `ctest` 15/15; focused `nert_hip_kernels_test` Gemm/MatMul/Conv filter 14/14; `build-ocl` 29/29; OFF `build` 13/13; `scripts/format.sh --check` 302 files | pass | 2026-10-23 | No rocBLAS/hipBLAS/MIOpen dependency anywhere; only the AMD-backend build still needs an AMD runner. |
