@@ -46,9 +46,12 @@ first-party rows hipified from the CUDA sources; `Gemm`, `MatMul`,
 MIOpen slice. HIP is not part of the 0.2.0 release gate, and the
 reference host has no AMD device for the AMD half.
 
-Full-model gates, not op-table presence, define coverage. As of 2026-10-22,
+Full-model gates, not op-table presence, define coverage. As of 2026-10-23,
 24 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; no
-entry remains open, and 6 entries need an ONNX export.
+entry remains open, and 6 entries need an ONNX export. The CUDA path was
+revalidated in Docker with the cuDNN Frontend; see the validation snapshot
+below.
+
 Image understanding (GGUF/llama.cpp) and Gaussian
 Splatting (LGM/GRM) are out of scope for this ONNX runtime. The catalog
 is incomplete and 0.2.0 is not release-ready; see the
@@ -63,6 +66,10 @@ is incomplete and 0.2.0 is not release-ready; see the
 - [Memory footprint profiling](docs/memory-footprint-profiling.md) —
   planned model fit/sizing report (API + CLI), the accounting model, and
   a current plan-level workaround.
+- [cuDNN Frontend validation](specs/2026-10-18-n1e-cudnn-graph/validation.md)
+  — Docker CUDA/cuDNN build, CTest result, and ResNet-18 gate.
+- [Grounding DINO OpenCL validation](specs/2026-10-22-grounding-dino-opencl/validation.md)
+  — live-buffer remedy and the full-model OpenCL gate.
 
 ## Devices
 
@@ -155,6 +162,23 @@ toolkit-only runners stay green. The bench driver runs as
 `ctest -R bench_runtime` (missing GPU prints `SKIP:` and exits 0).
 
 Check formatting with `scripts/format.sh --check` (or `--fix`).
+
+## Validation snapshot
+
+Last full local pass: 2026-10-23.
+
+| Surface | Result |
+| --- | --- |
+| CPU CTest | 13/13 |
+| CUDA + cuDNN Frontend (`nert-gpu:26.08`, CUDA 13.4.59, cuDNN 9.25.0, Frontend v1.31.0) | 24/24; ResNet-18 full 49-node dispatch, top-1/top-5 identical, max abs `2.44e-03` (recorded device deviation) |
+| OpenCL CTest | 29/29 |
+| OpenCL full-model gate | Grounding DINO exit 0, 19,224 nodes, 2,215 MiB peak board memory, canonicalized task gate pass (recorded Grounding DINO deviation) |
+| HIP (NVIDIA backend, RTX 3060) | 15/15 CTest; 149/149 adapted first-party CUDA tests |
+| Format | 298 files clean |
+
+The CUDA row is a Docker measurement, not a host-only result; the image and
+the pinned cuDNN Frontend headers are described in the build section and the
+linked validation packet.
 
 ## Opset policy
 
