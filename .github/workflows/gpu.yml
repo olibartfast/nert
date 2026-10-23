@@ -1,0 +1,68 @@
+name: GPU validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'wip/nert-version-aware-opsets']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gpu:
+    # Opt in only after registering a trusted NVIDIA runner. Pull-request
+    # code must not execute automatically on a persistent self-hosted host.
+    if: vars.NERT_GPU_CI == 'true'
+    name: ${{ matrix.backend }} / NVIDIA
+    runs-on: [self-hosted, linux, x64, nert-nvidia]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        backend: [CUDA, HIP]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check GPU and toolchain
+        run: |
+          nvidia-smi
+          nvcc --version
+          cmake --version
+      - name: Configure
+        run: >-
+          cmake -S . -B build-gpu-${{ matrix.backend }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DNERT_BUILD_TESTS=ON
+          -DNERT_ENABLE_${{ matrix.backend }}=ON
+      - name: Build
+        run: cmake --build build-gpu-${{ matrix.backend }} --parallel 2
+      - name: Run device suites and reject skipped tests
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          backend_lower="${BACKEND,,}"
+          ctest --test-dir "build-gpu-$BACKEND" \
+            -R "^nert_${backend_lower}_" --no-tests=error \
+            --output-on-failure --output-junit gpu-results.xml
+          python3 - "build-gpu-$BACKEND/gpu-results.xml" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          root = ET.parse(sys.argv[1]).getroot()
+          cases = root.findall('.//testcase')
+          assert cases, 'No device test cases executed'
+          for case in cases:
+              assert case.find('skipped') is None, f"Skipped CTest: {case.attrib}"
+              output = ''.join(case.itertext())
+              assert '[  SKIPPED ]' not in output, f"Skipped GoogleTest: {case.attrib}"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gpu-${{ matrix.backend }}
+          path: |
+            build-gpu-${{ matrix.backend }}/gpu-results.xml
+            build-gpu-${{ matrix.backend }}/Testing/Temporary/LastTest.log
