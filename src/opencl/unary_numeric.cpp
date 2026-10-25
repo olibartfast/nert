@@ -26,6 +26,12 @@ __kernel void neg_i(__global const long* x, __global long* y, long n) {
 __kernel void floor_f(__global const float* x, __global float* y, long n) {
     long i = get_global_id(0); if (i < n) y[i] = floor(x[i]);
 }
+__kernel void sign_f(__global const float* x, __global float* y, long n) {
+    long i = get_global_id(0); if (i < n) y[i] = isnan(x[i]) ? x[i] : (float)((0.0f < x[i]) - (x[i] < 0.0f));
+}
+__kernel void sign_i(__global const long* x, __global long* y, long n) {
+    long i = get_global_id(0); if (i < n) y[i] = (long)(((long)0 < x[i]) - (x[i] < (long)0));
+}
 )CLC";
 
 void Check(cl_int status, const std::string& context) {
@@ -80,6 +86,12 @@ void Run(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 
 void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     Run(node, inputs, outputs, "Abs", "abs_f", "abs_i");
+}
+void Sign(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
+    if (inputs.size() == 1 && outputs.size() == 1 && inputs[0].dims != outputs[0].dims) {
+        throw InferenceException("Sign: shape mismatch");
+    }
+    Run(node, inputs, outputs, "Sign", "sign_f", "sign_i");
 }
 void Neg(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs) {
     Run(node, inputs, outputs, "Neg", "neg_f", "neg_i");

@@ -1,0 +1,5 @@
+input input dtype=float32 dims=1,3,432,432 file=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin
+output dets dtype=float32 elems=800 bytes=3200 file=/tmp/nert-release-gates/rfdetr_seg_medium/cpu_dets.bin
+output labels dtype=float32 elems=18200 bytes=72800 file=/tmp/nert-release-gates/rfdetr_seg_medium/cpu_labels.bin
+output masks dtype=float32 elems=2332800 bytes=9331200 file=/tmp/nert-release-gates/rfdetr_seg_medium/cpu_masks.bin
+device=cpu construct_ms=14.3416 run_ms=254521 total_ms=254536 nodes_dispatched=1069

@@ -1,0 +1,26 @@
+{
+  "seconds": 6.4824740290641785,
+  "outputs": {
+    "dets": {
+      "over_tol": 2,
+      "elements": 800,
+      "max_abs": 0.0017643868923187256,
+      "max_ratio": 1.565569145919927
+    },
+    "labels": {
+      "over_tol": 0,
+      "elements": 18200,
+      "max_abs": 0.0025300979614257812,
+      "max_ratio": 0.4042218249922142
+    },
+    "masks": {
+      "over_tol": 12309,
+      "elements": 2332800,
+      "max_abs": 0.09166908264160156,
+      "max_ratio": 21.133943425053832
+    }
+  },
+  "gate_exit": 1,
+  "process_exit": 0,
+  "strict_pass": false
+}

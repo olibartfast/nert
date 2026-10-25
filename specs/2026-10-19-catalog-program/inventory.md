@@ -1,7 +1,8 @@
 # Neuriplo catalog inventory
 
-Date: 2026-10-22. Release scope: **30 in-scope ONNX entries** out of 32
-catalog groups. NERT is ONNX-only; image understanding (GGUF/llama.cpp) and
+Date: 2026-10-24. Release scope: **29 available in-scope ONNX entries** out of 32
+catalog groups, with one unavailable keypoint-size placeholder explicitly
+deferred by the user on 2026-10-24. NERT is ONNX-only; image understanding (GGUF/llama.cpp) and
 Gaussian Splatting are approved out of scope. The full census is retained at
 `$HERMES_CACHE/cache/scratch/nert-specs-slim-2026-10-19/inventory-full.md`.
 
@@ -9,27 +10,29 @@ Gaussian Splatting are approved out of scope. The full census is retained at
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS on CPU/CUDA/OpenCL | 24 | ResNet-18, YOLO26n, OWLv2, RF-DETR seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s\*, YOLO26x\*, RT-DETRv4-s, RF-DETR seg-nano-576\*, Grounding DINO (GD deviation), YOLOv8n, YOLO11m-seg, OWL-ViT, ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small, entry 29 (VideoMAE/ViViT/TimeSformer) |
-| Open | 0 | — |
-| Missing ONNX export | 6 | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes |
+| PASS on CPU/CUDA/OpenCL | 29 | The prior 24 plus the five newly provisioned representatives. Detection-small passes strictly; EdgeCrafter det/seg/pose and RF-DETR seg-medium carry approved, frozen-fixture task deviations with raw failures preserved. |
+| Open | 0 | Native AMD and independent packet review are tracked separately. |
+| Missing ONNX export | 0 | — |
+| Deferred placeholder | 1 | RF-DETR keypoint other sizes; only already-gated Preview exists upstream. User-approved deferral 2026-10-24. |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
-| **Total** | **32** | |
+| **Total** | **32** | 29 in scope |
 
 \* YOLO26s and YOLO26x carry the documented R-6 TopK tie-flip deviation in the
 sub-0.001 confidence tail; confident detections are identical. RF-DETR
 seg-nano-576 carries the documented rank-99 TopK near-tie deviation (`SN-DEV`).
 
-24 + 0 + 6 = 30 in-scope entries. The PASS count assumes one gated
+29 available entries + 1 deferred placeholder + 2 exclusions = 32 groups. The PASS count assumes one gated
 representative per entry closes it (YOLOv8n for entry 17, YOLO11m-seg for
 entry 18, OWL-ViT for entry 25, ResNet-50 for entry 30, RAFT-small for entry
 31); other sizes are not gated and do not move the scoreboard — an open
 maintainer decision. Entry 29 is a single entry and is counted once.
 
-Entry 29 is closed by its gated video models, with all three recorded
-(VideoMAE, ViViT, TimeSformer); the remaining six missing-export entries
-(EdgeCrafter detection, EdgeCrafter segmentation, EdgeCrafter pose, RF-DETR
-detection other sizes, RF-DETR segmentation other sizes and RF-DETR keypoint
-other sizes) have no provisioned artifact.
+Entry 29 is closed by its three gated video models. Five of the previously
+missing exports are now provisioned, with full-model evidence in
+`../2026-10-24-release-gates/`. Detection-small passes the raw gate; the
+other four entries pass the user-approved task-equivalence criterion;
+independent packet review is recorded separately.
+Entry 24 has no distinct upstream model and is explicitly deferred.
 
 ## Entry status
 
@@ -53,12 +56,12 @@ other sizes) have no provisioned artifact.
 | 16 | RT-DETRv4-s | PASS | CUDA asymmetric-pad Conv remedy accepted; full-model CUDA gate closed (boxes 0/1200, scores 0/300, labels 300/300). |
 | 17 | YOLO detector v5–v12 variants | PASS | Closed by the gated representative YOLOv8n detector (opset 18 pinned at export; 301 nodes on disk / 260 dispatched; CPU/CUDA/OpenCL gate, 0 over tolerance). Other sizes are not gated. |
 | 18 | YOLO segmentation variants | PASS | Closed by the gated representative YOLO11m-seg (opset 18 from the local checkpoint; 515 nodes on disk / 467 dispatched; CPU/CUDA/OpenCL gate, 0 over tolerance on both outputs). Other sizes are not gated. |
-| 19 | EdgeCrafter detection | Missing export | Upstream repo + checkpoint download. |
-| 20 | EdgeCrafter segmentation | Missing export | Upstream repo + checkpoint download. |
-| 21 | EdgeCrafter pose | Missing export | Upstream repo + checkpoint download. |
-| 22 | RF-DETR detection other sizes | Missing export | `rfdetr` import broken under transformers 4.35; weights auto-download. |
-| 23 | RF-DETR segmentation other sizes | Missing export | Same dependency issue. |
-| 24 | RF-DETR keypoint other sizes | Missing export | Same; exporter may fall back to keypoint-preview. |
+| 19 | EdgeCrafter detection | PASS (task deviation) | Export provisioned and runtime support complete; raw numeric differences and approved retained-detection gates are recorded in `../2026-10-24-release-gates/results.md`. |
+| 20 | EdgeCrafter segmentation | PASS (task deviation) | Export provisioned and runtime support complete; raw numeric differences and approved retained-detection gates are recorded in `../2026-10-24-release-gates/results.md`. |
+| 21 | EdgeCrafter pose | PASS (task deviation) | Export provisioned and runtime support complete; raw numeric differences and approved retained-detection gates are recorded in `../2026-10-24-release-gates/results.md`. |
+| 22 | RF-DETR detection other sizes | PASS | RF-DETR Small simplified opset-18 export; fresh CPU/CUDA/OpenCL gates, 0 raw values over tolerance. |
+| 23 | RF-DETR segmentation other sizes | PASS (task deviation) | Export provisioned and runtime support complete; raw numeric differences and approved retained-detection gates are recorded in `../2026-10-24-release-gates/results.md`. |
+| 24 | RF-DETR keypoint other sizes | Deferred | No distinct named size exists in installed rfdetr 1.8.0 or current upstream. Preview fallback is entry 7, not new coverage. User-approved deferral until a distinct upstream size ships. |
 | 25 | OWL-ViT | PASS | Closed by the gated OWL-ViT base patch32: a worker-authored exporter under `/tmp` (the repository has no OWL-ViT exporter), opset 18 pinned at export, fully static and checker-clean; re-exported at two exporter sites only to remove a DOUBLE `Cast` and a constant `Reciprocal` the loader rejects, proven bit-identical to the rejected artifact on both outputs across five input sets; full CPU/CUDA/OpenCL gate, 0 over tolerance. |
 | 26 | ViTPose-base-simple | PASS | Gate 2026-10-20: opset 18 pinned at export; 536 nodes on disk / 422 dispatched; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on all three. |
 | 27 | Depth-Anything-V2 | PASS | Gate 2026-10-20: opset 18 pinned at export; 553 nodes on disk / 553 dispatched; CPU/CUDA/OpenCL gate, 0 over the scaled tolerance on predicted_depth (max_abs ≤ 1.09e-04). OpenCL leg after the architect-authorized Resize no-op-attribute fix. |
@@ -74,10 +77,10 @@ other sizes) have no provisioned artifact.
 | --- | --- | --- |
 | YOLO detector variants | Entry 17 closed by the gated YOLOv8n representative at opset 18 (`export/detection/yolo/export.py --opset 18`); offline for yolo26s/x/11s/26n; download for v5/v6/v7/v8 (other sizes)/v9/v10/v12 | `ultralytics`, checkpoints, opset 18 pin |
 | YOLO segmentation variants | Entry 18 closed by the gated YOLO11m-seg representative at opset 18 from the local checkpoint; download for other sizes | Ultralytics CLI, `-seg.pt` checkpoints |
-| EdgeCrafter detection/seg/pose | Download + new environment | Upstream repo, checkpoints, `onnxsim`/`onnxscript` |
-| RF-DETR detection other sizes | Download + dependency fix | `rfdetr`, transformers upgrade, weights |
-| RF-DETR segmentation other sizes | Download + dependency fix | Same |
-| RF-DETR keypoint other sizes | Download + dependency fix | Same; exporter may fall back to keypoint-preview |
+| EdgeCrafter detection/seg/pose | Provisioned locally | Split/Sign implemented; approved task deviation |
+| RF-DETR detection other sizes | Closed by Small | Provisioned simplified export; CPU/CUDA/OpenCL raw PASS |
+| RF-DETR segmentation other sizes | Provisioned Medium | Approved task deviation |
+| RF-DETR keypoint other sizes | Unavailable upstream | Deferred until a distinct size ships; Preview fallback must not count twice |
 | OWL-ViT | Entry 25 closed by the gated OWL-ViT base patch32: worker-authored exporter under `/tmp` pinned at opset 18, re-exported at two sites only to remove a DOUBLE `Cast` and a constant `Reciprocal` (bit-identity proof) | HF `google/owlvit-*` checkpoint |
 | ViTPose | Entry 26 closed by the gated ViTPose-base-simple representative at opset 18 (`export/pose_estimation/vitpose/export_vitpose_to_onnx.py --opset 18`, static batch, 256x192) | HF `usyd-community/vitpose-base-simple`, transformers |
 | Depth-Anything-V2 | Download | HF `depth-anything/Depth-Anything-V2-*` |

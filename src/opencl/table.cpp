@@ -27,6 +27,7 @@ namespace opencl_kernels {
 
 void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Neg(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sign(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Floor(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void GreaterOrEqual(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Relu(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -104,6 +105,7 @@ KernelFn FindOpenCLKernel(const std::string& op_type) {
     static const std::unordered_map<std::string, KernelFn> table = {
         {"Abs", &Abs},
         {"Neg", &Neg},
+        {"Sign", &Sign},
         {"Floor", &Floor},
         {"GreaterOrEqual", &GreaterOrEqual},
         {"Relu", &Relu},

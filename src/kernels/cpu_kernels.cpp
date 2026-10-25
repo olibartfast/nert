@@ -54,6 +54,7 @@ KernelFn FindCpuKernel(const std::string& op_type) {
         {"Pow", &Pow},
         {"Abs", &Abs},
         {"Neg", &Neg},
+        {"Sign", &Sign},
         {"Exp", &Exp},
         {"Log", &Log},
         {"Cos", &Cos},

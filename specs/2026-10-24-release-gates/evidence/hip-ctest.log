@@ -1,0 +1,12 @@
+Internal ctest changing into directory: /tmp/opencode/bench-hip
+Test project /tmp/opencode/bench-hip
+    Start 15: nert_hip_kernels
+1/3 Test #15: nert_hip_kernels .................   Passed    0.38 sec
+    Start 16: nert_cpu_release
+2/3 Test #16: nert_cpu_release .................   Passed    0.01 sec
+    Start 17: nert_hip_release
+3/3 Test #17: nert_hip_release .................   Passed    0.41 sec
+
+100% tests passed, 0 tests failed out of 3
+
+Total Test time (real) =   0.80 sec

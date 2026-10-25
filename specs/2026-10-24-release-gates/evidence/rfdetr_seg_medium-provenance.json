@@ -1,0 +1,17 @@
+{
+  "model": "/tmp/opencode/exports/rfdetr_seg_medium/rfdetr-seg-medium-sim.onnx",
+  "sha256": "4c83c812867f5cd56ee0e53e0c0dbc7be4261e97810a4a622596545b2493f49b",
+  "inputs": {
+    "input": [
+      1,
+      3,
+      432,
+      432
+    ]
+  },
+  "ort": "1.27.0",
+  "numpy": "1.26.4",
+  "pillow": "12.3.0",
+  "source_image": "/home/oli/repos/neuriplo/build-parity/native_yolo_parity_fixture/bus.jpg",
+  "source_image_sha256": "c02019c4979c191eb739ddd944445ef408dad5679acab6fd520ef9d434bfbc63"
+}

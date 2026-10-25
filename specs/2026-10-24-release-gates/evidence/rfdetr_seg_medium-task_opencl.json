@@ -1,0 +1,24 @@
+{
+  "model": "rfdetr_seg_medium",
+  "device": "opencl",
+  "threshold": 0.25,
+  "reference_kept": 6,
+  "device_kept": 6,
+  "selection_equal": true,
+  "kept_class_mismatch": 0,
+  "reference_threshold_margin": 0.005523204803466797,
+  "raw_mismatch": {
+    "dets": 3,
+    "masks": 26162,
+    "labels": 29
+  },
+  "kept_mismatch": {
+    "dets": 0,
+    "masks": 0,
+    "labels": 0
+  },
+  "all_mask_iou_min": 0.9977553310886644,
+  "kept_mask_iou_min": 1.0,
+  "kept_binary_mask_mismatch": 0,
+  "task_equivalence_pass": true
+}

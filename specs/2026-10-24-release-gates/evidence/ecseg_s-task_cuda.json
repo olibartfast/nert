@@ -1,0 +1,26 @@
+{
+  "model": "ecseg_s",
+  "device": "cuda",
+  "threshold": 0.25,
+  "reference_kept": 10,
+  "device_kept": 10,
+  "selection_equal": true,
+  "kept_class_mismatch": 0,
+  "reference_threshold_margin": 0.03351286053657532,
+  "raw_mismatch": {
+    "masks": 1,
+    "scores": 0,
+    "labels": 0,
+    "boxes": 0
+  },
+  "kept_mismatch": {
+    "masks": 0,
+    "scores": 0,
+    "labels": 0,
+    "boxes": 0
+  },
+  "all_mask_iou_min": 1.0,
+  "kept_mask_iou_min": 1.0,
+  "kept_binary_mask_mismatch": 0,
+  "task_equivalence_pass": true
+}
