@@ -1,0 +1,5 @@
+input input dtype=float32 dims=1,3,432,432 file=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin
+output dets dtype=float32 elems=800 bytes=3200 file=/tmp/nert-release-gates/rfdetr_seg_medium/cuda_dets.bin
+output labels dtype=float32 elems=18200 bytes=72800 file=/tmp/nert-release-gates/rfdetr_seg_medium/cuda_labels.bin
+output masks dtype=float32 elems=2332800 bytes=9331200 file=/tmp/nert-release-gates/rfdetr_seg_medium/cuda_masks.bin
+device=cuda construct_ms=259.361 run_ms=4398.27 total_ms=4657.63 nodes_dispatched=1069

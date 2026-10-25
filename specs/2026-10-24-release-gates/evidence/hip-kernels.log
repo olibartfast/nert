@@ -1,0 +1,65 @@
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 28 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 28 tests from NertHIPKernels
+[ RUN      ] NertHIPKernels.ReluExact
+[       OK ] NertHIPKernels.ReluExact (219 ms)
+[ RUN      ] NertHIPKernels.AddBroadcastInt64Exact
+[       OK ] NertHIPKernels.AddBroadcastInt64Exact (9 ms)
+[ RUN      ] NertHIPKernels.GemmSmallExact
+[       OK ] NertHIPKernels.GemmSmallExact (9 ms)
+[ RUN      ] NertHIPKernels.GemmTransposedWithBiasWithinTolerance
+[       OK ] NertHIPKernels.GemmTransposedWithBiasWithinTolerance (9 ms)
+[ RUN      ] NertHIPKernels.GemmRejectsMismatch
+[       OK ] NertHIPKernels.GemmRejectsMismatch (6 ms)
+[ RUN      ] NertHIPKernels.MatMulBatchedBroadcast
+[       OK ] NertHIPKernels.MatMulBatchedBroadcast (9 ms)
+[ RUN      ] NertHIPKernels.MatMulPromotedVector
+[       OK ] NertHIPKernels.MatMulPromotedVector (7 ms)
+[ RUN      ] NertHIPKernels.MatMulRejectsMismatch
+[       OK ] NertHIPKernels.MatMulRejectsMismatch (6 ms)
+[ RUN      ] NertHIPKernels.MulBroadcastExact
+[       OK ] NertHIPKernels.MulBroadcastExact (9 ms)
+[ RUN      ] NertHIPKernels.SubInt64Exact
+[       OK ] NertHIPKernels.SubInt64Exact (8 ms)
+[ RUN      ] NertHIPKernels.DivFloatIEEE
+[       OK ] NertHIPKernels.DivFloatIEEE (9 ms)
+[ RUN      ] NertHIPKernels.DivInt64ZeroThrows
+[       OK ] NertHIPKernels.DivInt64ZeroThrows (6 ms)
+[ RUN      ] NertHIPKernels.SigmoidNear
+[       OK ] NertHIPKernels.SigmoidNear (6 ms)
+[ RUN      ] NertHIPKernels.TanhNear
+[       OK ] NertHIPKernels.TanhNear (6 ms)
+[ RUN      ] NertHIPKernels.SoftmaxLastAxis
+[       OK ] NertHIPKernels.SoftmaxLastAxis (6 ms)
+[ RUN      ] NertHIPKernels.SoftmaxAxisZeroStable
+[       OK ] NertHIPKernels.SoftmaxAxisZeroStable (4 ms)
+[ RUN      ] NertHIPKernels.ReshapeFloatPreservesOrder
+[       OK ] NertHIPKernels.ReshapeFloatPreservesOrder (9 ms)
+[ RUN      ] NertHIPKernels.ReshapeZeroAndInferred
+[       OK ] NertHIPKernels.ReshapeZeroAndInferred (8 ms)
+[ RUN      ] NertHIPKernels.ReshapeInt64Copies
+[       OK ] NertHIPKernels.ReshapeInt64Copies (4 ms)
+[ RUN      ] NertHIPKernels.ReshapeRejectsCountMismatch
+[       OK ] NertHIPKernels.ReshapeRejectsCountMismatch (6 ms)
+[ RUN      ] NertHIPKernels.ConvPointwiseNoBias
+[       OK ] NertHIPKernels.ConvPointwiseNoBias (9 ms)
+[ RUN      ] NertHIPKernels.ConvPadded3x3WithBias
+[       OK ] NertHIPKernels.ConvPadded3x3WithBias (9 ms)
+[ RUN      ] NertHIPKernels.ConvDepthwiseWithBias
+[       OK ] NertHIPKernels.ConvDepthwiseWithBias (8 ms)
+[ RUN      ] NertHIPKernels.ConvSameUpperAsymmetricPad
+[       OK ] NertHIPKernels.ConvSameUpperAsymmetricPad (8 ms)
+[ RUN      ] NertHIPKernels.ConvRejectsBadBiasShape
+[       OK ] NertHIPKernels.ConvRejectsBadBiasShape (9 ms)
+[ RUN      ] NertHIPKernels.ConvTransposeStride2NoBias
+[       OK ] NertHIPKernels.ConvTransposeStride2NoBias (9 ms)
+[ RUN      ] NertHIPKernels.ConvTransposePaddedWithBias
+[       OK ] NertHIPKernels.ConvTransposePaddedWithBias (8 ms)
+[ RUN      ] NertHIPKernels.ConvTransposeRejectsOutputShapeMismatch
+[       OK ] NertHIPKernels.ConvTransposeRejectsOutputShapeMismatch (6 ms)
+[----------] 28 tests from NertHIPKernels (438 ms total)
+
+[----------] Global test environment tear-down
+[==========] 28 tests from 1 test suite ran. (438 ms total)
+[  PASSED  ] 28 tests.

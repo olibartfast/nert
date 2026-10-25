@@ -36,9 +36,9 @@ target_link_libraries(nert_shapes_test PRIVATE
     GTest::gtest_main)
 
 add_test(NAME nert_shapes
-    COMMAND nert_shapes_test --gtest_filter=NertShapes.*)
+    COMMAND nert_shapes_test --gtest_filter=EngineShapes.*)
 add_test(NAME nert_shapes_negative
-    COMMAND nert_shapes_test --gtest_filter=NertShapesNegative.*)
+    COMMAND nert_shapes_test --gtest_filter=EngineShapesNegative.*)
 
 add_executable(nert_plan_test memory_planner_test.cpp)
 target_compile_features(nert_plan_test PRIVATE cxx_std_17)
@@ -49,9 +49,9 @@ target_link_libraries(nert_plan_test PRIVATE
     GTest::gtest_main)
 
 add_test(NAME nert_plan
-    COMMAND nert_plan_test --gtest_filter=NertPlan.*)
+    COMMAND nert_plan_test --gtest_filter=EnginePlan.*)
 add_test(NAME nert_plan_negative
-    COMMAND nert_plan_test --gtest_filter=NertPlanNegative.*)
+    COMMAND nert_plan_test --gtest_filter=EnginePlanNegative.*)
 
 add_executable(nert_device_test device_test.cpp)
 target_compile_features(nert_device_test PRIVATE cxx_std_17)
@@ -396,3 +396,14 @@ if(NERT_ENABLE_HIP)
         GTest::gtest_main)
     add_test(NAME nert_hip_kernels COMMAND nert_hip_kernels_test)
 endif()
+
+# The same release regression contracts execute on each enabled device.
+foreach(backend IN ITEMS CPU CUDA OPENCL HIP)
+    if(backend STREQUAL "CPU" OR NERT_ENABLE_${backend})
+        string(TOLOWER "${backend}" backend_lower)
+        add_executable(nert_${backend_lower}_release_test release_kernels_test.cpp)
+        target_link_libraries(nert_${backend_lower}_release_test PRIVATE nert GTest::gtest_main)
+        target_compile_definitions(nert_${backend_lower}_release_test PRIVATE TEST_${backend})
+        add_test(NAME nert_${backend_lower}_release COMMAND nert_${backend_lower}_release_test)
+    endif()
+endforeach()

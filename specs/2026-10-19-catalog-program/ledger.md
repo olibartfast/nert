@@ -1,7 +1,8 @@
 # Catalog program — orchestration ledger
 
-Opened 2026-10-19. Release goal: the complete Neuriplo tasks catalog — 30
-in-scope ONNX entries out of 32. Image understanding (GGUF/llama.cpp) and
+Opened 2026-10-19. Initial release goal: 30 in-scope ONNX entries out of 32.
+Current scope (approved 2026-10-24): 29 available ONNX entries, with one
+unavailable keypoint-size placeholder explicitly deferred. Image understanding (GGUF/llama.cpp) and
 Gaussian Splatting (LGM/GRM) are maintainer-approved out of scope. The
 measured inventory is [inventory.md](inventory.md); the living device matrix
 is [coverage.md](../2026-10-17-task-models/coverage.md).
@@ -24,49 +25,30 @@ is [coverage.md](../2026-10-17-task-models/coverage.md).
 
 | Item | State |
 | --- | --- |
-| CPU / CUDA kernel tables | 72 / 72 rows |
-| OpenCL kernel table | 68 / 72 rows; the four absent types are unused by currently loadable catalog entries |
-| HIP | 9 rows; unsupported for 0.2.0 |
-| Recorded full-model PASS | 23 of 30 in-scope entries on CPU/CUDA/OpenCL (two carry the documented R-6 sub-0.001 TopK deviation, one the documented rank-99 TopK near-tie deviation; the three video models are clean on all nine legs) |
-| Open, in scope | 1 entry (Grounding DINO, OpenCL backend gap; untouched by boundary 7) |
-| Missing ONNX export | 6 entries |
-| Out of scope | 2 entries |
-| Release | **not ready**; 0.2.0 is unreleased |
+| CPU / CUDA kernel tables | 73 / 73 rows |
+| OpenCL kernel table | 73 / 73 rows |
+| HIP | 73 rows; full-catalog native AMD validation and persistent CI are accepted known missing coverage for 0.2.0 |
+| Recorded full-model PASS | 29 available in-scope entries on CPU/CUDA/OpenCL; four new entries carry explicit user-approved fixture-specific task deviations |
+| Open, in scope | 0 model entries; final independent packet acceptance is recorded below |
+| Missing ONNX export | 0; the unavailable keypoint-size placeholder is explicitly deferred |
+| Deferred placeholder | 1: only KeypointPreview exists upstream and is already covered |
+| Out of scope | 2: image understanding and Gaussian Splatting |
+| Release | Local gate packet accepted; AMD full-catalog/CI coverage is accepted known missing for 0.2.0; GitFlow release preparation remains |
 
-The 23 recorded PASS entries are ResNet-18, YOLO26n, OWLv2, RF-DETR
-seg-small, RAFT-large, YOLO11s, YOLOv8n-pose, YOLO26s-pose, RF-DETR
-nano-1101, YOLO26n-depth, RF-DETR keypoint-preview, YOLO26s, YOLO26x,
-RT-DETRv4-s, RF-DETR seg-nano-576, **YOLOv8n, YOLO11m-seg, OWL-ViT,
-ResNet-50, ViTPose-base-simple, Depth-Anything-V2-Small, RAFT-small and
-entry 29 (VideoMAE/ViViT/TimeSformer)** (the export-first batches and
-boundary 7, recorded below). The one open entry is:
+The current per-model details and preserved raw failures are in
+[coverage](../2026-10-17-task-models/coverage.md) and the
+[2026-10-24 evidence](../2026-10-24-release-gates/results.md).
+Grounding DINO's OpenCL live-buffer gate closed on 2026-10-22; older capacity
+GAP notes below are historical. The five remaining available catalog exports
+now load and run on all three local backends. Their 15/15 retained-detection
+checks pass on frozen inputs; seven legs also pass every raw output element,
+and eight carry approved fixture-specific deviations.
 
-- **Grounding DINO** — CPU/CUDA task-equivalence PASS (the decoded-detection set
-  check closed 2026-10-20: pred_boxes 0/3600 canonicalized, per-box IoU min
-  0.99973 with 900/900, top-1 900/900, decoded set_diff 0); the **OpenCL cell
-  is a documented backend GAP** after the GD-2c arena-view experiment was
-  reverted (the handle path demands 11,028.5 MiB on a 5,803.3 MiB device against
-  a 1,687.9 MiB live set). Whether the release gate admits a documented
-  GAP-with-deviation is an open maintainer decision.
-
-Closed this session: RF-DETR seg-nano-576 (PASS with the documented rank-99
-TopK near-tie deviation, `SN-DEV`) and RT-DETRv4-s (PASS on all three devices
-after the accepted CUDA asymmetric-pad `Conv` remedy). **The census
-(`inventory.md`) carries the same 15/1/14/2 scoreboard and the same three
-entry rows, corrected by the orchestrator to match these closed gates.**
-
-**Boundary 3 closed four more entries** by the export-first method — YOLOv8n
-(entry 17), YOLO11m-seg (18), OWL-ViT (25), ResNet-50 (30) — taking the
-scoreboard to **19 / 1 / 10 / 2**. **The census and the coverage matrix now
-carry that scoreboard.** No release was cut: the gate still requires zero
-open entries and zero missing exports among the 30 in-scope entries.
-
-**Note for the next session:** the `## Definitions` block in `coverage.md`
-defines `GAP` as "at least one op type used by the model has no row on that
-device", while Grounding DINO's OpenCL cell is a `GAP` for a **capacity** reason
-(all 26 op types it uses are present). The cell explains itself, but the
-definition and the cell disagree; the packet was forbidden to change
-`Definitions`, so this is a maintainer decision.
+This packet does not publish a release. Future releases must use GitFlow,
+as explicitly requested by the user: reviewed work belongs on the integration
+branch, then a release branch, followed by main/tag and integration back-merge.
+The current checkout has no develop/release branches or GitFlow configuration;
+initialize/confirm that topology before any release operation, with the accepted AMD limitations carried into the release notes. No branch initialization, commit, push or tag was performed.
 
 ## Run history
 
@@ -1354,3 +1336,22 @@ that commit. Evidence remains under
 **No engine change.** Tables unchanged at CPU 72 / CUDA 72 / OpenCL 68 /
 HIP 9; no kernel row and no engine source file changed. No release was cut.
 Commit: this integration commit.
+
+## 2026-10-24 — recovered release-gate packet
+
+Recovered session `ses_e95444623ffegPuDxHToNSWm7S`; base `95027c3`.
+Split/num_outputs and Sign support now unblock all three EdgeCrafter models.
+Five exports are provisioned; fresh CPU/CUDA/OpenCL runs and preserved raw
+failures are recorded in [results](../2026-10-24-release-gates/results.md).
+The fresh strict RF-DETR detection-small gates have zero values over tolerance.
+Four other entries have user-approved retained-detection deviations; raw
+numeric failures remain preserved. Entry 24 would silently
+reuse Preview in the exporter; it is not counted twice.
+
+The user approved the task criterion, unavailable-size deferral, and fresh
+reviewer on 2026-10-24. Independent review and final acceptance are recorded
+in the packet evidence.
+Independent read-only review passed; the packet acceptance command/result
+are preserved in the dated evidence. No commit,
+push, tag or release was made. AMD cloud testing is excluded by the user; its
+release requirement remains open.

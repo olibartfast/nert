@@ -1,0 +1,1406 @@
+Start testing: Oct 24 13:13 CEST
+----------------------------------------------------------
+1/14 Testing: nert_loader
+1/14 Test: nert_loader
+Command: "/home/oli/repos/nert/build/test/nert_loader_test" "--gtest_filter=EngineLoader.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_loader" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EngineLoader.*
+[==========] Running 58 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 58 tests from EngineLoader
+[ RUN      ] EngineLoader.RealFixtureLoads
+[       OK ] EngineLoader.RealFixtureLoads (140 ms)
+[ RUN      ] EngineLoader.RealFixtureNodeCountAndOpsHistogram
+[       OK ] EngineLoader.RealFixtureNodeCountAndOpsHistogram (104 ms)
+[ RUN      ] EngineLoader.RealFixtureInitializerCount
+[       OK ] EngineLoader.RealFixtureInitializerCount (117 ms)
+[ RUN      ] EngineLoader.RealFixtureInt64ShapeConstants
+[       OK ] EngineLoader.RealFixtureInt64ShapeConstants (111 ms)
+[ RUN      ] EngineLoader.RealFixtureIODtypesAndShapes
+[       OK ] EngineLoader.RealFixtureIODtypesAndShapes (113 ms)
+[ RUN      ] EngineLoader.HermeticReluNodeAndGraphIo
+[       OK ] EngineLoader.HermeticReluNodeAndGraphIo (0 ms)
+[ RUN      ] EngineLoader.HermeticGemmAttributesAndInitializer
+[       OK ] EngineLoader.HermeticGemmAttributesAndInitializer (0 ms)
+[ RUN      ] EngineLoader.HermeticInt64ReshapeConstant
+[       OK ] EngineLoader.HermeticInt64ReshapeConstant (0 ms)
+[ RUN      ] EngineLoader.HermeticConstantFoldingFloat
+[       OK ] EngineLoader.HermeticConstantFoldingFloat (0 ms)
+[ RUN      ] EngineLoader.HermeticDoubleConstantNarrowsToFloat
+[       OK ] EngineLoader.HermeticDoubleConstantNarrowsToFloat (0 ms)
+[ RUN      ] EngineLoader.HermeticDuplicateValueInfo
+[       OK ] EngineLoader.HermeticDuplicateValueInfo (0 ms)
+[ RUN      ] EngineLoader.HermeticBoolInitializerLoads
+[       OK ] EngineLoader.HermeticBoolInitializerLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticConstantFoldingInt64
+[       OK ] EngineLoader.HermeticConstantFoldingInt64 (0 ms)
+[ RUN      ] EngineLoader.HermeticFlattenLoads
+[       OK ] EngineLoader.HermeticFlattenLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticBoolValueInfoAccepted
+[       OK ] EngineLoader.HermeticBoolValueInfoAccepted (0 ms)
+[ RUN      ] EngineLoader.HermeticNewElementwiseLoads
+[       OK ] EngineLoader.HermeticNewElementwiseLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticConcatSplitLoads
+[       OK ] EngineLoader.HermeticConcatSplitLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticUnsqueezeExpandLoads
+[       OK ] EngineLoader.HermeticUnsqueezeExpandLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticTransposeGatherLoads
+[       OK ] EngineLoader.HermeticTransposeGatherLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticCastLoads
+[       OK ] EngineLoader.HermeticCastLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticSoftmaxResizeLoads
+[       OK ] EngineLoader.HermeticSoftmaxResizeLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticResizeNoOpAttributesLoad
+[       OK ] EngineLoader.HermeticResizeNoOpAttributesLoad (0 ms)
+[ RUN      ] EngineLoader.HermeticSliceTopKLoads
+[       OK ] EngineLoader.HermeticSliceTopKLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticCastToInt32Loads
+[       OK ] EngineLoader.HermeticCastToInt32Loads (0 ms)
+[ RUN      ] EngineLoader.HermeticCastToBoolLoads
+[       OK ] EngineLoader.HermeticCastToBoolLoads (0 ms)
+[ RUN      ] EngineLoader.ValueInfoZeroDimensionLoads
+[       OK ] EngineLoader.ValueInfoZeroDimensionLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticConstantOfShapeEqualWhereShapeLoads
+[       OK ] EngineLoader.HermeticConstantOfShapeEqualWhereShapeLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticReduceMaxModLoads
+[       OK ] EngineLoader.HermeticReduceMaxModLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticConvKernelShapeAdmitted
+[       OK ] EngineLoader.HermeticConvKernelShapeAdmitted (0 ms)
+[ RUN      ] EngineLoader.HermeticOpsetRangeElevenToEighteen
+[       OK ] EngineLoader.HermeticOpsetRangeElevenToEighteen (0 ms)
+[ RUN      ] EngineLoader.HermeticReduceAxesAttributePreserved
+[       OK ] EngineLoader.HermeticReduceAxesAttributePreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticReduceAxesNameCollision
+[       OK ] EngineLoader.HermeticReduceAxesNameCollision (0 ms)
+[ RUN      ] EngineLoader.HermeticReduceAxesEmptyAndInvalid
+[       OK ] EngineLoader.HermeticReduceAxesEmptyAndInvalid (0 ms)
+[ RUN      ] EngineLoader.HermeticOpset13ReduceMeanMatchesOpset18
+[       OK ] EngineLoader.HermeticOpset13ReduceMeanMatchesOpset18 (0 ms)
+[ RUN      ] EngineLoader.HermeticScatterNDReductionNonePreserved
+[       OK ] EngineLoader.HermeticScatterNDReductionNonePreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacySoftmaxDirect
+[       OK ] EngineLoader.HermeticLegacySoftmaxDirect (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacySoftmaxIntermediateInput
+[       OK ] EngineLoader.HermeticLegacySoftmaxIntermediateInput (0 ms)
+[ RUN      ] EngineLoader.HermeticSoftmaxAtOpset13Unchanged
+[       OK ] EngineLoader.HermeticSoftmaxAtOpset13Unchanged (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacyReduceSumAxesPreserved
+[       OK ] EngineLoader.HermeticLegacyReduceSumAxesPreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacySqueezePreserved
+[       OK ] EngineLoader.HermeticLegacySqueezePreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacyUnsqueezePreserved
+[       OK ] EngineLoader.HermeticLegacyUnsqueezePreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacySplitPreserved
+[       OK ] EngineLoader.HermeticLegacySplitPreserved (0 ms)
+[ RUN      ] EngineLoader.HermeticOpset11ResizeWithSizesLoads
+[       OK ] EngineLoader.HermeticOpset11ResizeWithSizesLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticNewerStableOperators
+[       OK ] EngineLoader.HermeticNewerStableOperators (1 ms)
+[ RUN      ] EngineLoader.HermeticNewerPlainCastAccepted
+[       OK ] EngineLoader.HermeticNewerPlainCastAccepted (0 ms)
+[ RUN      ] EngineLoader.HermeticNewerPadModesAccepted
+[       OK ] EngineLoader.HermeticNewerPadModesAccepted (0 ms)
+[ RUN      ] EngineLoader.HermeticNewerAveragePoolWithoutDilationsAccepted
+[       OK ] EngineLoader.HermeticNewerAveragePoolWithoutDilationsAccepted (0 ms)
+[ RUN      ] EngineLoader.HermeticNewerPlainRangeAccepted
+[       OK ] EngineLoader.HermeticNewerPlainRangeAccepted (0 ms)
+[ RUN      ] EngineLoader.HermeticGridSampleAt19Accepted
+[       OK ] EngineLoader.HermeticGridSampleAt19Accepted (0 ms)
+[ RUN      ] EngineLoader.HermeticNodeSchemaVersionTracksDeclaredOpset
+[       OK ] EngineLoader.HermeticNodeSchemaVersionTracksDeclaredOpset (0 ms)
+[ RUN      ] EngineLoader.HermeticEffectiveSchemaBelowEleven
+[       OK ] EngineLoader.HermeticEffectiveSchemaBelowEleven (0 ms)
+[ RUN      ] EngineLoader.HermeticNewerAddResolvesSchemaFourteen
+[       OK ] EngineLoader.HermeticNewerAddResolvesSchemaFourteen (0 ms)
+[ RUN      ] EngineLoader.HermeticLegacySoftmaxKeepsMetadata
+[       OK ] EngineLoader.HermeticLegacySoftmaxKeepsMetadata (0 ms)
+[ RUN      ] EngineLoader.HermeticInt64AndBoolGraphIoAccepted
+[       OK ] EngineLoader.HermeticInt64AndBoolGraphIoAccepted (0 ms)
+[ RUN      ] EngineLoader.NamedDimensionLoadsAsSymbolic
+[       OK ] EngineLoader.NamedDimensionLoadsAsSymbolic (0 ms)
+[ RUN      ] EngineLoader.HermeticConstantOfShapeFloatBoolAndAbsentValueLoad
+[       OK ] EngineLoader.HermeticConstantOfShapeFloatBoolAndAbsentValueLoad (0 ms)
+[ RUN      ] EngineLoader.HermeticInstanceNormalizationEpsilonLoads
+[       OK ] EngineLoader.HermeticInstanceNormalizationEpsilonLoads (0 ms)
+[ RUN      ] EngineLoader.HermeticReduceMaxNoopZeroAtOpset18Accepted
+[       OK ] EngineLoader.HermeticReduceMaxNoopZeroAtOpset18Accepted (0 ms)
+[----------] 58 tests from EngineLoader (604 ms total)
+
+[----------] Global test environment tear-down
+[==========] 58 tests from 1 test suite ran. (604 ms total)
+[  PASSED  ] 58 tests.
+<end of output>
+Test time =   0.61 sec
+----------------------------------------------------------
+Test Passed.
+"nert_loader" end time: Oct 24 13:13 CEST
+"nert_loader" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/14 Testing: nert_loader_negative
+2/14 Test: nert_loader_negative
+Command: "/home/oli/repos/nert/build/test/nert_loader_test" "--gtest_filter=EngineLoaderNegative.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_loader_negative" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EngineLoaderNegative.*
+[==========] Running 49 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 49 tests from EngineLoaderNegative
+[ RUN      ] EngineLoaderNegative.UnknownOpNamesNodeAndOpType
+[       OK ] EngineLoaderNegative.UnknownOpNamesNodeAndOpType (0 ms)
+[ RUN      ] EngineLoaderNegative.UnsupportedAttributeNamesNodeAndOpType
+[       OK ] EngineLoaderNegative.UnsupportedAttributeNamesNodeAndOpType (0 ms)
+[ RUN      ] EngineLoaderNegative.UnsupportedGraphIoTypeRejected
+[       OK ] EngineLoaderNegative.UnsupportedGraphIoTypeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ConstantOtherDtypeRejected
+[       OK ] EngineLoaderNegative.ConstantOtherDtypeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NonFloatInitializerRejected
+[       OK ] EngineLoaderNegative.NonFloatInitializerRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ZeroDimensionRejected
+[       OK ] EngineLoaderNegative.ZeroDimensionRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.MissingModelFileNamesPath
+[       OK ] EngineLoaderNegative.MissingModelFileNamesPath (0 ms)
+[ RUN      ] EngineLoaderNegative.CastToOutsidePolicyRejected
+[       OK ] EngineLoaderNegative.CastToOutsidePolicyRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ResizeModeOutsidePolicyRejected
+[       OK ] EngineLoaderNegative.ResizeModeOutsidePolicyRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ModFmodOutsidePolicyRejected
+[       OK ] EngineLoaderNegative.ModFmodOutsidePolicyRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.TopKPolicyOutsidePolicyRejected
+[       OK ] EngineLoaderNegative.TopKPolicyOutsidePolicyRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.TopKNonConstantKRejectedAtLoad
+[       OK ] EngineLoaderNegative.TopKNonConstantKRejectedAtLoad (0 ms)
+[ RUN      ] EngineLoaderNegative.InstanceNormalizationUnknownAttributeRejected
+[       OK ] EngineLoaderNegative.InstanceNormalizationUnknownAttributeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ConstantOfShapeDoubleValueRejected
+[       OK ] EngineLoaderNegative.ConstantOfShapeDoubleValueRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ConstantOfShapeTwoElementValueRejected
+[       OK ] EngineLoaderNegative.ConstantOfShapeTwoElementValueRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.SliceAttributeRejected
+[       OK ] EngineLoaderNegative.SliceAttributeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.UnsupportedAttributeOnNewOp
+[       OK ] EngineLoaderNegative.UnsupportedAttributeOnNewOp (0 ms)
+[ RUN      ] EngineLoaderNegative.ValueInfoNegativeDimensionRejected
+[       OK ] EngineLoaderNegative.ValueInfoNegativeDimensionRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.OpsetBelowFloorRejected
+[       OK ] EngineLoaderNegative.OpsetBelowFloorRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.MissingOpsetDeclarationRejected
+[       OK ] EngineLoaderNegative.MissingOpsetDeclarationRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NoEffectiveSchemaAtDeclaredOpsetRejected
+[       OK ] EngineLoaderNegative.NoEffectiveSchemaAtDeclaredOpsetRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ReduceAxesAttributeAtOpset18Rejected
+[       OK ] EngineLoaderNegative.ReduceAxesAttributeAtOpset18Rejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ReduceAxesInputBeforeOpset18Rejected
+[       OK ] EngineLoaderNegative.ReduceAxesInputBeforeOpset18Rejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ReduceEmptyAxesInputBeforeOpset18Rejected
+[       OK ] EngineLoaderNegative.ReduceEmptyAxesInputBeforeOpset18Rejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ReduceMaxNoopAtOpset18RejectedAsCapabilityGap
+[       OK ] EngineLoaderNegative.ReduceMaxNoopAtOpset18RejectedAsCapabilityGap (0 ms)
+[ RUN      ] EngineLoaderNegative.ReduceNoopBeforeOpset18Rejected
+[       OK ] EngineLoaderNegative.ReduceNoopBeforeOpset18Rejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ScatterNDUnsupportedReductionRejected
+[       OK ] EngineLoaderNegative.ScatterNDUnsupportedReductionRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ScatterNDReductionBeforeOpset16Rejected
+[       OK ] EngineLoaderNegative.ScatterNDReductionBeforeOpset16Rejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacyAxesAttributeAtThirteenRejected
+[       OK ] EngineLoaderNegative.LegacyAxesAttributeAtThirteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacySplitAttributeAtThirteenRejected
+[       OK ] EngineLoaderNegative.LegacySplitAttributeAtThirteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacyAxesInputBeforeThirteenRejected
+[       OK ] EngineLoaderNegative.LegacyAxesInputBeforeThirteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacySplitInputBeforeThirteenRejected
+[       OK ] EngineLoaderNegative.LegacySplitInputBeforeThirteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacyUnsqueezeMissingAxesRejected
+[       OK ] EngineLoaderNegative.LegacyUnsqueezeMissingAxesRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacyUnsqueezeEmptyAxesRejected
+[       OK ] EngineLoaderNegative.LegacyUnsqueezeEmptyAxesRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacySplitEmptyRejected
+[       OK ] EngineLoaderNegative.LegacySplitEmptyRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacyReduceSumNoopBeforeThirteenRejected
+[       OK ] EngineLoaderNegative.LegacyReduceSumNoopBeforeThirteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.LegacySoftmaxAxisOutOfRangeRejected
+[       OK ] EngineLoaderNegative.LegacySoftmaxAxisOutOfRangeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerCastSaturateRejected
+[       OK ] EngineLoaderNegative.NewerCastSaturateRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerCastRoundModeRejected
+[       OK ] EngineLoaderNegative.NewerCastRoundModeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerPadWrapRejected
+[       OK ] EngineLoaderNegative.NewerPadWrapRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerAveragePoolDilationsRejected
+[       OK ] EngineLoaderNegative.NewerAveragePoolDilationsRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerRangeStashTypeRejected
+[       OK ] EngineLoaderNegative.NewerRangeStashTypeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.ConvTransposeOutputShapeRejectedByManifest
+[       OK ] EngineLoaderNegative.ConvTransposeOutputShapeRejectedByManifest (0 ms)
+[ RUN      ] EngineLoaderNegative.ResizeAxesAtSchemaEighteenRejected
+[       OK ] EngineLoaderNegative.ResizeAxesAtSchemaEighteenRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.SplitNumOutputsCountMismatchRejected
+[       OK ] EngineLoaderNegative.SplitNumOutputsCountMismatchRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerGridSampleBehaviorChangeRejected
+[       OK ] EngineLoaderNegative.NewerGridSampleBehaviorChangeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerUnknownOperatorRejected
+[       OK ] EngineLoaderNegative.NewerUnknownOperatorRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.NewerUnsupportedDtypeRejected
+[       OK ] EngineLoaderNegative.NewerUnsupportedDtypeRejected (0 ms)
+[ RUN      ] EngineLoaderNegative.SplitNumOutputsOldSchemaAndNonPositiveRejected
+[       OK ] EngineLoaderNegative.SplitNumOutputsOldSchemaAndNonPositiveRejected (0 ms)
+[----------] 49 tests from EngineLoaderNegative (14 ms total)
+
+[----------] Global test environment tear-down
+[==========] 49 tests from 1 test suite ran. (14 ms total)
+[  PASSED  ] 49 tests.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"nert_loader_negative" end time: Oct 24 13:13 CEST
+"nert_loader_negative" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/14 Testing: nert_shapes
+3/14 Test: nert_shapes
+Command: "/home/oli/repos/nert/build/test/nert_shapes_test" "--gtest_filter=EngineShapes.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_shapes" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EngineShapes.*
+[==========] Running 80 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 80 tests from EngineShapes
+[ RUN      ] EngineShapes.AddBroadcast
+[       OK ] EngineShapes.AddBroadcast (0 ms)
+[ RUN      ] EngineShapes.ReluCopiesInputShape
+[       OK ] EngineShapes.ReluCopiesInputShape (0 ms)
+[ RUN      ] EngineShapes.MatMulBroadcastAndPromotion
+[       OK ] EngineShapes.MatMulBroadcastAndPromotion (0 ms)
+[ RUN      ] EngineShapes.ReshapeZeroAndInferred
+[       OK ] EngineShapes.ReshapeZeroAndInferred (0 ms)
+[ RUN      ] EngineShapes.ReshapeIncreasesRank
+[       OK ] EngineShapes.ReshapeIncreasesRank (0 ms)
+[ RUN      ] EngineShapes.ReduceMeanKeepdimsOn
+[       OK ] EngineShapes.ReduceMeanKeepdimsOn (0 ms)
+[ RUN      ] EngineShapes.ReduceMeanKeepdimsOff
+[       OK ] EngineShapes.ReduceMeanKeepdimsOff (0 ms)
+[ RUN      ] EngineShapes.ReduceMeanAttributeFormDeclaredThirteen
+[       OK ] EngineShapes.ReduceMeanAttributeFormDeclaredThirteen (0 ms)
+[ RUN      ] EngineShapes.ReduceMeanEmptyAxesNoopIdentity
+[       OK ] EngineShapes.ReduceMeanEmptyAxesNoopIdentity (0 ms)
+[ RUN      ] EngineShapes.ReduceL2AttributeFormDeclaredThirteen
+[       OK ] EngineShapes.ReduceL2AttributeFormDeclaredThirteen (0 ms)
+[ RUN      ] EngineShapes.ReduceMaxAttributeFormDeclaredThirteen
+[       OK ] EngineShapes.ReduceMaxAttributeFormDeclaredThirteen (0 ms)
+[ RUN      ] EngineShapes.ConvStrideAndPad
+[       OK ] EngineShapes.ConvStrideAndPad (0 ms)
+[ RUN      ] EngineShapes.ConvSameUpper
+[       OK ] EngineShapes.ConvSameUpper (0 ms)
+[ RUN      ] EngineShapes.MaxPoolCeilMode
+[       OK ] EngineShapes.MaxPoolCeilMode (0 ms)
+[ RUN      ] EngineShapes.MaxPoolFloorDefault
+[       OK ] EngineShapes.MaxPoolFloorDefault (0 ms)
+[ RUN      ] EngineShapes.GlobalAveragePoolCollapsesSpatial
+[       OK ] EngineShapes.GlobalAveragePoolCollapsesSpatial (0 ms)
+[ RUN      ] EngineShapes.GemmTransposes
+[       OK ] EngineShapes.GemmTransposes (0 ms)
+[ RUN      ] EngineShapes.GemmDefaults
+[       OK ] EngineShapes.GemmDefaults (0 ms)
+[ RUN      ] EngineShapes.NewElementwiseBroadcast
+[       OK ] EngineShapes.NewElementwiseBroadcast (2 ms)
+[ RUN      ] EngineShapes.ModInt64PropagatesDtype
+[       OK ] EngineShapes.ModInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.SigmoidSoftmaxCopyInputShape
+[       OK ] EngineShapes.SigmoidSoftmaxCopyInputShape (0 ms)
+[ RUN      ] EngineShapes.ConcatAxis
+[       OK ] EngineShapes.ConcatAxis (0 ms)
+[ RUN      ] EngineShapes.SplitSizedAndEqual
+[       OK ] EngineShapes.SplitSizedAndEqual (0 ms)
+[ RUN      ] EngineShapes.UnsqueezeInsertsOnes
+[       OK ] EngineShapes.UnsqueezeInsertsOnes (0 ms)
+[ RUN      ] EngineShapes.ExpandBroadcastsToShape
+[       OK ] EngineShapes.ExpandBroadcastsToShape (0 ms)
+[ RUN      ] EngineShapes.ExpandMaxBroadcastsDataAndTarget
+[       OK ] EngineShapes.ExpandMaxBroadcastsDataAndTarget (0 ms)
+[ RUN      ] EngineShapes.TransposePermutes
+[       OK ] EngineShapes.TransposePermutes (0 ms)
+[ RUN      ] EngineShapes.GatherElementsMatchesIndices
+[       OK ] EngineShapes.GatherElementsMatchesIndices (0 ms)
+[ RUN      ] EngineShapes.GatherInsertsIndices
+[       OK ] EngineShapes.GatherInsertsIndices (0 ms)
+[ RUN      ] EngineShapes.CastChangesDtype
+[       OK ] EngineShapes.CastChangesDtype (0 ms)
+[ RUN      ] EngineShapes.CastInt32EmulatesInt64
+[       OK ] EngineShapes.CastInt32EmulatesInt64 (0 ms)
+[ RUN      ] EngineShapes.ResizeScalesNearest
+[       OK ] EngineShapes.ResizeScalesNearest (0 ms)
+[ RUN      ] EngineShapes.SliceExtractsWindow
+[       OK ] EngineShapes.SliceExtractsWindow (0 ms)
+[ RUN      ] EngineShapes.SliceNegativeSteps
+[       OK ] EngineShapes.SliceNegativeSteps (0 ms)
+[ RUN      ] EngineShapes.SliceNegativeStepEmpty
+[       OK ] EngineShapes.SliceNegativeStepEmpty (0 ms)
+[ RUN      ] EngineShapes.TopKSelectsK
+[       OK ] EngineShapes.TopKSelectsK (0 ms)
+[ RUN      ] EngineShapes.ConstantOfShapeUsesShapeInput
+[       OK ] EngineShapes.ConstantOfShapeUsesShapeInput (0 ms)
+[ RUN      ] EngineShapes.EqualBroadcastsToBool
+[       OK ] EngineShapes.EqualBroadcastsToBool (0 ms)
+[ RUN      ] EngineShapes.WhereBroadcastsThree
+[       OK ] EngineShapes.WhereBroadcastsThree (0 ms)
+[ RUN      ] EngineShapes.ShapeOutputsRank
+[       OK ] EngineShapes.ShapeOutputsRank (0 ms)
+[ RUN      ] EngineShapes.ReduceMaxDropsAxes
+[       OK ] EngineShapes.ReduceMaxDropsAxes (0 ms)
+[ RUN      ] EngineShapes.FlattenAxis
+[       OK ] EngineShapes.FlattenAxis (0 ms)
+[ RUN      ] EngineShapes.ConcatInt64PropagatesDtype
+[       OK ] EngineShapes.ConcatInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.SplitInt64PropagatesDtype
+[       OK ] EngineShapes.SplitInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.UnsqueezeInt64PropagatesDtype
+[       OK ] EngineShapes.UnsqueezeInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.ExpandInt64PropagatesDtype
+[       OK ] EngineShapes.ExpandInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.TransposeInt64PropagatesDtype
+[       OK ] EngineShapes.TransposeInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.SliceInt64PropagatesDtype
+[       OK ] EngineShapes.SliceInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.GatherInt64PropagatesDtype
+[       OK ] EngineShapes.GatherInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.GatherElementsInt64PropagatesDtype
+[       OK ] EngineShapes.GatherElementsInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.ResizeInt64PropagatesDtype
+[       OK ] EngineShapes.ResizeInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.FlattenInt64PropagatesDtype
+[       OK ] EngineShapes.FlattenInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.FixtureInferShapes
+[       OK ] EngineShapes.FixtureInferShapes (137 ms)
+[ RUN      ] EngineShapes.FixtureBatchTwoPinnedReshapeRejected
+[       OK ] EngineShapes.FixtureBatchTwoPinnedReshapeRejected (109 ms)
+[ RUN      ] EngineShapes.PerShapeSeamWithoutReload
+[       OK ] EngineShapes.PerShapeSeamWithoutReload (0 ms)
+[ RUN      ] EngineShapes.EvaluatorSliceEndsChains
+[       OK ] EngineShapes.EvaluatorSliceEndsChains (0 ms)
+[ RUN      ] EngineShapes.EvaluatorSliceNegativeStep
+[       OK ] EngineShapes.EvaluatorSliceNegativeStep (0 ms)
+[ RUN      ] EngineShapes.EvaluatorWhereExpandShape
+[       OK ] EngineShapes.EvaluatorWhereExpandShape (0 ms)
+[ RUN      ] EngineShapes.Int64ArithmeticPropagatesDtype
+[       OK ] EngineShapes.Int64ArithmeticPropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.WhereInt64PropagatesDtype
+[       OK ] EngineShapes.WhereInt64PropagatesDtype (0 ms)
+[ RUN      ] EngineShapes.ConcatOfShapePiecesFeedsReshape
+[       OK ] EngineShapes.ConcatOfShapePiecesFeedsReshape (0 ms)
+[ RUN      ] EngineShapes.ResizeEmptyScalesWithSizes
+[       OK ] EngineShapes.ResizeEmptyScalesWithSizes (0 ms)
+[ RUN      ] EngineShapes.GreaterWhereFeedsReshape
+[       OK ] EngineShapes.GreaterWhereFeedsReshape (0 ms)
+[ RUN      ] EngineShapes.FloatRangeChainFromShapeResolves
+[       OK ] EngineShapes.FloatRangeChainFromShapeResolves (0 ms)
+[ RUN      ] EngineShapes.RangeStartAboveLimitIsEmpty
+[       OK ] EngineShapes.RangeStartAboveLimitIsEmpty (0 ms)
+[ RUN      ] EngineShapes.PadWithShapeDerivedPads
+[       OK ] EngineShapes.PadWithShapeDerivedPads (0 ms)
+[ RUN      ] EngineShapes.PadWithEvaluatedParameterChain
+[       OK ] EngineShapes.PadWithEvaluatedParameterChain (0 ms)
+[ RUN      ] EngineShapes.Int64ReduceSumFeedsReshape
+[       OK ] EngineShapes.Int64ReduceSumFeedsReshape (0 ms)
+[ RUN      ] EngineShapes.ReduceSumFloatKeepdimsOff
+[       OK ] EngineShapes.ReduceSumFloatKeepdimsOff (0 ms)
+[ RUN      ] EngineShapes.GridSampleOutputShape
+[       OK ] EngineShapes.GridSampleOutputShape (0 ms)
+[ RUN      ] EngineShapes.InstanceNormalizationKeepsInputShape
+[       OK ] EngineShapes.InstanceNormalizationKeepsInputShape (0 ms)
+[ RUN      ] EngineShapes.EinsumOutputShape
+[       OK ] EngineShapes.EinsumOutputShape (0 ms)
+[ RUN      ] EngineShapes.EinsumEllipsisOutputShape
+[       OK ] EngineShapes.EinsumEllipsisOutputShape (0 ms)
+[ RUN      ] EngineShapes.ConstantOfShapeDtypeFollowsValue
+[       OK ] EngineShapes.ConstantOfShapeDtypeFollowsValue (0 ms)
+[ RUN      ] EngineShapes.EvalFloatConstantOfShapeCastDrivesReshape
+[       OK ] EngineShapes.EvalFloatConstantOfShapeCastDrivesReshape (0 ms)
+[ RUN      ] EngineShapes.EvalBoolConstantOfShapeDrivesWhere
+[       OK ] EngineShapes.EvalBoolConstantOfShapeDrivesWhere (0 ms)
+[ RUN      ] EngineShapes.CastToBoolDrivesWhere
+[       OK ] EngineShapes.CastToBoolDrivesWhere (0 ms)
+[ RUN      ] EngineShapes.EmptySliceConcatsIntoReshapeAndPlansZeroBytes
+[       OK ] EngineShapes.EmptySliceConcatsIntoReshapeAndPlansZeroBytes (0 ms)
+[ RUN      ] EngineShapes.SplitNumOutputsSchema18
+[       OK ] EngineShapes.SplitNumOutputsSchema18 (0 ms)
+[ RUN      ] EngineShapes.SplitUnevenLegacyStillThrowsModelLoadException
+[       OK ] EngineShapes.SplitUnevenLegacyStillThrowsModelLoadException (0 ms)
+[----------] 80 tests from EngineShapes (264 ms total)
+
+[----------] Global test environment tear-down
+[==========] 80 tests from 1 test suite ran. (264 ms total)
+[  PASSED  ] 80 tests.
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"nert_shapes" end time: Oct 24 13:13 CEST
+"nert_shapes" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/14 Testing: nert_shapes_negative
+4/14 Test: nert_shapes_negative
+Command: "/home/oli/repos/nert/build/test/nert_shapes_test" "--gtest_filter=EngineShapesNegative.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_shapes_negative" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EngineShapesNegative.*
+[==========] Running 27 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 27 tests from EngineShapesNegative
+[ RUN      ] EngineShapesNegative.ReshapeProductMismatchNamesNode
+[       OK ] EngineShapesNegative.ReshapeProductMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ReduceMeanAxisOutOfRangeNamesNode
+[       OK ] EngineShapesNegative.ReduceMeanAxisOutOfRangeNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ReduceMeanDuplicateAxisNamesNode
+[       OK ] EngineShapesNegative.ReduceMeanDuplicateAxisNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.InputAbsentFromInputDimsNamesInput
+[       OK ] EngineShapesNegative.InputAbsentFromInputDimsNamesInput (0 ms)
+[ RUN      ] EngineShapesNegative.UnresolvedNodeInputNamesNode
+[       OK ] EngineShapesNegative.UnresolvedNodeInputNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.UnknownOpNamesNodeAndOpType
+[       OK ] EngineShapesNegative.UnknownOpNamesNodeAndOpType (0 ms)
+[ RUN      ] EngineShapesNegative.TopKNonConstantKNamesNode
+[       OK ] EngineShapesNegative.TopKNonConstantKNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.SliceDynamicStartsNamesNode
+[       OK ] EngineShapesNegative.SliceDynamicStartsNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.SplitSizeMismatchNamesNode
+[       OK ] EngineShapesNegative.SplitSizeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ResizeMissingInputsNamesNode
+[       OK ] EngineShapesNegative.ResizeMissingInputsNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ResizeSizesInputNamesNode
+[       OK ] EngineShapesNegative.ResizeSizesInputNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ConcatRankMismatchNamesNode
+[       OK ] EngineShapesNegative.ConcatRankMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ModDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.ModDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ConcatDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.ConcatDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.AddDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.AddDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.SubDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.SubDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.MulDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.MulDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.DivDtypeMismatchNamesNode
+[       OK ] EngineShapesNegative.DivDtypeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.WhereXYMismatchNamesNode
+[       OK ] EngineShapesNegative.WhereXYMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.SliceSigmoidRootedStartsNamesNode
+[       OK ] EngineShapesNegative.SliceSigmoidRootedStartsNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ExpandIncompatibleDimsNamesNode
+[       OK ] EngineShapesNegative.ExpandIncompatibleDimsNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.PadWrapModeNamesNode
+[       OK ] EngineShapesNegative.PadWrapModeNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.RangeFloatLimitNotConstantNamesNode
+[       OK ] EngineShapesNegative.RangeFloatLimitNotConstantNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.InstanceNormalizationScaleLengthNamesNode
+[       OK ] EngineShapesNegative.InstanceNormalizationScaleLengthNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.EinsumLabelSizeMismatchNamesNode
+[       OK ] EngineShapesNegative.EinsumLabelSizeMismatchNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.GridSampleBicubicNamesNode
+[       OK ] EngineShapesNegative.GridSampleBicubicNamesNode (0 ms)
+[ RUN      ] EngineShapesNegative.ConstantOfShapeStringValueNamesNode
+[       OK ] EngineShapesNegative.ConstantOfShapeStringValueNamesNode (0 ms)
+[----------] 27 tests from EngineShapesNegative (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 27 tests from 1 test suite ran. (4 ms total)
+[  PASSED  ] 27 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_shapes_negative" end time: Oct 24 13:13 CEST
+"nert_shapes_negative" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/14 Testing: nert_plan
+5/14 Test: nert_plan
+Command: "/home/oli/repos/nert/build/test/nert_plan_test" "--gtest_filter=EnginePlan.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_plan" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EnginePlan.*
+[==========] Running 14 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 14 tests from EnginePlan
+[ RUN      ] EnginePlan.DisjointLifetimesShareOffset
+[       OK ] EnginePlan.DisjointLifetimesShareOffset (0 ms)
+[ RUN      ] EnginePlan.OverlappingLifetimesDoNotOverlap
+[       OK ] EnginePlan.OverlappingLifetimesDoNotOverlap (0 ms)
+[ RUN      ] EnginePlan.JumpReusesExactOffsets
+[       OK ] EnginePlan.JumpReusesExactOffsets (0 ms)
+[ RUN      ] EnginePlan.OffsetsAlignedAndWithinArena
+[       OK ] EnginePlan.OffsetsAlignedAndWithinArena (0 ms)
+[ RUN      ] EnginePlan.SequentialArenaSmallerThanSum
+[       OK ] EnginePlan.SequentialArenaSmallerThanSum (0 ms)
+[ RUN      ] EnginePlan.InputsAndInitializersHaveNoBuffer
+[       OK ] EnginePlan.InputsAndInitializersHaveNoBuffer (0 ms)
+[ RUN      ] EnginePlan.GraphOutputHasBuffer
+[       OK ] EnginePlan.GraphOutputHasBuffer (0 ms)
+[ RUN      ] EnginePlan.OutputNeverAliasesItsInput
+[       OK ] EnginePlan.OutputNeverAliasesItsInput (153 ms)
+[ RUN      ] EnginePlan.PerShapeSeamWithoutReload
+[       OK ] EnginePlan.PerShapeSeamWithoutReload (0 ms)
+[ RUN      ] EnginePlan.DtypeAwareBufferSizes
+[       OK ] EnginePlan.DtypeAwareBufferSizes (0 ms)
+[ RUN      ] EnginePlan.MixedDtypeOverlappingLifetimesDoNotOverlap
+[       OK ] EnginePlan.MixedDtypeOverlappingLifetimesDoNotOverlap (0 ms)
+[ RUN      ] EnginePlan.FixturePlanNonEmpty
+[       OK ] EnginePlan.FixturePlanNonEmpty (126 ms)
+[ RUN      ] EnginePlan.DeadOutputTensorGetsBuffer
+[       OK ] EnginePlan.DeadOutputTensorGetsBuffer (0 ms)
+[ RUN      ] EnginePlan.TwoOutputNodeWithOneDeadOutputPlansBoth
+[       OK ] EnginePlan.TwoOutputNodeWithOneDeadOutputPlansBoth (0 ms)
+[----------] 14 tests from EnginePlan (281 ms total)
+
+[----------] Global test environment tear-down
+[==========] 14 tests from 1 test suite ran. (281 ms total)
+[  PASSED  ] 14 tests.
+<end of output>
+Test time =   0.29 sec
+----------------------------------------------------------
+Test Passed.
+"nert_plan" end time: Oct 24 13:13 CEST
+"nert_plan" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/14 Testing: nert_plan_negative
+6/14 Test: nert_plan_negative
+Command: "/home/oli/repos/nert/build/test/nert_plan_test" "--gtest_filter=EnginePlanNegative.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_plan_negative" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = EnginePlanNegative.*
+[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from EnginePlanNegative
+[ RUN      ] EnginePlanNegative.ElementCountOverflowNamesTensor
+[       OK ] EnginePlanNegative.ElementCountOverflowNamesTensor (0 ms)
+[ RUN      ] EnginePlanNegative.ByteSizeOverflowNamesTensor
+[       OK ] EnginePlanNegative.ByteSizeOverflowNamesTensor (0 ms)
+[ RUN      ] EnginePlanNegative.MissingShapeNamesTensor
+[       OK ] EnginePlanNegative.MissingShapeNamesTensor (0 ms)
+[ RUN      ] EnginePlanNegative.EmptyGraphRejected
+[       OK ] EnginePlanNegative.EmptyGraphRejected (0 ms)
+[----------] 4 tests from EnginePlanNegative (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 4 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 4 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_plan_negative" end time: Oct 24 13:13 CEST
+"nert_plan_negative" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/14 Testing: nert_device
+7/14 Test: nert_device
+Command: "/home/oli/repos/nert/build/test/nert_device_test" "--gtest_filter=NertDevice.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_device" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = NertDevice.*
+[==========] Running 6 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 6 tests from NertDevice
+[ RUN      ] NertDevice.ReferenceIsStableAndNamedCpu
+[       OK ] NertDevice.ReferenceIsStableAndNamedCpu (0 ms)
+[ RUN      ] NertDevice.AllocateIsAlignedAndUsable
+[       OK ] NertDevice.AllocateIsAlignedAndUsable (0 ms)
+[ RUN      ] NertDevice.NonPositiveAllocationReturnsNull
+[       OK ] NertDevice.NonPositiveAllocationReturnsNull (0 ms)
+[ RUN      ] NertDevice.TransferRoundTripsBytePattern
+[       OK ] NertDevice.TransferRoundTripsBytePattern (0 ms)
+[ RUN      ] NertDevice.ZeroByteTransferIsNoOp
+[       OK ] NertDevice.ZeroByteTransferIsNoOp (0 ms)
+[ RUN      ] NertDevice.UnknownOpResolvesNull
+[       OK ] NertDevice.UnknownOpResolvesNull (0 ms)
+[----------] 6 tests from NertDevice (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 6 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_device" end time: Oct 24 13:13 CEST
+"nert_device" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/14 Testing: nert_kernels
+8/14 Test: nert_kernels
+Command: "/home/oli/repos/nert/build/test/nert_kernels_test" "--gtest_filter=NertKernels.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_kernels" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = NertKernels.*
+[==========] Running 202 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 202 tests from NertKernels
+[ RUN      ] NertKernels.ReluMixedSignVector
+[       OK ] NertKernels.ReluMixedSignVector (0 ms)
+[ RUN      ] NertKernels.AddBroadcastsLowerRank
+[       OK ] NertKernels.AddBroadcastsLowerRank (0 ms)
+[ RUN      ] NertKernels.AddBroadcastsBothAxes
+[       OK ] NertKernels.AddBroadcastsBothAxes (0 ms)
+[ RUN      ] NertKernels.ReshapeReordersDims
+[       OK ] NertKernels.ReshapeReordersDims (0 ms)
+[ RUN      ] NertKernels.ReshapeRankChangeWithShapeOperand
+[       OK ] NertKernels.ReshapeRankChangeWithShapeOperand (0 ms)
+[ RUN      ] NertKernels.ReshapeInfersMinusOne
+[       OK ] NertKernels.ReshapeInfersMinusOne (0 ms)
+[ RUN      ] NertKernels.ReshapeZeroCopiesInputDim
+[       OK ] NertKernels.ReshapeZeroCopiesInputDim (0 ms)
+[ RUN      ] NertKernels.ReduceMeanOneAxisKeepdimsDefault
+[       OK ] NertKernels.ReduceMeanOneAxisKeepdimsDefault (0 ms)
+[ RUN      ] NertKernels.ReduceMeanOneAxisKeepdimsZero
+[       OK ] NertKernels.ReduceMeanOneAxisKeepdimsZero (0 ms)
+[ RUN      ] NertKernels.ReduceMeanAllAxes
+[       OK ] NertKernels.ReduceMeanAllAxes (0 ms)
+[ RUN      ] NertKernels.ReduceMeanEmptyAxesNoopIdentity
+[       OK ] NertKernels.ReduceMeanEmptyAxesNoopIdentity (0 ms)
+[ RUN      ] NertKernels.ReduceMeanOmittedAxesUnknownDtype
+[       OK ] NertKernels.ReduceMeanOmittedAxesUnknownDtype (0 ms)
+[ RUN      ] NertKernels.ReduceMaxEmptyAxesReducesAll
+[       OK ] NertKernels.ReduceMaxEmptyAxesReducesAll (0 ms)
+[ RUN      ] NertKernels.ReduceMeanOldAttributeFormMatchesInputForm
+[       OK ] NertKernels.ReduceMeanOldAttributeFormMatchesInputForm (0 ms)
+[ RUN      ] NertKernels.ReduceL2OldAttributeFormMatchesInputForm
+[       OK ] NertKernels.ReduceL2OldAttributeFormMatchesInputForm (0 ms)
+[ RUN      ] NertKernels.ReduceMaxOldAttributeFormMatchesInputForm
+[       OK ] NertKernels.ReduceMaxOldAttributeFormMatchesInputForm (0 ms)
+[ RUN      ] NertKernels.GemmPlainProduct
+[       OK ] NertKernels.GemmPlainProduct (0 ms)
+[ RUN      ] NertKernels.GemmTransA
+[       OK ] NertKernels.GemmTransA (0 ms)
+[ RUN      ] NertKernels.GemmTransB
+[       OK ] NertKernels.GemmTransB (0 ms)
+[ RUN      ] NertKernels.GemmAlphaBetaRankOneBias
+[       OK ] NertKernels.GemmAlphaBetaRankOneBias (0 ms)
+[ RUN      ] NertKernels.MatMulTwoDimensional
+[       OK ] NertKernels.MatMulTwoDimensional (0 ms)
+[ RUN      ] NertKernels.MatMulBatchedThreeDimensional
+[       OK ] NertKernels.MatMulBatchedThreeDimensional (0 ms)
+[ RUN      ] NertKernels.MatMulPromotesOneDimensionalLhs
+[       OK ] NertKernels.MatMulPromotesOneDimensionalLhs (0 ms)
+[ RUN      ] NertKernels.MatMulPromotesOneDimensionalRhs
+[       OK ] NertKernels.MatMulPromotesOneDimensionalRhs (0 ms)
+[ RUN      ] NertKernels.ConvIdentityOneByOne
+[       OK ] NertKernels.ConvIdentityOneByOne (0 ms)
+[ RUN      ] NertKernels.ConvKnownTwoByTwoKernel
+[       OK ] NertKernels.ConvKnownTwoByTwoKernel (0 ms)
+[ RUN      ] NertKernels.ConvWithBias
+[       OK ] NertKernels.ConvWithBias (0 ms)
+[ RUN      ] NertKernels.ConvDepthwiseGroupEqualsChannels
+[       OK ] NertKernels.ConvDepthwiseGroupEqualsChannels (0 ms)
+[ RUN      ] NertKernels.ConvStrideAndPadding
+[       OK ] NertKernels.ConvStrideAndPadding (0 ms)
+[ RUN      ] NertKernels.MaxPoolTwoByTwoStrideTwo
+[       OK ] NertKernels.MaxPoolTwoByTwoStrideTwo (0 ms)
+[ RUN      ] NertKernels.MaxPoolPaddingAndCeilMode
+[       OK ] NertKernels.MaxPoolPaddingAndCeilMode (0 ms)
+[ RUN      ] NertKernels.MulBroadcastsLowerRank
+[       OK ] NertKernels.MulBroadcastsLowerRank (0 ms)
+[ RUN      ] NertKernels.MulBroadcastsBothAxes
+[       OK ] NertKernels.MulBroadcastsBothAxes (0 ms)
+[ RUN      ] NertKernels.DivPlainQuotient
+[       OK ] NertKernels.DivPlainQuotient (0 ms)
+[ RUN      ] NertKernels.DivBroadcastsLowerRank
+[       OK ] NertKernels.DivBroadcastsLowerRank (0 ms)
+[ RUN      ] NertKernels.DivByZeroYieldsInfAndNan
+[       OK ] NertKernels.DivByZeroYieldsInfAndNan (0 ms)
+[ RUN      ] NertKernels.SubPlainDifference
+[       OK ] NertKernels.SubPlainDifference (0 ms)
+[ RUN      ] NertKernels.SubBroadcastsBothAxes
+[       OK ] NertKernels.SubBroadcastsBothAxes (0 ms)
+[ RUN      ] NertKernels.SigmoidBasicValues
+[       OK ] NertKernels.SigmoidBasicValues (0 ms)
+[ RUN      ] NertKernels.SigmoidSaturatesForLargeMagnitudes
+[       OK ] NertKernels.SigmoidSaturatesForLargeMagnitudes (0 ms)
+[ RUN      ] NertKernels.CastFloatToInt64Truncates
+[       OK ] NertKernels.CastFloatToInt64Truncates (0 ms)
+[ RUN      ] NertKernels.CastInt64ToFloat
+[       OK ] NertKernels.CastInt64ToFloat (0 ms)
+[ RUN      ] NertKernels.CastFloatToBool
+[       OK ] NertKernels.CastFloatToBool (0 ms)
+[ RUN      ] NertKernels.CastBoolToInt64
+[       OK ] NertKernels.CastBoolToInt64 (0 ms)
+[ RUN      ] NertKernels.CastInt64ToBool
+[       OK ] NertKernels.CastInt64ToBool (0 ms)
+[ RUN      ] NertKernels.CastBoolToFloat
+[       OK ] NertKernels.CastBoolToFloat (0 ms)
+[ RUN      ] NertKernels.CastFloatToInt32Emulation
+[       OK ] NertKernels.CastFloatToInt32Emulation (0 ms)
+[ RUN      ] NertKernels.SoftmaxDefaultLastAxis
+[       OK ] NertKernels.SoftmaxDefaultLastAxis (0 ms)
+[ RUN      ] NertKernels.SoftmaxFirstAxis
+[       OK ] NertKernels.SoftmaxFirstAxis (0 ms)
+[ RUN      ] NertKernels.SoftmaxLegacyDefaultAxisCoerces2D
+[       OK ] NertKernels.SoftmaxLegacyDefaultAxisCoerces2D (0 ms)
+[ RUN      ] NertKernels.ReduceMaxOneAxisKeepdimsDefault
+[       OK ] NertKernels.ReduceMaxOneAxisKeepdimsDefault (0 ms)
+[ RUN      ] NertKernels.ReduceMaxOneAxisKeepdimsZero
+[       OK ] NertKernels.ReduceMaxOneAxisKeepdimsZero (0 ms)
+[ RUN      ] NertKernels.ReduceMaxAllAxes
+[       OK ] NertKernels.ReduceMaxAllAxes (0 ms)
+[ RUN      ] NertKernels.ReduceMaxNegativeAxis
+[       OK ] NertKernels.ReduceMaxNegativeAxis (0 ms)
+[ RUN      ] NertKernels.ModDividendSign
+[       OK ] NertKernels.ModDividendSign (0 ms)
+[ RUN      ] NertKernels.ModBroadcastsLowerRank
+[       OK ] NertKernels.ModBroadcastsLowerRank (0 ms)
+[ RUN      ] NertKernels.EqualFloatVectors
+[       OK ] NertKernels.EqualFloatVectors (0 ms)
+[ RUN      ] NertKernels.EqualInt64Broadcast
+[       OK ] NertKernels.EqualInt64Broadcast (0 ms)
+[ RUN      ] NertKernels.WhereFlatSelect
+[       OK ] NertKernels.WhereFlatSelect (0 ms)
+[ RUN      ] NertKernels.WhereBroadcastsAllThree
+[       OK ] NertKernels.WhereBroadcastsAllThree (0 ms)
+[ RUN      ] NertKernels.TableResolvesKnownOpsAndRejectsUnknown
+[       OK ] NertKernels.TableResolvesKnownOpsAndRejectsUnknown (0 ms)
+[ RUN      ] NertKernels.ConcatAxisOne
+[       OK ] NertKernels.ConcatAxisOne (0 ms)
+[ RUN      ] NertKernels.ConcatNegativeAxisInt64
+[       OK ] NertKernels.ConcatNegativeAxisInt64 (0 ms)
+[ RUN      ] NertKernels.ConcatEmptyOperand
+[       OK ] NertKernels.ConcatEmptyOperand (0 ms)
+[ RUN      ] NertKernels.SplitUnequalSizes
+[       OK ] NertKernels.SplitUnequalSizes (0 ms)
+[ RUN      ] NertKernels.SplitOldAttributeForm
+[       OK ] NertKernels.SplitOldAttributeForm (0 ms)
+[ RUN      ] NertKernels.SplitEvenNegativeAxisInt64
+[       OK ] NertKernels.SplitEvenNegativeAxisInt64 (0 ms)
+[ RUN      ] NertKernels.UnsqueezeMiddleAxis
+[       OK ] NertKernels.UnsqueezeMiddleAxis (0 ms)
+[ RUN      ] NertKernels.UnsqueezeNegativeAxisInt64
+[       OK ] NertKernels.UnsqueezeNegativeAxisInt64 (0 ms)
+[ RUN      ] NertKernels.UnsqueezeOldAttributeForm
+[       OK ] NertKernels.UnsqueezeOldAttributeForm (0 ms)
+[ RUN      ] NertKernels.ExpandLeadingAxis
+[       OK ] NertKernels.ExpandLeadingAxis (0 ms)
+[ RUN      ] NertKernels.ExpandHigherRankInt64
+[       OK ] NertKernels.ExpandHigherRankInt64 (0 ms)
+[ RUN      ] NertKernels.ExpandMaxBroadcastDataAndTarget
+[       OK ] NertKernels.ExpandMaxBroadcastDataAndTarget (0 ms)
+[ RUN      ] NertKernels.TransposeSwapTwoDimensional
+[       OK ] NertKernels.TransposeSwapTwoDimensional (0 ms)
+[ RUN      ] NertKernels.TransposeDefaultReverseInt64
+[       OK ] NertKernels.TransposeDefaultReverseInt64 (0 ms)
+[ RUN      ] NertKernels.SlicePlainRange
+[       OK ] NertKernels.SlicePlainRange (0 ms)
+[ RUN      ] NertKernels.SliceClampAndStepInt64
+[       OK ] NertKernels.SliceClampAndStepInt64 (0 ms)
+[ RUN      ] NertKernels.SliceNegativeStepsReverse
+[       OK ] NertKernels.SliceNegativeStepsReverse (0 ms)
+[ RUN      ] NertKernels.SliceNegativeStepInt64
+[       OK ] NertKernels.SliceNegativeStepInt64 (0 ms)
+[ RUN      ] NertKernels.GatherRowsAxisZero
+[       OK ] NertKernels.GatherRowsAxisZero (0 ms)
+[ RUN      ] NertKernels.GatherNegativeAxisWrapInt64
+[       OK ] NertKernels.GatherNegativeAxisWrapInt64 (0 ms)
+[ RUN      ] NertKernels.GatherElementsAxisOne
+[       OK ] NertKernels.GatherElementsAxisOne (0 ms)
+[ RUN      ] NertKernels.GatherElementsNegativeAxisInt64
+[       OK ] NertKernels.GatherElementsNegativeAxisInt64 (0 ms)
+[ RUN      ] NertKernels.GatherElementsUnequalStride
+[       OK ] NertKernels.GatherElementsUnequalStride (0 ms)
+[ RUN      ] NertKernels.ResizeNearestDouble
+[       OK ] NertKernels.ResizeNearestDouble (0 ms)
+[ RUN      ] NertKernels.ResizeTripleWidthInt64
+[       OK ] NertKernels.ResizeTripleWidthInt64 (0 ms)
+[ RUN      ] NertKernels.FlattenAxisOne
+[       OK ] NertKernels.FlattenAxisOne (0 ms)
+[ RUN      ] NertKernels.FlattenNegativeAxisInt64
+[       OK ] NertKernels.FlattenNegativeAxisInt64 (0 ms)
+[ RUN      ] NertKernels.ShapeThreeDimensional
+[       OK ] NertKernels.ShapeThreeDimensional (0 ms)
+[ RUN      ] NertKernels.ShapeBoolInput
+[       OK ] NertKernels.ShapeBoolInput (0 ms)
+[ RUN      ] NertKernels.ConstantOfShapeFill
+[       OK ] NertKernels.ConstantOfShapeFill (0 ms)
+[ RUN      ] NertKernels.ConstantOfShapeScalar
+[       OK ] NertKernels.ConstantOfShapeScalar (0 ms)
+[ RUN      ] NertKernels.TopKTwoLargest
+[       OK ] NertKernels.TopKTwoLargest (0 ms)
+[ RUN      ] NertKernels.TopKRowsSmallerK
+[       OK ] NertKernels.TopKRowsSmallerK (0 ms)
+[ RUN      ] NertKernels.AddInt64BroadcastsBothAxes
+[       OK ] NertKernels.AddInt64BroadcastsBothAxes (0 ms)
+[ RUN      ] NertKernels.SubInt64PlainDifference
+[       OK ] NertKernels.SubInt64PlainDifference (0 ms)
+[ RUN      ] NertKernels.MulInt64BroadcastsLowerRank
+[       OK ] NertKernels.MulInt64BroadcastsLowerRank (0 ms)
+[ RUN      ] NertKernels.DivInt64TruncatesTowardZero
+[       OK ] NertKernels.DivInt64TruncatesTowardZero (0 ms)
+[ RUN      ] NertKernels.WhereInt64FlatSelect
+[       OK ] NertKernels.WhereInt64FlatSelect (0 ms)
+[ RUN      ] NertKernels.WhereInt64BroadcastsAllThree
+[       OK ] NertKernels.WhereInt64BroadcastsAllThree (0 ms)
+[ RUN      ] NertKernels.FloorRoundsDown
+[       OK ] NertKernels.FloorRoundsDown (0 ms)
+[ RUN      ] NertKernels.IdentityCopiesInt64
+[       OK ] NertKernels.IdentityCopiesInt64 (0 ms)
+[ RUN      ] NertKernels.PowScalarAndBroadcastExponent
+[       OK ] NertKernels.PowScalarAndBroadcastExponent (0 ms)
+[ RUN      ] NertKernels.TileRepeatsEachAxis
+[       OK ] NertKernels.TileRepeatsEachAxis (0 ms)
+[ RUN      ] NertKernels.AveragePoolTwoByTwoStrideOne
+[       OK ] NertKernels.AveragePoolTwoByTwoStrideOne (0 ms)
+[ RUN      ] NertKernels.AveragePoolCountIncludePad
+[       OK ] NertKernels.AveragePoolCountIncludePad (0 ms)
+[ RUN      ] NertKernels.GlobalAveragePoolChannelMeans
+[       OK ] NertKernels.GlobalAveragePoolChannelMeans (0 ms)
+[ RUN      ] NertKernels.GlobalAveragePoolRankOneRejected
+[       OK ] NertKernels.GlobalAveragePoolRankOneRejected (0 ms)
+[ RUN      ] NertKernels.ConvTransposeStrideTwoUpsamples
+[       OK ] NertKernels.ConvTransposeStrideTwoUpsamples (0 ms)
+[ RUN      ] NertKernels.ConvTransposeOverlapAndPads
+[       OK ] NertKernels.ConvTransposeOverlapAndPads (0 ms)
+[ RUN      ] NertKernels.ResizeFromSizesInput
+[       OK ] NertKernels.ResizeFromSizesInput (0 ms)
+[ RUN      ] NertKernels.ErfSqrtTanhUnary
+[       OK ] NertKernels.ErfSqrtTanhUnary (0 ms)
+[ RUN      ] NertKernels.IsNaNFlagsNaN
+[       OK ] NertKernels.IsNaNFlagsNaN (0 ms)
+[ RUN      ] NertKernels.SqueezeCopiesInOrder
+[       OK ] NertKernels.SqueezeCopiesInOrder (0 ms)
+[ RUN      ] NertKernels.LayerNormalizationLastAxis
+[       OK ] NertKernels.LayerNormalizationLastAxis (0 ms)
+[ RUN      ] NertKernels.InstanceNormalizationPerChannelPlanes
+[       OK ] NertKernels.InstanceNormalizationPerChannelPlanes (0 ms)
+[ RUN      ] NertKernels.InstanceNormalizationDefaultEpsilon
+[       OK ] NertKernels.InstanceNormalizationDefaultEpsilon (0 ms)
+[ RUN      ] NertKernels.ShapeStartEndSelectsDims
+[       OK ] NertKernels.ShapeStartEndSelectsDims (0 ms)
+[ RUN      ] NertKernels.ResizeLinearTransforms
+[       OK ] NertKernels.ResizeLinearTransforms (0 ms)
+[ RUN      ] NertKernels.ResizeNearestOnnxDefaults
+[       OK ] NertKernels.ResizeNearestOnnxDefaults (0 ms)
+[ RUN      ] NertKernels.Conv3dTubelet
+[       OK ] NertKernels.Conv3dTubelet (0 ms)
+[ RUN      ] NertKernels.AbsFloat
+[       OK ] NertKernels.AbsFloat (0 ms)
+[ RUN      ] NertKernels.AbsInt64
+[       OK ] NertKernels.AbsInt64 (0 ms)
+[ RUN      ] NertKernels.NegFloat
+[       OK ] NertKernels.NegFloat (0 ms)
+[ RUN      ] NertKernels.NegInt64
+[       OK ] NertKernels.NegInt64 (0 ms)
+[ RUN      ] NertKernels.ExpValues
+[       OK ] NertKernels.ExpValues (0 ms)
+[ RUN      ] NertKernels.LogValues
+[       OK ] NertKernels.LogValues (0 ms)
+[ RUN      ] NertKernels.CosValues
+[       OK ] NertKernels.CosValues (0 ms)
+[ RUN      ] NertKernels.SinValues
+[       OK ] NertKernels.SinValues (0 ms)
+[ RUN      ] NertKernels.ClipBothBounds
+[       OK ] NertKernels.ClipBothBounds (0 ms)
+[ RUN      ] NertKernels.ClipOnlyMin
+[       OK ] NertKernels.ClipOnlyMin (0 ms)
+[ RUN      ] NertKernels.ClipOnlyMax
+[       OK ] NertKernels.ClipOnlyMax (0 ms)
+[ RUN      ] NertKernels.ClipInt64Bounds
+[       OK ] NertKernels.ClipInt64Bounds (0 ms)
+[ RUN      ] NertKernels.ClipInt64OnlyMin
+[       OK ] NertKernels.ClipInt64OnlyMin (0 ms)
+[ RUN      ] NertKernels.ClipInt64OnlyMax
+[       OK ] NertKernels.ClipInt64OnlyMax (0 ms)
+[ RUN      ] NertKernels.ClipInt64Identity
+[       OK ] NertKernels.ClipInt64Identity (0 ms)
+[ RUN      ] NertKernels.GreaterFloatBroadcast
+[       OK ] NertKernels.GreaterFloatBroadcast (0 ms)
+[ RUN      ] NertKernels.GreaterInt64
+[       OK ] NertKernels.GreaterInt64 (0 ms)
+[ RUN      ] NertKernels.LessFloatBroadcast
+[       OK ] NertKernels.LessFloatBroadcast (0 ms)
+[ RUN      ] NertKernels.LessInt64
+[       OK ] NertKernels.LessInt64 (0 ms)
+[ RUN      ] NertKernels.AndBroadcast
+[       OK ] NertKernels.AndBroadcast (0 ms)
+[ RUN      ] NertKernels.NotFlipsBools
+[       OK ] NertKernels.NotFlipsBools (0 ms)
+[ RUN      ] NertKernels.PadConstantWithValue
+[       OK ] NertKernels.PadConstantWithValue (0 ms)
+[ RUN      ] NertKernels.PadConstantDefaultZero
+[       OK ] NertKernels.PadConstantDefaultZero (0 ms)
+[ RUN      ] NertKernels.PadReflect
+[       OK ] NertKernels.PadReflect (0 ms)
+[ RUN      ] NertKernels.PadEdge
+[       OK ] NertKernels.PadEdge (0 ms)
+[ RUN      ] NertKernels.PadNegativeCrops
+[       OK ] NertKernels.PadNegativeCrops (0 ms)
+[ RUN      ] NertKernels.RangeFloat32
+[       OK ] NertKernels.RangeFloat32 (0 ms)
+[ RUN      ] NertKernels.RangeInt64NegativeDelta
+[       OK ] NertKernels.RangeInt64NegativeDelta (0 ms)
+[ RUN      ] NertKernels.ReduceSumKeepdimsDefault
+[       OK ] NertKernels.ReduceSumKeepdimsDefault (0 ms)
+[ RUN      ] NertKernels.ReduceSumOldAttributeForm
+[       OK ] NertKernels.ReduceSumOldAttributeForm (0 ms)
+[ RUN      ] NertKernels.ReduceSumInt64KeepdimsZeroNegativeAxis
+[       OK ] NertKernels.ReduceSumInt64KeepdimsZeroNegativeAxis (0 ms)
+[ RUN      ] NertKernels.ReduceSumNoopWithEmptyAxes
+[       OK ] NertKernels.ReduceSumNoopWithEmptyAxes (0 ms)
+[ RUN      ] NertKernels.GridSampleBilinearAlignCornersZero
+[       OK ] NertKernels.GridSampleBilinearAlignCornersZero (0 ms)
+[ RUN      ] NertKernels.GridSampleBilinearAlignCornersOne
+[       OK ] NertKernels.GridSampleBilinearAlignCornersOne (0 ms)
+[ RUN      ] NertKernels.GridSampleNearest
+[       OK ] NertKernels.GridSampleNearest (0 ms)
+[ RUN      ] NertKernels.GridSamplePaddingZeros
+[       OK ] NertKernels.GridSamplePaddingZeros (0 ms)
+[ RUN      ] NertKernels.GridSamplePaddingBorder
+[       OK ] NertKernels.GridSamplePaddingBorder (0 ms)
+[ RUN      ] NertKernels.GridSamplePaddingReflection
+[       OK ] NertKernels.GridSamplePaddingReflection (0 ms)
+[ RUN      ] NertKernels.EinsumBchwBncToBnhw
+[       OK ] NertKernels.EinsumBchwBncToBnhw (0 ms)
+[ RUN      ] NertKernels.EinsumMatrixProduct
+[       OK ] NertKernels.EinsumMatrixProduct (0 ms)
+[ RUN      ] NertKernels.EinsumTrace
+[       OK ] NertKernels.EinsumTrace (0 ms)
+[ RUN      ] NertKernels.EinsumTranspose
+[       OK ] NertKernels.EinsumTranspose (0 ms)
+[ RUN      ] NertKernels.EinsumEllipsisBatchMatMul
+[       OK ] NertKernels.EinsumEllipsisBatchMatMul (0 ms)
+[ RUN      ] NertKernels.EinsumEllipsisBroadcasts
+[       OK ] NertKernels.EinsumEllipsisBroadcasts (0 ms)
+[ RUN      ] NertKernels.ConstantOfShapeFloatFill
+[       OK ] NertKernels.ConstantOfShapeFloatFill (0 ms)
+[ RUN      ] NertKernels.ConstantOfShapeBoolFill
+[       OK ] NertKernels.ConstantOfShapeBoolFill (0 ms)
+[ RUN      ] NertKernels.ConstantOfShapeDefaultFillsFloatZero
+[       OK ] NertKernels.ConstantOfShapeDefaultFillsFloatZero (0 ms)
+[ RUN      ] NertKernels.SliceEmptyRangeInt64
+[       OK ] NertKernels.SliceEmptyRangeInt64 (0 ms)
+[ RUN      ] NertKernels.ConcatEmptyInputInt64
+[       OK ] NertKernels.ConcatEmptyInputInt64 (0 ms)
+[ RUN      ] NertKernels.MatMulAccumulatesInDouble
+[       OK ] NertKernels.MatMulAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.GemmAccumulatesInDouble
+[       OK ] NertKernels.GemmAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.ConvAccumulatesInDouble
+[       OK ] NertKernels.ConvAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.ReduceSumAccumulatesInDouble
+[       OK ] NertKernels.ReduceSumAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.ReduceMeanAccumulatesInDouble
+[       OK ] NertKernels.ReduceMeanAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.EinsumAccumulatesInDouble
+[       OK ] NertKernels.EinsumAccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.SoftmaxSumsInDouble
+[       OK ] NertKernels.SoftmaxSumsInDouble (0 ms)
+[ RUN      ] NertKernels.EluDefaultAlpha
+[       OK ] NertKernels.EluDefaultAlpha (0 ms)
+[ RUN      ] NertKernels.EluNonDefaultAlpha
+[       OK ] NertKernels.EluNonDefaultAlpha (0 ms)
+[ RUN      ] NertKernels.MaxBroadcastsTwoInputs
+[       OK ] NertKernels.MaxBroadcastsTwoInputs (0 ms)
+[ RUN      ] NertKernels.MinThreeInt64Inputs
+[       OK ] NertKernels.MinThreeInt64Inputs (0 ms)
+[ RUN      ] NertKernels.LessOrEqualBroadcastsTwoInputs
+[       OK ] NertKernels.LessOrEqualBroadcastsTwoInputs (0 ms)
+[ RUN      ] NertKernels.GreaterOrEqualInt64WithEquality
+[       OK ] NertKernels.GreaterOrEqualInt64WithEquality (0 ms)
+[ RUN      ] NertKernels.OrBroadcastsBoolInputs
+[       OK ] NertKernels.OrBroadcastsBoolInputs (0 ms)
+[ RUN      ] NertKernels.ReduceL2AxisKeepdims
+[       OK ] NertKernels.ReduceL2AxisKeepdims (0 ms)
+[ RUN      ] NertKernels.ReduceL2AccumulatesInDouble
+[       OK ] NertKernels.ReduceL2AccumulatesInDouble (0 ms)
+[ RUN      ] NertKernels.ArgMaxAxisKeepdimsFirstMax
+[       OK ] NertKernels.ArgMaxAxisKeepdimsFirstMax (0 ms)
+[ RUN      ] NertKernels.ArgMaxLastIndexNoKeepdims
+[       OK ] NertKernels.ArgMaxLastIndexNoKeepdims (0 ms)
+[ RUN      ] NertKernels.CumSumAxisInclusive
+[       OK ] NertKernels.CumSumAxisInclusive (0 ms)
+[ RUN      ] NertKernels.CumSumExclusiveReverseInt64
+[       OK ] NertKernels.CumSumExclusiveReverseInt64 (0 ms)
+[ RUN      ] NertKernels.EyeLikeDefaultDiagonal
+[       OK ] NertKernels.EyeLikeDefaultDiagonal (0 ms)
+[ RUN      ] NertKernels.EyeLikeSuperdiagonalInt64
+[       OK ] NertKernels.EyeLikeSuperdiagonalInt64 (0 ms)
+[ RUN      ] NertKernels.ScatterNDRowScatter
+[       OK ] NertKernels.ScatterNDRowScatter (0 ms)
+[ RUN      ] NertKernels.ScatterNDNegativeIndexInt64
+[       OK ] NertKernels.ScatterNDNegativeIndexInt64 (0 ms)
+[ RUN      ] NertKernels.FlattenBoolCopies
+[       OK ] NertKernels.FlattenBoolCopies (0 ms)
+[ RUN      ] NertKernels.GatherBoolData
+[       OK ] NertKernels.GatherBoolData (0 ms)
+[ RUN      ] NertKernels.ConcatBoolRows
+[       OK ] NertKernels.ConcatBoolRows (0 ms)
+[ RUN      ] NertKernels.SliceBoolRange
+[       OK ] NertKernels.SliceBoolRange (0 ms)
+[ RUN      ] NertKernels.TransposeBoolPerm
+[       OK ] NertKernels.TransposeBoolPerm (0 ms)
+[ RUN      ] NertKernels.UnsqueezeBoolAxes
+[       OK ] NertKernels.UnsqueezeBoolAxes (0 ms)
+[ RUN      ] NertKernels.SplitNumOutputsUnevenAndConflicts
+[       OK ] NertKernels.SplitNumOutputsUnevenAndConflicts (0 ms)
+[ RUN      ] NertKernels.SignSpecialValuesAndIntegerExtremes
+[       OK ] NertKernels.SignSpecialValuesAndIntegerExtremes (0 ms)
+[----------] 202 tests from NertKernels (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 202 tests from 1 test suite ran. (4 ms total)
+[  PASSED  ] 202 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_kernels" end time: Oct 24 13:13 CEST
+"nert_kernels" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/14 Testing: nert_kernels_negative
+9/14 Test: nert_kernels_negative
+Command: "/home/oli/repos/nert/build/test/nert_kernels_test" "--gtest_filter=NertKernelsNegative.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_kernels_negative" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = NertKernelsNegative.*
+[==========] Running 72 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 72 tests from NertKernelsNegative
+[ RUN      ] NertKernelsNegative.ReluRejectsDtypeMismatch
+[       OK ] NertKernelsNegative.ReluRejectsDtypeMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.AddRejectsWrongArity
+[       OK ] NertKernelsNegative.AddRejectsWrongArity (0 ms)
+[ RUN      ] NertKernelsNegative.ReshapeRejectsSizeMismatch
+[       OK ] NertKernelsNegative.ReshapeRejectsSizeMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.ReshapeAllowzeroKeepsZero
+[       OK ] NertKernelsNegative.ReshapeAllowzeroKeepsZero (0 ms)
+[ RUN      ] NertKernelsNegative.ReshapeRejectsTwoMinusOne
+[       OK ] NertKernelsNegative.ReshapeRejectsTwoMinusOne (0 ms)
+[ RUN      ] NertKernelsNegative.ReshapeRejectsIndivisibleMinusOne
+[       OK ] NertKernelsNegative.ReshapeRejectsIndivisibleMinusOne (0 ms)
+[ RUN      ] NertKernelsNegative.GemmRejectsInnerDimMismatch
+[       OK ] NertKernelsNegative.GemmRejectsInnerDimMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.MatMulRejectsInnerDimMismatch
+[       OK ] NertKernelsNegative.MatMulRejectsInnerDimMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.ConvRejectsChannelMismatch
+[       OK ] NertKernelsNegative.ConvRejectsChannelMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.MaxPoolRejectsShapeMismatch
+[       OK ] NertKernelsNegative.MaxPoolRejectsShapeMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.MulRejectsMixedDtypes
+[       OK ] NertKernelsNegative.MulRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.DivRejectsBroadcastMismatch
+[       OK ] NertKernelsNegative.DivRejectsBroadcastMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.SubRejectsWrongArity
+[       OK ] NertKernelsNegative.SubRejectsWrongArity (0 ms)
+[ RUN      ] NertKernelsNegative.SigmoidRejectsDtypeMismatch
+[       OK ] NertKernelsNegative.SigmoidRejectsDtypeMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.CastRejectsUnsupportedTo
+[       OK ] NertKernelsNegative.CastRejectsUnsupportedTo (0 ms)
+[ RUN      ] NertKernelsNegative.CastRejectsMissingTo
+[       OK ] NertKernelsNegative.CastRejectsMissingTo (0 ms)
+[ RUN      ] NertKernelsNegative.SoftmaxRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.SoftmaxRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.ReduceMaxRejectsDuplicateAxis
+[       OK ] NertKernelsNegative.ReduceMaxRejectsDuplicateAxis (0 ms)
+[ RUN      ] NertKernelsNegative.ModRejectsZeroDivisor
+[       OK ] NertKernelsNegative.ModRejectsZeroDivisor (0 ms)
+[ RUN      ] NertKernelsNegative.ModRejectsFmodOne
+[       OK ] NertKernelsNegative.ModRejectsFmodOne (0 ms)
+[ RUN      ] NertKernelsNegative.EqualRejectsMixedDtypes
+[       OK ] NertKernelsNegative.EqualRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.WhereRejectsNonBoolCondition
+[       OK ] NertKernelsNegative.WhereRejectsNonBoolCondition (0 ms)
+[ RUN      ] NertKernelsNegative.ConcatRejectsOffAxisMismatch
+[       OK ] NertKernelsNegative.ConcatRejectsOffAxisMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.ConcatRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.ConcatRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.SplitRejectsSizeSumMismatch
+[       OK ] NertKernelsNegative.SplitRejectsSizeSumMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.SplitRejectsUnevenDefault
+[       OK ] NertKernelsNegative.SplitRejectsUnevenDefault (0 ms)
+[ RUN      ] NertKernelsNegative.UnsqueezeRejectsDuplicateAxes
+[       OK ] NertKernelsNegative.UnsqueezeRejectsDuplicateAxes (0 ms)
+[ RUN      ] NertKernelsNegative.UnsqueezeRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.UnsqueezeRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.ExpandRejectsUnbroadcastable
+[       OK ] NertKernelsNegative.ExpandRejectsUnbroadcastable (0 ms)
+[ RUN      ] NertKernelsNegative.ExpandRejectsIncompatibleDims
+[       OK ] NertKernelsNegative.ExpandRejectsIncompatibleDims (0 ms)
+[ RUN      ] NertKernelsNegative.TransposeRejectsBadPerm
+[       OK ] NertKernelsNegative.TransposeRejectsBadPerm (0 ms)
+[ RUN      ] NertKernelsNegative.SliceRejectsStartsEndsMismatch
+[       OK ] NertKernelsNegative.SliceRejectsStartsEndsMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.SliceRejectsNonPositiveStep
+[       OK ] NertKernelsNegative.SliceRejectsNonPositiveStep (0 ms)
+[ RUN      ] NertKernelsNegative.GatherRejectsIndexOutOfRange
+[       OK ] NertKernelsNegative.GatherRejectsIndexOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.GatherRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.GatherRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.GatherElementsRejectsRankMismatch
+[       OK ] NertKernelsNegative.GatherElementsRejectsRankMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.GatherElementsRejectsIndexOutOfRange
+[       OK ] NertKernelsNegative.GatherElementsRejectsIndexOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.ResizeRejectsSizesInput
+[       OK ] NertKernelsNegative.ResizeRejectsSizesInput (0 ms)
+[ RUN      ] NertKernelsNegative.ResizeRejectsScalesRankMismatch
+[       OK ] NertKernelsNegative.ResizeRejectsScalesRankMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.FlattenRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.FlattenRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.ShapeRejectsNonInt64Output
+[       OK ] NertKernelsNegative.ShapeRejectsNonInt64Output (0 ms)
+[ RUN      ] NertKernelsNegative.ConstantOfShapeRejectsNegativeDim
+[       OK ] NertKernelsNegative.ConstantOfShapeRejectsNegativeDim (0 ms)
+[ RUN      ] NertKernelsNegative.ConstantOfShapeMissingValueRejectsInt64Output
+[       OK ] NertKernelsNegative.ConstantOfShapeMissingValueRejectsInt64Output (0 ms)
+[ RUN      ] NertKernelsNegative.TopKRejectsKExceedsDim
+[       OK ] NertKernelsNegative.TopKRejectsKExceedsDim (0 ms)
+[ RUN      ] NertKernelsNegative.TopKRejectsLargestZero
+[       OK ] NertKernelsNegative.TopKRejectsLargestZero (0 ms)
+[ RUN      ] NertKernelsNegative.TopKRejectsNonScalarK
+[       OK ] NertKernelsNegative.TopKRejectsNonScalarK (0 ms)
+[ RUN      ] NertKernelsNegative.DivRejectsInt64ZeroDivisor
+[       OK ] NertKernelsNegative.DivRejectsInt64ZeroDivisor (0 ms)
+[ RUN      ] NertKernelsNegative.WhereRejectsMixedValueDtypes
+[       OK ] NertKernelsNegative.WhereRejectsMixedValueDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.ConvTransposeRejectsWrongOutputShape
+[       OK ] NertKernelsNegative.ConvTransposeRejectsWrongOutputShape (0 ms)
+[ RUN      ] NertKernelsNegative.LayerNormalizationRejectsScaleShape
+[       OK ] NertKernelsNegative.LayerNormalizationRejectsScaleShape (0 ms)
+[ RUN      ] NertKernelsNegative.InstanceNormalizationRejectsScaleLength
+[       OK ] NertKernelsNegative.InstanceNormalizationRejectsScaleLength (0 ms)
+[ RUN      ] NertKernelsNegative.ClipRejectsMixedDtypes
+[       OK ] NertKernelsNegative.ClipRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.ExpRejectsInt64
+[       OK ] NertKernelsNegative.ExpRejectsInt64 (0 ms)
+[ RUN      ] NertKernelsNegative.GreaterRejectsMixedDtypes
+[       OK ] NertKernelsNegative.GreaterRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.PadRejectsWrapMode
+[       OK ] NertKernelsNegative.PadRejectsWrapMode (0 ms)
+[ RUN      ] NertKernelsNegative.RangeRejectsZeroDelta
+[       OK ] NertKernelsNegative.RangeRejectsZeroDelta (0 ms)
+[ RUN      ] NertKernelsNegative.EinsumRejectsMalformedDots
+[       OK ] NertKernelsNegative.EinsumRejectsMalformedDots (0 ms)
+[ RUN      ] NertKernelsNegative.EinsumRejectsImplicitEllipsisOutput
+[       OK ] NertKernelsNegative.EinsumRejectsImplicitEllipsisOutput (0 ms)
+[ RUN      ] NertKernelsNegative.GridSampleRejectsBicubic
+[       OK ] NertKernelsNegative.GridSampleRejectsBicubic (0 ms)
+[ RUN      ] NertKernelsNegative.ConstantOfShapeBoolValueRejectsFloatOutput
+[       OK ] NertKernelsNegative.ConstantOfShapeBoolValueRejectsFloatOutput (0 ms)
+[ RUN      ] NertKernelsNegative.ConstantOfShapeRejectsStringValue
+[       OK ] NertKernelsNegative.ConstantOfShapeRejectsStringValue (0 ms)
+[ RUN      ] NertKernelsNegative.EluRejectsInt64
+[       OK ] NertKernelsNegative.EluRejectsInt64 (0 ms)
+[ RUN      ] NertKernelsNegative.MaxRejectsMixedDtypes
+[       OK ] NertKernelsNegative.MaxRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.MinRejectsBroadcastMismatch
+[       OK ] NertKernelsNegative.MinRejectsBroadcastMismatch (0 ms)
+[ RUN      ] NertKernelsNegative.LessOrEqualRejectsMixedDtypes
+[       OK ] NertKernelsNegative.LessOrEqualRejectsMixedDtypes (0 ms)
+[ RUN      ] NertKernelsNegative.GreaterOrEqualRejectsNonBoolOutput
+[       OK ] NertKernelsNegative.GreaterOrEqualRejectsNonBoolOutput (0 ms)
+[ RUN      ] NertKernelsNegative.OrRejectsNonBoolInput
+[       OK ] NertKernelsNegative.OrRejectsNonBoolInput (0 ms)
+[ RUN      ] NertKernelsNegative.ReduceL2RejectsInt64
+[       OK ] NertKernelsNegative.ReduceL2RejectsInt64 (0 ms)
+[ RUN      ] NertKernelsNegative.ArgMaxRejectsNonInt64Output
+[       OK ] NertKernelsNegative.ArgMaxRejectsNonInt64Output (0 ms)
+[ RUN      ] NertKernelsNegative.CumSumRejectsAxisOutOfRange
+[       OK ] NertKernelsNegative.CumSumRejectsAxisOutOfRange (0 ms)
+[ RUN      ] NertKernelsNegative.EyeLikeRejectsRank3
+[       OK ] NertKernelsNegative.EyeLikeRejectsRank3 (0 ms)
+[ RUN      ] NertKernelsNegative.ScatterNDRejectsIndexOutOfRange
+[       OK ] NertKernelsNegative.ScatterNDRejectsIndexOutOfRange (0 ms)
+[----------] 72 tests from NertKernelsNegative (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 72 tests from 1 test suite ran. (3 ms total)
+[  PASSED  ] 72 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_kernels_negative" end time: Oct 24 13:13 CEST
+"nert_kernels_negative" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/14 Testing: nert_executor
+10/14 Test: nert_executor
+Command: "/home/oli/repos/nert/build/test/nert_executor_test" "--gtest_filter=NertExecutor.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_executor" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = NertExecutor.*
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from NertExecutor
+[ RUN      ] NertExecutor.HermeticAddReluMatchesHandComputed
+[       OK ] NertExecutor.HermeticAddReluMatchesHandComputed (0 ms)
+[ RUN      ] NertExecutor.ArenaAllocatedOnceAndReused
+[       OK ] NertExecutor.ArenaAllocatedOnceAndReused (0 ms)
+[ RUN      ] NertExecutor.ResidentInitializersUploadOnceAcrossRuns
+[       OK ] NertExecutor.ResidentInitializersUploadOnceAcrossRuns (0 ms)
+[ RUN      ] NertExecutor.HandleDeviceAllocatesOnlyLiveTensors
+[       OK ] NertExecutor.HandleDeviceAllocatesOnlyLiveTensors (0 ms)
+[ RUN      ] NertExecutor.HandleDeviceReleasesBuffersOnKernelThrow
+[       OK ] NertExecutor.HandleDeviceReleasesBuffersOnKernelThrow (0 ms)
+[ RUN      ] NertExecutor.ThrowingKernelReleasesStagedInputs
+[       OK ] NertExecutor.ThrowingKernelReleasesStagedInputs (0 ms)
+[ RUN      ] NertExecutor.TypedRunInt64InputBoolOutput
+[       OK ] NertExecutor.TypedRunInt64InputBoolOutput (0 ms)
+[ RUN      ] NertExecutor.TypedRunMatchesFloatRun
+[       OK ] NertExecutor.TypedRunMatchesFloatRun (0 ms)
+[ RUN      ] NertExecutor.FixtureResNet18RunsAndIsFinite
+[       OK ] NertExecutor.FixtureResNet18RunsAndIsFinite (11237 ms)
+[----------] 9 tests from NertExecutor (11241 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (11241 ms total)
+[  PASSED  ] 9 tests.
+<end of output>
+Test time =  11.25 sec
+----------------------------------------------------------
+Test Passed.
+"nert_executor" end time: Oct 24 13:13 CEST
+"nert_executor" time elapsed: 00:00:11
+----------------------------------------------------------
+
+11/14 Testing: nert_executor_negative
+11/14 Test: nert_executor_negative
+Command: "/home/oli/repos/nert/build/test/nert_executor_test" "--gtest_filter=NertExecutorNegative.*"
+Directory: /home/oli/repos/nert/build/test
+"nert_executor_negative" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+Note: Google Test filter = NertExecutorNegative.*
+[==========] Running 5 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 5 tests from NertExecutorNegative
+[ RUN      ] NertExecutorNegative.MissingInputThrows
+[       OK ] NertExecutorNegative.MissingInputThrows (0 ms)
+[ RUN      ] NertExecutorNegative.WrongInputSizeThrows
+[       OK ] NertExecutorNegative.WrongInputSizeThrows (1 ms)
+[ RUN      ] NertExecutorNegative.OpWithoutKernelThrows
+[       OK ] NertExecutorNegative.OpWithoutKernelThrows (0 ms)
+[ RUN      ] NertExecutorNegative.FloatRunRejectsNonFloatGraphInput
+[       OK ] NertExecutorNegative.FloatRunRejectsNonFloatGraphInput (0 ms)
+[ RUN      ] NertExecutorNegative.TypedRunRejectsMistypedOrMissizedInput
+[       OK ] NertExecutorNegative.TypedRunRejectsMistypedOrMissizedInput (0 ms)
+[----------] 5 tests from NertExecutorNegative (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test suite ran. (2 ms total)
+[  PASSED  ] 5 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_executor_negative" end time: Oct 24 13:13 CEST
+"nert_executor_negative" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/14 Testing: nert_constant_folding
+12/14 Test: nert_constant_folding
+Command: "/home/oli/repos/nert/build/test/nert_constant_folding_test"
+Directory: /home/oli/repos/nert/build/test
+"nert_constant_folding" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from NertConstantFolding
+[ RUN      ] NertConstantFolding.FoldsConstantChainKeepsLiveNodes
+[       OK ] NertConstantFolding.FoldsConstantChainKeepsLiveNodes (0 ms)
+[ RUN      ] NertConstantFolding.LeavesGraphOutputProducers
+[       OK ] NertConstantFolding.LeavesGraphOutputProducers (0 ms)
+[ RUN      ] NertConstantFolding.LeavesUnknownOps
+[       OK ] NertConstantFolding.LeavesUnknownOps (0 ms)
+[----------] 3 tests from NertConstantFolding (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 3 tests.
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"nert_constant_folding" end time: Oct 24 13:13 CEST
+"nert_constant_folding" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/14 Testing: nert_opset_table
+13/14 Test: nert_opset_table
+Command: "/usr/bin/python3" "/home/oli/repos/nert/test/../tools/gen_opset_compat.py" "--check"
+Directory: /home/oli/repos/nert/build/test
+"nert_opset_table" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+opset schema catalog is current (290 entries)
+<end of output>
+Test time =   2.18 sec
+----------------------------------------------------------
+Test Passed.
+"nert_opset_table" end time: Oct 24 13:13 CEST
+"nert_opset_table" time elapsed: 00:00:02
+----------------------------------------------------------
+
+14/14 Testing: nert_cpu_release
+14/14 Test: nert_cpu_release
+Command: "/home/oli/repos/nert/build/test/nert_cpu_release_test"
+Directory: /home/oli/repos/nert/build/test
+"nert_cpu_release" start time: Oct 24 13:13 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from ReleaseKernels
+[ RUN      ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes
+[       OK ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes (0 ms)
+[ RUN      ] ReleaseKernels.SplitNumOutputsUneven
+[       OK ] ReleaseKernels.SplitNumOutputsUneven (0 ms)
+[ RUN      ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice
+[       OK ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice (0 ms)
+[----------] 3 tests from ReleaseKernels (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 3 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_cpu_release" end time: Oct 24 13:13 CEST
+"nert_cpu_release" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 24 13:13 CEST

@@ -19,8 +19,10 @@ trusted Linux x64 AMD GPU runner with label `nert-amd` and set repository
 variable `NERT_AMD_GPU_CI=true`. The runner needs ROCm under `/opt/rocm`,
 GoogleTest/GoogleMock, CMake, a C++17 compiler and Python 3. CMake detects the
 GPU architecture; `CMAKE_HIP_ARCHITECTURES=gfx942` can pin MI300X manually.
-An unconfigured/skipped AMD job does not satisfy the mandatory AMD release
-gate. These device suites alone do not close the full-model catalog gate.
+Full-catalog AMD validation and persistent AMD CI are accepted known missing
+coverage for 0.2.0 (maintainer decision, 2026-10-24), rather than release
+blockers. An unconfigured/skipped AMD job is still not PASS. These device
+suites alone do not prove full-model catalog parity.
 
 GPU jobs are disabled until the
 runner and repository variable are configured; a skipped job is not GPU proof.

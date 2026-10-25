@@ -108,10 +108,11 @@ Specification: `specs/2026-10-16-phase5-rename/`. No behavior changed.
 
 ## Phase N1 — Device Layers (In Progress)
 
-Release decision (2026-10-23): HIP on AMD/ROCm is mandatory for 0.2.0.
-Native AMD build and focused device parity passed on MI300X. Every in-scope
-model gate on AMD and persistent AMD CI are still required. NVIDIA HIP
-evidence does not close this gate. See `2026-10-23-amd-devcloud/runbook.md`.
+Release decision (2026-10-24), superseding 2026-10-23: full-catalog AMD
+validation and persistent AMD CI are accepted known missing coverage for
+0.2.0, not release blockers. Earlier native AMD build and focused device
+parity passed on MI300X; that evidence predates the latest Sign/Split changes.
+NVIDIA HIP evidence does not constitute native AMD validation. See `2026-10-23-amd-devcloud/runbook.md`.
 Acceptance: `2026-10-16-n1c-hip/validation.md`.
 
 The device-layer goal is simple to state: the same model and the same plan run

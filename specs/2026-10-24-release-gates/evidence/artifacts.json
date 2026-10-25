@@ -1,0 +1,488 @@
+[
+  {
+    "path": "/tmp/opencode/exports/ecdet_s/ecdet_s.onnx",
+    "kind": "gated model",
+    "bytes": 40674706,
+    "sha256": "ff47e8f1e9b1d14bf8a4849faa74e9ae12cc10bad1042f4b6e4d359acb78437e"
+  },
+  {
+    "path": "/tmp/opencode/exports/ecdet_s/ecdet_s.onnx.data",
+    "kind": "external weights",
+    "bytes": 39832880,
+    "sha256": "daad7609070118daf50fe8e427f97c79bcdd185365d3c5c5200de8278d4d9706"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/ref_scores.npy",
+    "kind": "reference",
+    "bytes": 1328,
+    "sha256": "9bff80694756ab28f44c1d9225195c4392abc844ec9d1e405a2195132bd93e6c"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/ref_labels.npy",
+    "kind": "reference",
+    "bytes": 2528,
+    "sha256": "1c9fd25949e503f375d4a6afa8e6936075227de57137f1d8b423f8f6b78b84c8"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/ref_boxes.npy",
+    "kind": "reference",
+    "bytes": 4928,
+    "sha256": "a074f24b08c87c4ed31bdf304a5a23dbe04cdd7445dbca4296ce54b0b9ef7507"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/images.bin",
+    "kind": "frozen input",
+    "bytes": 4915200,
+    "sha256": "4ca45c2baaf15989d62a57c69309c4b1756a4edc0e87a8f8738acb001088efa7"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/orig_target_sizes.bin",
+    "kind": "frozen input",
+    "bytes": 16,
+    "sha256": "78e2dc81875c282e12e5fab168c53632c8fc7408e839f22f3b0729643a0ede27"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cpu_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "9eca7f420433309d90b08fd08910c6a4139e15260f49462225f83a0708492835"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cpu_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "2cedd4719161f1d91cd09f701d0e3c3c981269be257794d3447f8a007b6ef800"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cpu_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "67ef0231fd03be26eb1beafa60a40a084a924b8e844af90ce1c22bf2453f0cd7"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cuda_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "6d927757aa51e19900c89852a64ac6f79b5efc8b6bddf61c2a73f6fda015d1d2"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cuda_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "2cedd4719161f1d91cd09f701d0e3c3c981269be257794d3447f8a007b6ef800"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/cuda_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "e199eeaf659570c555bc11692d36a571fcc48768ddfa47915ba9f2c38133059e"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/opencl_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "1129b75b56b539786f33b6be306249f0f1ad3ea1e669979827d7dc1f0c72b281"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/opencl_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "b6ba98a6e6041f32495eb5ac3a19662ea0fd1dc2ba4268ab9771f87eee261346"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecdet_s/opencl_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "7cf139cfec484cc23b9ea3b78fc6f76d156169837b8bd0d1f8218e760edd1b10"
+  },
+  {
+    "path": "/tmp/opencode/exports/ecseg_s/ecseg_s.onnx",
+    "kind": "gated model",
+    "bytes": 42320129,
+    "sha256": "6dc6027f82f297ef36995490c59c2a0c7270aed47c8ca5543c1d38f333dbd179"
+  },
+  {
+    "path": "/tmp/opencode/exports/ecseg_s/ecseg_s.onnx.data",
+    "kind": "external weights",
+    "bytes": 41471792,
+    "sha256": "0c3974d3094377427ddb1fa3707d697073b2e4e9e78fc8d756400e5efd5c1431"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/ref_masks.npy",
+    "kind": "reference",
+    "bytes": 30720128,
+    "sha256": "0d2e11e7e96fe01411f02e78e3a770c0f53ef52a3f32543394389635cea4b84f"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/ref_scores.npy",
+    "kind": "reference",
+    "bytes": 1328,
+    "sha256": "660e51a4386dbe4ad1c84a948f3adee7ecb63e7da2fac055b94374be677f4a10"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/ref_labels.npy",
+    "kind": "reference",
+    "bytes": 2528,
+    "sha256": "d8cbc9e2a8179f7aded544c0670934cda5bf8757787f4ecc7dd0518323a2efb3"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/ref_boxes.npy",
+    "kind": "reference",
+    "bytes": 4928,
+    "sha256": "6ee48d5b388985191f028b0d90d2792bc36c95723ba0d9847e91e16821b07d38"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/images.bin",
+    "kind": "frozen input",
+    "bytes": 4915200,
+    "sha256": "4ca45c2baaf15989d62a57c69309c4b1756a4edc0e87a8f8738acb001088efa7"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/orig_target_sizes.bin",
+    "kind": "frozen input",
+    "bytes": 16,
+    "sha256": "78e2dc81875c282e12e5fab168c53632c8fc7408e839f22f3b0729643a0ede27"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cpu_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "84559fd641ad2a5f408668abda0fffdfb3520ad25e0a4c398e5e05c203268c5b"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cpu_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "6912932aaa67853e8592db3d3b143d1b18197433f11062c54e7765ba2e20af73"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cpu_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "d09671eb808665907ffceb28b821c8fcb074a2242fc1941a816689d6c69d84ea"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cpu_masks.bin",
+    "kind": "device output",
+    "bytes": 30720000,
+    "sha256": "bbe1633d74e55d1a84cab649522711c75df0c3f002f10fb8ce07b35dd6c11116"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cuda_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "4d1519f3675c853aedd70eaef6844758b5eaec5d72b31da476c5ac2f78ce2110"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cuda_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "6912932aaa67853e8592db3d3b143d1b18197433f11062c54e7765ba2e20af73"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cuda_masks.bin",
+    "kind": "device output",
+    "bytes": 30720000,
+    "sha256": "cacfc2e284e060cd004877f46e121939702c02a9959191b788a39d49d76cde8e"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/cuda_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "c8ebab9d020cc65323aa9b88591ad472ce83ead80920dd9bd91feeab7fad9090"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/opencl_boxes.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "625dff792b11540aae1d35c393cb9cf75e18841c4b86a0bcd8bfa17930149f4e"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/opencl_masks.bin",
+    "kind": "device output",
+    "bytes": 30720000,
+    "sha256": "d4d4a93f24dcf2bc41207b550bb2b391e3a3ed75a50285841f6fd495ee50ed4a"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/opencl_scores.bin",
+    "kind": "device output",
+    "bytes": 1200,
+    "sha256": "248ae30cbea76a60109c909eadb9898e31227ddb1a2fe2dba1325558a6da603f"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecseg_s/opencl_labels.bin",
+    "kind": "device output",
+    "bytes": 2400,
+    "sha256": "6912932aaa67853e8592db3d3b143d1b18197433f11062c54e7765ba2e20af73"
+  },
+  {
+    "path": "/tmp/opencode/exports/ecpose_s/ecpose_s.onnx",
+    "kind": "gated model",
+    "bytes": 41834767,
+    "sha256": "810dcac9622028160b97a24b0ae78c6f673350ac131285814acc7bfb37c5c33a"
+  },
+  {
+    "path": "/tmp/opencode/exports/ecpose_s/ecpose_s.onnx.data",
+    "kind": "external weights",
+    "bytes": 41013000,
+    "sha256": "60669d0a32e5f121bb37fda1d3fdb65a150fc96dfe24d31ca9aeb99597a7f388"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/ref_scores.npy",
+    "kind": "reference",
+    "bytes": 368,
+    "sha256": "6591f6cc57f6ba684290d2341d722ffcf7021d1e43ec45e5544f4f1f0ccb489a"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/ref_labels.npy",
+    "kind": "reference",
+    "bytes": 608,
+    "sha256": "a677bf4d4621d3ad278b45dc4f5d0f3ac8296a6cc6520df9d22384c0871102bd"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/ref_keypoints.npy",
+    "kind": "reference",
+    "bytes": 8288,
+    "sha256": "c49506dc7ca4f34ce0687602e4fcc0f4a52bc2331b130bca122dad8b7d66476c"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/images.bin",
+    "kind": "frozen input",
+    "bytes": 4915200,
+    "sha256": "4ca45c2baaf15989d62a57c69309c4b1756a4edc0e87a8f8738acb001088efa7"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/orig_target_sizes.bin",
+    "kind": "frozen input",
+    "bytes": 16,
+    "sha256": "78e2dc81875c282e12e5fab168c53632c8fc7408e839f22f3b0729643a0ede27"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cpu_labels.bin",
+    "kind": "device output",
+    "bytes": 480,
+    "sha256": "82c0a80ad1ea537afd050803a3815beaa2f0647609709db7cd650e66e83b4fb9"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cpu_scores.bin",
+    "kind": "device output",
+    "bytes": 240,
+    "sha256": "cb3fa5e0c87e589e97bc783cf52d03e957346ed86fe04d87aad0fad1c2a8e42c"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cpu_keypoints.bin",
+    "kind": "device output",
+    "bytes": 8160,
+    "sha256": "784966cac058750efdf0d6c639b7c49d1b5567cc5881504a540607dd80df28f3"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cuda_scores.bin",
+    "kind": "device output",
+    "bytes": 240,
+    "sha256": "23196d850aac8b864dffd963f5c79e5a1ca45fca250c5c3d636191850c940184"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cuda_keypoints.bin",
+    "kind": "device output",
+    "bytes": 8160,
+    "sha256": "2716b82b39a502475f437f592f0674b99faaca81b6cfa4a184c21841dab3695e"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/cuda_labels.bin",
+    "kind": "device output",
+    "bytes": 480,
+    "sha256": "82c0a80ad1ea537afd050803a3815beaa2f0647609709db7cd650e66e83b4fb9"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/opencl_scores.bin",
+    "kind": "device output",
+    "bytes": 240,
+    "sha256": "9058bdd2ca36790df0ec7f53d713ad765952514fbe470999d9117eadca512e80"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/opencl_labels.bin",
+    "kind": "device output",
+    "bytes": 480,
+    "sha256": "82c0a80ad1ea537afd050803a3815beaa2f0647609709db7cd650e66e83b4fb9"
+  },
+  {
+    "path": "/tmp/nert-release-gates/ecpose_s/opencl_keypoints.bin",
+    "kind": "device output",
+    "bytes": 8160,
+    "sha256": "61e7561afe37fb68e2e070f3d9eb527d91ab8cc4017613015860aea6d5d2cd8a"
+  },
+  {
+    "path": "/tmp/opencode/exports/rfdetr_det_small/rfdetr-small-sim.onnx",
+    "kind": "gated model",
+    "bytes": 117771671,
+    "sha256": "1871563b4c20aed2372027d91d76f2c26f6258a06a0c03411c36830a8c60d744"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/ref_dets.npy",
+    "kind": "reference",
+    "bytes": 4928,
+    "sha256": "7861fb26151b217563f22c4b581b5ca401dae61f4b9d374a12d1c8e31a88a0b5"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/ref_labels.npy",
+    "kind": "reference",
+    "bytes": 109328,
+    "sha256": "3bfc778e81dcef16a17e8ad97df216b460b678a76a8d79bb120f201d1186d7be"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/input.bin",
+    "kind": "frozen input",
+    "bytes": 3145728,
+    "sha256": "32397107e1e003a88dce12a500c2c21599b20937d6b41de68973d9296cc2cff2"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/cpu_labels.bin",
+    "kind": "device output",
+    "bytes": 109200,
+    "sha256": "774ce0ea476ab33079309d6ea4b0d7c7b30b85da0cdcbd560122c16e2c0d6bb5"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/cpu_dets.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "330aea3e1fc0f0dcbd8cbd53bf7c48a222c555bd9f66fbd4d558609f438dab68"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/cuda_labels.bin",
+    "kind": "device output",
+    "bytes": 109200,
+    "sha256": "5f002f2cb8d267dbb76c7ca387978d34067eff372f68f60b76fb45fcca7a5e8e"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/cuda_dets.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "a6f131615051d22fb7154ba5257ba12b3902589e272365becae8a051592556c4"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/opencl_dets.bin",
+    "kind": "device output",
+    "bytes": 4800,
+    "sha256": "1cc334ca448c55f91cf15f496cefd0cd508ef2a74f6827a56ef427501511b973"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_det_small/opencl_labels.bin",
+    "kind": "device output",
+    "bytes": 109200,
+    "sha256": "5a1bbb100660d12fff5269a9f2d02afdae2758cd3fc542ccb7052d943a7929ae"
+  },
+  {
+    "path": "/tmp/opencode/exports/rfdetr_seg_medium/rfdetr-seg-medium-sim.onnx",
+    "kind": "gated model",
+    "bytes": 133997973,
+    "sha256": "4c83c812867f5cd56ee0e53e0c0dbc7be4261e97810a4a622596545b2493f49b"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/ref_dets.npy",
+    "kind": "reference",
+    "bytes": 3328,
+    "sha256": "49b4acf5ed55bd360581b2b8326f94e94375a5c51c51741e24f67c1b39cec4e8"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/ref_masks.npy",
+    "kind": "reference",
+    "bytes": 9331328,
+    "sha256": "03de790ad96f84665481258d76652b5aab69d691456fc72af8cefde9940f8fea"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/ref_labels.npy",
+    "kind": "reference",
+    "bytes": 72928,
+    "sha256": "a4524b45eab945efe597e7dee2745b55276e98a4427de5d10c4c902c3d2ae5bf"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/input.bin",
+    "kind": "frozen input",
+    "bytes": 2239488,
+    "sha256": "ce09c9671cbf55ca80b36155933f1ff0fbdbb2463df678fc2ae79a6cdc30919b"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cpu_labels.bin",
+    "kind": "device output",
+    "bytes": 72800,
+    "sha256": "6c977add2f007cbf148cfe4ed0bd8c645c22e35fe6ac668f4e3dc6b272bcd6e4"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cpu_dets.bin",
+    "kind": "device output",
+    "bytes": 3200,
+    "sha256": "6df3ff18d5cfbcc48be65218e260df85a42d72dcd57fc7da3b9fa5a82aafd183"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cpu_masks.bin",
+    "kind": "device output",
+    "bytes": 9331200,
+    "sha256": "049a1fe035e1ddd5983e6a49826795e88029716bd1f725858a2f796ebeca3a18"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cuda_labels.bin",
+    "kind": "device output",
+    "bytes": 72800,
+    "sha256": "bf6b53f6bbd3012f28b444126b6c7db86a99491d4b734b57e6c68c3a41f4c133"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cuda_masks.bin",
+    "kind": "device output",
+    "bytes": 9331200,
+    "sha256": "4066b2290e1cf35f4aa270400a34cf9c55e571fa985bd07553430476b26d07fe"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/cuda_dets.bin",
+    "kind": "device output",
+    "bytes": 3200,
+    "sha256": "78d1779c4072244b75ee85718e29e0e39a0c970a42740f4b05c2b4f87301cd87"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/opencl_dets.bin",
+    "kind": "device output",
+    "bytes": 3200,
+    "sha256": "d11dfca504827c1dcfadc1df990aafe63eebedc7301fcd3e757fb3ab0e7bb85c"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/opencl_masks.bin",
+    "kind": "device output",
+    "bytes": 9331200,
+    "sha256": "6c1a0ca719e2753c80fdba0a9763ad0d8ec302b7c33a3d4f64a260c1045f454b"
+  },
+  {
+    "path": "/tmp/nert-release-gates/rfdetr_seg_medium/opencl_labels.bin",
+    "kind": "device output",
+    "bytes": 72800,
+    "sha256": "26d18733329936d3b8bc7dccc8f072db84f90cd66a9f7a3d0e0f98825ebf045d"
+  },
+  {
+    "path": "/tmp/nert-release-gates/gate_cpu",
+    "kind": "gate executable",
+    "bytes": 1086904,
+    "sha256": "ff38f30a7f41768503c9e067f1d4b056c84a82ab074c6e15452b95c389961ddb"
+  },
+  {
+    "path": "/tmp/nert-release-gates/gate_cuda",
+    "kind": "gate executable",
+    "bytes": 3764848,
+    "sha256": "28bad2ec728106946120bcfabd2a0da848933d0481991aaa4411fa7a517daaf0"
+  },
+  {
+    "path": "/tmp/nert-release-gates/gate_opencl",
+    "kind": "gate executable",
+    "bytes": 1667392,
+    "sha256": "a3eb481b47f1295bb956d44f65381f64281709de5983494a24cdcfaf6241cb5e"
+  },
+  {
+    "path": "/tmp/opencode/nert_gate.cpp",
+    "kind": "gate source",
+    "bytes": 9292,
+    "sha256": "c1874a9d0e82f0abb97c277549c3466a2296d395a3bd307c8b6fab1e9ab4fa9f"
+  },
+  {
+    "path": "/home/oli/repos/neuriplo/build-parity/native_yolo_parity_fixture/bus.jpg",
+    "kind": "source image",
+    "bytes": 137419,
+    "sha256": "c02019c4979c191eb739ddd944445ef408dad5679acab6fd520ef9d434bfbc63"
+  }
+]

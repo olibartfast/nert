@@ -1930,6 +1930,13 @@ std::vector<TensorInfo> split_shapes(const StaticContext& ctx, const Node& node,
         parts = int64_constant(ctx, node, node.inputs[1]);
         parts_supplied = true;
     }
+    std::vector<int64_t> default_parts;
+    try {
+        default_parts = DefaultSplitParts(node, in[static_cast<size_t>(axis)], count,
+            parts_supplied, "Split");
+    } catch (const InferenceException& error) {
+        fail(node, error.what());
+    }
     if (parts_supplied) {
         if (parts.size() != count) {
             fail(node, "Split split sizes must match the output count");
@@ -1945,12 +1952,7 @@ std::vector<TensorInfo> split_shapes(const StaticContext& ctx, const Node& node,
             fail(node, "Split split sizes must sum to the axis dim");
         }
     } else {
-        if (in[static_cast<size_t>(axis)] % static_cast<int64_t>(count) != 0) {
-            fail(node,
-                "Split axis dim is not divisible by the output count");
-        }
-        parts.assign(count,
-            in[static_cast<size_t>(axis)] / static_cast<int64_t>(count));
+        parts = default_parts;
     }
     std::vector<TensorInfo> outputs;
     outputs.reserve(count);
@@ -2829,7 +2831,7 @@ std::vector<TensorInfo> compute_outputs(const StaticContext& ctx, const Node& no
     }
     // Clip is dtype-preserving (float32 or int64 data, optional scalar bounds
     // of the same dtype), so its output is exactly its data input.
-    if (op == "Clip" || op == "Abs" || op == "Neg") {
+    if (op == "Clip" || op == "Abs" || op == "Neg" || op == "Sign") {
         return {need(0)};
     }
     if (op == "MatMul") {

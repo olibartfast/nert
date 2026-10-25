@@ -1,0 +1,21 @@
+{
+  "model": "ecdet_s",
+  "device": "cuda",
+  "threshold": 0.25,
+  "reference_kept": 9,
+  "device_kept": 9,
+  "selection_equal": true,
+  "kept_class_mismatch": 0,
+  "reference_threshold_margin": 0.006949126720428467,
+  "raw_mismatch": {
+    "scores": 0,
+    "labels": 2,
+    "boxes": 8
+  },
+  "kept_mismatch": {
+    "scores": 0,
+    "labels": 0,
+    "boxes": 0
+  },
+  "task_equivalence_pass": true
+}

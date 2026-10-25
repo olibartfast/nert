@@ -38,22 +38,27 @@ fallback or ONNX Runtime escape hatch; unsupported semantics fail explicitly.
 Version 0.2.0 is unreleased; the breaking namespace, header, filename,
 and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
 
-CPU, CUDA (with cuDNN), OpenCL and HIP have 72 op rows each. OpenCL now
+CPU, CUDA (with cuDNN), OpenCL and HIP have 73 op rows each. OpenCL now
 includes `Abs`, `Floor`, `GreaterOrEqual`, and `Neg`.
 HIP includes first-party `Gemm`, `MatMul`, `Conv`, and `ConvTranspose`
 without hipBLAS or MIOpen. Native AMD build and focused device parity
 passed on MI300X via AMD Developer Cloud (AMD's vendor developer program,
-not a neocloud). Full-model AMD validation and persistent CI are mandatory
-for release 0.2.0 and remain outstanding. See the
+not a neocloud). Full-catalog AMD validation and persistent AMD CI are accepted known missing
+coverage for 0.2.0 (maintainer decision, 2026-10-24), not release blockers. See the
 [AMD validation runbook](specs/2026-10-23-amd-devcloud/runbook.md).
 
-Full-model gates, not op-table presence, define coverage. As of 2026-10-22,
-24 of the 30 in-scope ONNX catalog entries pass on CPU, CUDA, and OpenCL; no
-entry remains open, and 6 entries need an ONNX export.
-Image understanding (GGUF/llama.cpp) and Gaussian
-Splatting (LGM/GRM) are out of scope for this ONNX runtime. The catalog
-is incomplete and 0.2.0 is not release-ready; see the
-[coverage matrix](specs/2026-10-17-task-models/coverage.md).
+Full-model gates, not op-table presence, define coverage. As of 2026-10-24,
+29 available in-scope catalog entries pass on CPU, CUDA and OpenCL. Four new
+entries use explicitly approved, frozen-fixture task-equivalence deviations;
+the raw numeric failures remain recorded. The unavailable “keypoint other
+sizes” placeholder is deferred until upstream provides a distinct model.
+Image understanding (GGUF/llama.cpp) and Gaussian Splatting remain out of scope.
+AMD full-catalog validation and persistent CI remain explicitly unvalidated;
+the latest Sign/Split changes have not been rerun on native AMD. These are
+accepted 0.2.0 limitations. Release preparation still requires committing the
+reviewed work and completing [GitFlow](docs/GITFLOW.md); no release has been published. See the
+[coverage matrix](specs/2026-10-17-task-models/coverage.md) and
+[gate evidence](specs/2026-10-24-release-gates/results.md).
 
 ## Documentation
 
@@ -69,13 +74,14 @@ is incomplete and 0.2.0 is not release-ready; see the
 
 `CpuDevice()` always exists. `CudaDevice()`, `OpenCLDevice()`, and
 `HipDevice()` exist only when the matching build flag is on. CPU and
-CUDA implement the full 72-row table; CUDA `Conv` and `ConvTranspose`
-require cuDNN. OpenCL implements 72 rows as the portable backend. HIP
-implements all 72 rows, including first-party `Gemm`, `MatMul`, `Conv`,
-and `ConvTranspose` without hipBLAS or MIOpen. The HIP sources are validated
-on NVIDIA and an AMD Developer Cloud (AMD vendor program, not a neocloud)
-MI300X through native AMD HIP; full-model AMD gates
-remain pending. Select AMD with `NERT_HIP_PLATFORM=amd` (CMake 3.21+).
+CUDA implement the full 73-row table; CUDA `Conv` and `ConvTranspose`
+require cuDNN. OpenCL implements 73 rows as the portable backend. HIP
+implements all 73 rows, including first-party `Gemm`, `MatMul`, `Conv`,
+and `ConvTranspose` without hipBLAS or MIOpen. The current HIP sources are validated
+on NVIDIA. Earlier native AMD build/device and three-model checks passed on
+an AMD Developer Cloud (AMD vendor program, not a neocloud) MI300X; that
+evidence predates the latest Sign/Split changes. Complete AMD model coverage
+and persistent CI are known missing coverage for 0.2.0. Select AMD with `NERT_HIP_PLATFORM=amd` (CMake 3.21+).
 
 A device can load only graphs whose op types all have a row. Op-table
 presence is a coverage statement, not a correctness claim; full-model
@@ -170,7 +176,9 @@ no global load-time canonicalization pass and no canonical opset baseline:
 - `ReduceSum`, `Squeeze`, `Unsqueeze`: pre-13 `axes` attribute is used in
   place; schema 13+ uses the input form.
 - `Split`: pre-13 `split` attribute is used in place; schema 13+ uses the
-  input form.
+  input form. Schema 18+ also supports `num_outputs`, including a smaller
+  final chunk for uneven splits; explicit sizes and `num_outputs` are mutually
+  exclusive.
 - `Softmax`: pre-13 2-D coercion and the old default axis of 1 are
   implemented directly in the kernel; schema 13+ uses single-axis semantics.
   The legacy path does not require static rank metadata.
@@ -198,7 +206,7 @@ the node, operator, declared opset, effective version, and the missing
 capability.
 
 Current guards include `ConvTranspose.output_shape`, `Resize.axes` (18+),
-`Split.num_outputs` (18+), `Cast.saturate` (19+), `Cast.round_mode` (24+),
+`Cast.saturate` (19+), `Cast.round_mode` (24+),
 `Pad.mode="wrap"` (19+), `AveragePool.dilations` (19+), `Range.stash_type`
 (27+), and nonzero `ReduceMax.noop_with_empty_axes` at schema 18.
 `GridSample` at effective 20+ is rejected because its mode default and value

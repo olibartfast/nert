@@ -92,6 +92,7 @@ add_library(nert STATIC
     src/kernels/is_nan.cpp
     src/kernels/abs.cpp
     src/kernels/neg.cpp
+    src/kernels/sign.cpp
     src/kernels/exp.cpp
     src/kernels/log.cpp
     src/kernels/cos.cpp
@@ -149,7 +150,7 @@ if(NERT_ENABLE_CUDA)
                                 src/cuda/gather.cu src/cuda/gather_elements.cu src/cuda/mat_mul.cu
                                 src/cuda/cast.cu src/cuda/equal.cu src/cuda/where.cu src/cuda/shape.cu
                                 src/cuda/constant_of_shape.cu src/cuda/mod.cu src/cuda/reduce_max.cu src/cuda/reduce_sum.cu
-                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/layer_normalization.cu src/cuda/sin.cu src/cuda/cos.cu src/cuda/exp.cu src/cuda/elu.cu src/cuda/log.cu src/cuda/floor.cu src/cuda/is_nan.cu src/cuda/abs.cu src/cuda/neg.cu src/cuda/pow.cu src/cuda/greater.cu src/cuda/less.cu src/cuda/greater_or_equal.cu src/cuda/less_or_equal.cu src/cuda/and.cu src/cuda/or.cu src/cuda/not.cu src/cuda/max.cu src/cuda/min.cu src/cuda/clip.cu src/cuda/identity.cu src/cuda/squeeze.cu src/cuda/tile.cu src/cuda/range.cu src/cuda/eye_like.cu src/cuda/pad.cu src/cuda/reduce_mean.cu src/cuda/reduce_l2.cu src/cuda/arg_max.cu src/cuda/cum_sum.cu src/cuda/scatter_nd.cu src/cuda/grid_sample.cu src/cuda/instance_normalization.cu src/cuda/einsum.cu src/cuda/table.cu)
+                                src/cuda/top_k.cu src/cuda/resize.cu src/cuda/layer_normalization.cu src/cuda/sin.cu src/cuda/cos.cu src/cuda/exp.cu src/cuda/elu.cu src/cuda/log.cu src/cuda/floor.cu src/cuda/is_nan.cu src/cuda/abs.cu src/cuda/neg.cu src/cuda/sign.cu src/cuda/pow.cu src/cuda/greater.cu src/cuda/less.cu src/cuda/greater_or_equal.cu src/cuda/less_or_equal.cu src/cuda/and.cu src/cuda/or.cu src/cuda/not.cu src/cuda/max.cu src/cuda/min.cu src/cuda/clip.cu src/cuda/identity.cu src/cuda/squeeze.cu src/cuda/tile.cu src/cuda/range.cu src/cuda/eye_like.cu src/cuda/pad.cu src/cuda/reduce_mean.cu src/cuda/reduce_l2.cu src/cuda/arg_max.cu src/cuda/cum_sum.cu src/cuda/scatter_nd.cu src/cuda/grid_sample.cu src/cuda/instance_normalization.cu src/cuda/einsum.cu src/cuda/table.cu)
     # PRIVATE: no CUDA type leaks through the public headers, so consumers
     # stay toolkit-free.
     target_link_libraries(nert PRIVATE CUDA::cudart CUDA::cublas)
@@ -277,7 +278,7 @@ if(NERT_ENABLE_HIP)
     target_sources(nert PRIVATE src/hip/eye_like.cu src/hip/flatten.cu src/hip/floor.cu src/hip/gather.cu src/hip/gather_elements.cu src/hip/global_average_pool.cu)
     target_sources(nert PRIVATE src/hip/greater.cu src/hip/greater_or_equal.cu src/hip/grid_sample.cu src/hip/identity.cu src/hip/instance_normalization.cu src/hip/is_nan.cu)
     target_sources(nert PRIVATE src/hip/layer_normalization.cu src/hip/less.cu src/hip/less_or_equal.cu src/hip/log.cu src/hip/max.cu src/hip/max_pool.cu)
-    target_sources(nert PRIVATE src/hip/min.cu src/hip/mod.cu src/hip/mul.cu src/hip/neg.cu src/hip/not.cu src/hip/or.cu)
+    target_sources(nert PRIVATE src/hip/min.cu src/hip/mod.cu src/hip/mul.cu src/hip/neg.cu src/hip/sign.cu src/hip/not.cu src/hip/or.cu)
     target_sources(nert PRIVATE src/hip/pad.cu src/hip/pow.cu src/hip/range.cu src/hip/reduce_l2.cu src/hip/reduce_max.cu src/hip/reduce_mean.cu)
     target_sources(nert PRIVATE src/hip/reduce_sum.cu src/hip/relu.cu src/hip/reshape.cu src/hip/resize.cu src/hip/scatter_nd.cu src/hip/shape.cu)
     target_sources(nert PRIVATE src/hip/sigmoid.cu src/hip/sin.cu src/hip/slice.cu src/hip/softmax.cu src/hip/split.cu src/hip/sqrt.cu)

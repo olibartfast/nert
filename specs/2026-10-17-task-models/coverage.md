@@ -1,6 +1,7 @@
 # Coverage matrix — task models × devices
 
-Date: 2026-10-20. Release target: 30 in-scope ONNX catalog entries. The
+Date: 2026-10-24. Release target: 29 available in-scope ONNX catalog entries; the unavailable
+keypoint-size placeholder is explicitly deferred (2026-10-24). The
 catalog census is [inventory.md](../2026-10-19-catalog-program/inventory.md);
 the run history is [ledger.md](../2026-10-19-catalog-program/ledger.md).
 Full pre-slim matrix:
@@ -18,24 +19,25 @@ Full pre-slim matrix:
 - **OUT-OF-SCOPE** — no ONNX runtime contract.
 
 Node counts in the detailed packets are NERT post-constant-folding counts.
-HIP on AMD/ROCm is mandatory for the 0.2.0 release gate (2026-10-23).
+Full-catalog AMD/ROCm validation and persistent CI are accepted known missing
+coverage for 0.2.0 (maintainer decision, 2026-10-24), not release blockers.
 Native AMD build and focused device parity have passed on MI300X. AMD raw
 full-model gates now pass for catalog YOLOv8n and Depth-Anything-V2-Small;
 ResNet-18 opset 19 also passed as an additional artifact-specific gate.
 Other AMD model legs are UNRUN. Details and hashes are in
 `../2026-10-23-amd-devcloud/runbook.md`. The three-device PASS entries below
-must not be interpreted as satisfying the new AMD gate.
+must not be interpreted as AMD validation. Earlier MI300X evidence predates the latest Sign/Split changes.
 
 ## Kernel tables
 
 | Layer | Rows | Notes |
 | --- | ---: | --- |
-| CPU (oracle) | 72 | Complete reference set. |
-| CUDA | 72 | Complete set; `Conv` and `ConvTranspose` require cuDNN. Strict float32 (`CUBLAS_PEDANTIC_MATH`, `CUDNN_FMA_MATH`). |
-| OpenCL | 72 | Reference operator set complete, including `Abs`, `Floor`, `GreaterOrEqual`, `Neg`; local CTest 30/30. |
-| HIP | 72 | NVIDIA and MI300X native AMD build/device tests pass. Full-model AMD legs and CI remain **required for 0.2.0 and UNRUN**. |
+| CPU (oracle) | 73 | Complete reference set. |
+| CUDA | 73 | Complete set; `Conv` and `ConvTranspose` require cuDNN. Strict float32 (`CUBLAS_PEDANTIC_MATH`, `CUDNN_FMA_MATH`). |
+| OpenCL | 73 | Reference operator set complete, including `Abs`, `Floor`, `GreaterOrEqual`, `Neg`; local CTest 32/32. |
+| HIP | 73 | NVIDIA and MI300X native AMD build/device tests pass. Full-catalog AMD parity and persistent CI are **known missing coverage for 0.2.0**; latest Sign/Split changes are UNRUN on AMD. |
 
-The CUDA 72 rows assume a cuDNN-enabled build: `Conv` and `ConvTranspose` sit
+The CUDA 73 rows assume a cuDNN-enabled build: `Conv` and `ConvTranspose` sit
 behind `#ifdef NERT_HAS_CUDNN`, so a non-cuDNN CUDA build would not have those
 rows.
 
@@ -62,7 +64,12 @@ rows.
 | VideoMAE | video classification | PASS | PASS | PASS | Gate 2026-10-20; opset **18 pinned at export** (legacy TorchScript exporter; HF `MCG-NJU/videomae-base-finetuned-kinetics` @ `488eb9a0565f257b32866000305c8178965eb9f6`); 521 nodes on disk / **407** dispatched (114 `Constant` folded); `pixel_values [1,16,3,224,224]` float32 → `logits [1,400]` float32 (400 elements); export sha256 `14fe0aced2ee6e547f4d8866829f2d9fd474d53da5fb9c6414ee1470c05cb586`; fixture `videomae.npy` sha256 `537c5e905549a0afe1329f63d6e76e26cd2b5ec3e574ce602fea68245ac2e0fc`; ORT 1.27.0 CPUExecutionProvider reference `ref_logits_videomae.npy` sha256 `20efdf6ca3e3586cd5ac4362cd1071d2b256cf2ac2736ab64a368bd77f1c95e2` (argmax 143). `--tol 1e-3` scaled `tol*(1+\|ref\|)`: over_tol **0/400** on all three devices; max_abs / mean_abs / max_ratio CPU 1.3113021850585938e-06 / 3.292784094810486e-07 / 0.0009440241920040157, CUDA 1.2516975402832031e-06 / 3.4138327464461327e-07 / 0.0008659470031916535, OpenCL 1.9669532775878906e-06 / 4.022219218313694e-07 / 0.0009925095604235309. All legs exit 0. |
 | ViViT | video classification | PASS | PASS | PASS | Gate 2026-10-20; opset **18 pinned at export** (legacy TorchScript exporter; HF `google/vivit-b-16x2-kinetics400` @ `8a7171a57f79b9aaa58bc8d977c002a0ea0f0d42`); final export 1,152 nodes on disk / **797** dispatched (355 `Constant` folded), `If`=0 `Identity`=3; the raw export (sha256 `6300d2776dd8e1ccd5997d90750f87a974e082971f420dc60e99241c550b38d1`, 1,152 nodes, `If`=2 `Identity`=1) is preserved, and raw vs folded logits are bit-identical on the frozen fixture (`max_abs_diff` 0.0); `pixel_values [1,32,3,224,224]` float32 → `logits [1,400]` float32 (400 elements); final export sha256 `24d5690ab5423bad63ddc782bfd7a30cbfcb80d3a43cf3fd1c59f83685d42d39`; fixture `vivit.npy` sha256 `78157408ea97c35a0c262dff2acb78ed614164ef1ac844a80b4442dc3a467536`; ORT 1.27.0 CPUExecutionProvider reference `ref_logits_vivit.npy` sha256 `9fd575da47044ef880271f61bd02f06e8da201f7c222226f11c307dec0903f4b` (argmax 382). `--tol 1e-3` scaled: over_tol **0/400** on all three devices; max_abs / mean_abs / max_ratio CPU 7.3909759521484375e-06 / 1.6508117550984025e-06 / 0.004278399711686194, CUDA 8.344650268554688e-06 / 1.782802864909172e-06 / 0.004494117344208187, OpenCL 3.8623809814453125e-05 / 9.126970544457436e-06 / 0.031353039818606473. All legs exit 0. |
 | TimeSformer | video classification | PASS | PASS | PASS | Gate 2026-10-20; opset **18 pinned at export** (legacy TorchScript exporter; HF `facebook/timesformer-base-finetuned-k400` @ `8aaf40ea7d3d282dcb0a5dea01a198320d15d6c0`); 1,289 nodes on disk / **904** dispatched (385 `Constant` folded); `pixel_values [1,8,3,224,224]` float32 → `logits [1,400]` float32 (400 elements); export sha256 `f0256c3770adba4df11f4a3d5e20596830b88784bdc7686137d8dc495f40335a`; fixture `timesformer.npy` sha256 `2d10ec9b9ffd0050511900efe11f05ebca326b37e8c8459e69635bccba4eb564`; ORT 1.27.0 CPUExecutionProvider reference `ref_logits_timesformer.npy` sha256 `150a1393cc307890ee026e228e4c680a652af46e33e4edccd889eb0e3961e078` (argmax 304). `--tol 1e-3` scaled: over_tol **0/400** on all three devices; max_abs / mean_abs / max_ratio CPU 3.337860107421875e-06 / 8.425139822065831e-07 / 0.0018960872446111409, CUDA 3.814697265625e-06 / 1.0447530075907708e-06 / 0.002557859409865797, OpenCL 6.67572021484375e-06 / 1.395069994032383e-06 / 0.003530061276282632. All legs exit 0. |
-| 6 missing-export entries | all families | MISSING-EXPORT | MISSING-EXPORT | MISSING-EXPORT | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes. See inventory; export-first. |
+| EdgeCrafter detection-small | detection | PASS (task deviation) | PASS (task deviation) | PASS | Split/Sign unblocked; CPU/CUDA low-score row swap at 295/296. All nine retained detections pass. Task-equivalence approved 2026-10-24; [evidence](../2026-10-24-release-gates/results.md). |
+| EdgeCrafter segmentation-small | segmentation | PASS | PASS (task deviation) | PASS (task deviation) | CUDA 1 / OpenCL 634 raw mask values over tolerance, confined below confidence 0.25; retained outputs pass. Task-equivalence approved 2026-10-24; same evidence. |
+| EdgeCrafter pose-small | pose | PASS (task deviation) | PASS | PASS | CPU 68 raw keypoint values differ in low-score rows; retained outputs pass. Task-equivalence approved 2026-10-24; same evidence. |
+| RF-DETR detection-small | detection | PASS | PASS | PASS | Exact provisioned simplified export, ORT 1.27.0 frozen references; 844 nodes on every leg; zero raw elements over tolerance. Same evidence. |
+| RF-DETR segmentation-medium | segmentation | PASS (task deviation) | PASS (task deviation) | PASS (task deviation) | Provisioned simplified export; retained GPU outputs pass, CPU validation recorded in the evidence packet. Task-equivalence approved 2026-10-24. |
+| RF-DETR keypoint other sizes | pose | DEFERRED | DEFERRED | DEFERRED | No distinct upstream size exists: only KeypointPreview (already entry 7). User approved deferral until a distinct size ships; Preview remains entry 7. |
 | Image understanding, Gaussian Splatting | — | OUT-OF-SCOPE | OUT-OF-SCOPE | OUT-OF-SCOPE | No ONNX contract. |
 
 Video fixture/reference provenance: one frozen canonical `(1,32,3,224,224)` buffer from seed `20261020` (`numpy.random.default_rng`), with F=16/32/8 prefixes for VideoMAE/ViViT/TimeSformer; references are ORT 1.27.0 CPUExecutionProvider. Harness-provenance caveat: the prebuilt `nert_gate_{cpu,cuda,opencl}` binaries predate HEAD `47bfe8f` (`bench: typed fixtures for R6/Tier-5 rows`, a bench-only commit); TimeSformer's dispatched op set contains no `Resize`, so its numerics are unaffected, and CPU/CUDA/OpenCL agree with each other and the reference (0/400 over tolerance). No engine source file changed.
@@ -71,19 +78,18 @@ Video fixture/reference provenance: one frozen canonical `(1,32,3,224,224)` buff
 
 | Status | Count | Entries |
 | --- | ---: | --- |
-| PASS | 24 | Five primary models + eight converted variants + RT-DETRv4-s + RF-DETR seg-nano-576 (SN deviation) + Grounding DINO (GD deviation) + YOLOv8n detector + YOLO11m-seg + OWL-ViT + ResNet-50 + ViTPose-base-simple + Depth-Anything-V2-Small + entry 31 (optical-flow small) + entry 29 (video: VideoMAE/ViViT/TimeSformer) |
-| Open | 0 | — |
-| Missing export | 6 | EdgeCrafter detection; EdgeCrafter segmentation; EdgeCrafter pose; RF-DETR detection other sizes; RF-DETR segmentation other sizes; RF-DETR keypoint other sizes |
+| PASS | 29 | The 24 previously recorded entries, detection-small's strict gates, and four new entries with explicitly approved fixture-specific task deviations. |
+| Open | 0 | Independent packet review is recorded in the 2026-10-24 evidence; AMD coverage is accepted as known missing. |
+| Missing export | 0 | — |
+| Deferred placeholder | 1 | RF-DETR keypoint other sizes: no distinct upstream model; Preview is already entry 7. User-approved deferral 2026-10-24. |
 | Out of scope | 2 | Image understanding, Gaussian Splatting |
-| **Total** | **32** | 30 in scope |
+| **Total** | **32** | 29 in scope, 3 explicitly deferred/out of scope |
 
-24 + 0 + 6 = 30 in-scope entries. RAFT-small (entry 31) is the
-twenty-second PASS, entry 29 (video) is the twenty-third, and Grounding DINO
-is the twenty-fourth: the video entry closes once, with VideoMAE, ViViT and
-TimeSformer recorded as its three gated models. The release gate is zero open
-entries and zero missing exports among those 30, plus AMD/HIP validation
-for every in-scope entry. Most AMD model legs are still UNRUN. The
-catalog is not complete and 0.2.0 is not release-ready.
+29 + 0 + 0 = 29 available in-scope entries. Four new entries use approved
+task-equivalence deviations on frozen inputs; raw numeric failures remain
+visible in the table and evidence. Full-catalog AMD/HIP validation and persistent CI remain known missing
+coverage, explicitly accepted for 0.2.0. Release preparation and the GitFlow
+lifecycle remain outstanding.
 
 The PASS count assumes one gated representative per catalog entry closes that
 entry (YOLOv8n detector for entry 17, YOLO11m-seg for entry 18, OWL-ViT for
@@ -100,11 +106,12 @@ Closed and dropped from this list: the Grounding DINO CPU/CUDA
 task-equivalence gate and OpenCL live-buffer repair, the RF-DETR seg-nano-576
 SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
 
-1. **Missing exports** — provision, probe, gate and review the 6 remaining
-   entries: EdgeCrafter detection, EdgeCrafter segmentation, EdgeCrafter pose,
-   RF-DETR detection other sizes, RF-DETR segmentation other sizes and
-   RF-DETR keypoint other sizes.
-   VideoMAE/ViViT/TimeSformer closed 2026-10-20 (three PASS rows above).
+1. Full-catalog AMD validation and persistent CI are known missing coverage
+   accepted for 0.2.0, with no unrun check represented as PASS.
+2. Entry 24 is explicitly deferred until upstream ships a distinct keypoint
+   size; silently falling back to Preview must not create duplicate coverage.
+3. Independent packet review passed; final acceptance is tracked in the
+   2026-10-24 release-gate evidence.
 
 ## Non-kernel limits
 
@@ -120,7 +127,7 @@ SN-DEV ruling and the RT-DETRv4-s full-model CUDA gate.
   rendering are host-side and outside the ONNX gate.
 - **Consumer adapter.** Neuriplo selects CPU or opt-in CUDA for NERT; there is
   no OpenCL/HIP consumer selection. OpenCL/HIP columns are engine capability.
-- **HIP.** AMD/ROCm validation is mandatory for the 0.2.0 release gate. The first-party table is now 72
+- **HIP.** Full-catalog AMD/ROCm validation and persistent CI are accepted known missing coverage for 0.2.0. The first-party table is now 73
   rows, validated through the NVIDIA HIP backend; `Gemm`, `MatMul`, `Conv`,
   and `ConvTranspose` are naive first-party device kernels with no library
   dependency. Native AMD build and focused device parity passed on an AMD

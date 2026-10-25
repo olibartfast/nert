@@ -1,11 +1,15 @@
 # Validation — N1c HIP Port (hipify)
 
 Defined before implementation. Native AMD build and focused device parity
-have now run on MI300X; full-model and persistent CI gates remain open.
+have run on MI300X; full-catalog and persistent CI coverage remain missing.
 
 ## Checks
 
-Mandatory 0.2.0 release gate, added by maintainer decision on 2026-10-23.
+Release policy update, maintainer decision on 2026-10-24: full-catalog AMD
+model validation and persistent AMD CI are accepted known missing coverage
+for 0.2.0, not release blockers. This supersedes the mandatory-gate decision
+of 2026-10-23. Unrun checks stay unchecked; NVIDIA HIP is not AMD evidence.
+Earlier MI300X evidence predates the latest Sign/Split changes.
 AMD Developer Cloud (AMD's vendor developer program, not a neocloud) is
 the intended hardware source; access and a VM are
 not provisioned by this specification. Current evidence is recorded below.
@@ -15,12 +19,12 @@ NVIDIA HIP runs cannot substitute for any AMD execution evidence.
   all 72 registered HIP rows with the ROCm toolchain.
 - [x] Every registered HIP device/parity test executes on a physical AMD
   GPU, with zero skips and tolerance `1e-3*(1+abs(reference))`.
-- [ ] Every in-scope catalog entry has AMD full-model reference parity;
+- [ ] KNOWN MISSING (accepted for 0.2.0): every in-scope catalog entry has AMD full-model reference parity;
   preserve model/input/reference hashes and documented task-specific bars
   and deviations. Existing three-device PASS counts do not satisfy this.
 - [x] Record base commit plus tested source snapshot hashes, GPU model, HIP/compiler/driver versions,
   build command and CTest/model logs in the validation evidence.
-- [ ] CI enforces the AMD leg; an absent runner or skipped job is not PASS.
+- [ ] KNOWN MISSING (accepted for 0.2.0): CI enforces the AMD leg; an absent runner or skipped job is not PASS.
 
 - [V-1] hipify translation committed as reviewable sources in `src/hip/`
   (no build-time translation step).

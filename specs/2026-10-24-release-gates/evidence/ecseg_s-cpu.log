@@ -1,0 +1,7 @@
+input images dtype=float32 dims=1,3,640,640 file=/tmp/nert-release-gates/ecseg_s/images.bin
+input orig_target_sizes dtype=int64 dims=1,2 file=/tmp/nert-release-gates/ecseg_s/orig_target_sizes.bin
+output boxes dtype=float32 elems=1200 bytes=4800 file=/tmp/nert-release-gates/ecseg_s/cpu_boxes.bin
+output labels dtype=int64 elems=300 bytes=2400 file=/tmp/nert-release-gates/ecseg_s/cpu_labels.bin
+output masks dtype=float32 elems=7680000 bytes=30720000 file=/tmp/nert-release-gates/ecseg_s/cpu_masks.bin
+output scores dtype=float32 elems=300 bytes=1200 file=/tmp/nert-release-gates/ecseg_s/cpu_scores.bin
+device=cpu construct_ms=20.394 run_ms=265241 total_ms=265262 nodes_dispatched=1569

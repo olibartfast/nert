@@ -1,0 +1,60 @@
+Internal ctest changing into directory: /home/oli/repos/nert/build-cudnn
+Test project /home/oli/repos/nert/build-cudnn
+      Start  1: nert_loader
+ 1/27 Test  #1: nert_loader ......................   Passed    0.53 sec
+      Start  2: nert_loader_negative
+ 2/27 Test  #2: nert_loader_negative .............   Passed    0.02 sec
+      Start  3: nert_shapes
+ 3/27 Test  #3: nert_shapes ......................   Passed    0.23 sec
+      Start  4: nert_shapes_negative
+ 4/27 Test  #4: nert_shapes_negative .............   Passed    0.01 sec
+      Start  5: nert_plan
+ 5/27 Test  #5: nert_plan ........................   Passed    0.22 sec
+      Start  6: nert_plan_negative
+ 6/27 Test  #6: nert_plan_negative ...............   Passed    0.01 sec
+      Start  7: nert_device
+ 7/27 Test  #7: nert_device ......................   Passed    0.01 sec
+      Start  8: nert_kernels
+ 8/27 Test  #8: nert_kernels .....................   Passed    0.01 sec
+      Start  9: nert_kernels_negative
+ 9/27 Test  #9: nert_kernels_negative ............   Passed    0.01 sec
+      Start 10: nert_executor
+10/27 Test #10: nert_executor ....................   Passed   10.32 sec
+      Start 11: nert_executor_negative
+11/27 Test #11: nert_executor_negative ...........   Passed    0.01 sec
+      Start 12: nert_constant_folding
+12/27 Test #12: nert_constant_folding ............   Passed    0.00 sec
+      Start 13: nert_cuda_device
+13/27 Test #13: nert_cuda_device .................   Passed    0.42 sec
+      Start 14: nert_cuda_kernels
+14/27 Test #14: nert_cuda_kernels ................   Passed    0.48 sec
+      Start 15: nert_cuda_conv
+15/27 Test #15: nert_cuda_conv ...................   Passed    0.84 sec
+      Start 16: nert_cuda_pool
+16/27 Test #16: nert_cuda_pool ...................   Passed    0.37 sec
+      Start 17: nert_cuda_shape
+17/27 Test #17: nert_cuda_shape ..................   Passed    0.37 sec
+      Start 18: nert_cuda_concat
+18/27 Test #18: nert_cuda_concat .................   Passed    0.36 sec
+      Start 19: nert_cuda_index
+19/27 Test #19: nert_cuda_index ..................   Passed    0.35 sec
+      Start 20: nert_cuda_misc
+20/27 Test #20: nert_cuda_misc ...................   Passed    0.41 sec
+      Start 21: nert_cuda_activations
+21/27 Test #21: nert_cuda_activations ............   Passed    0.37 sec
+      Start 22: nert_cuda_norm
+22/27 Test #22: nert_cuda_norm ...................   Passed    0.36 sec
+      Start 23: nert_cuda_move
+23/27 Test #23: nert_cuda_move ...................   Passed    0.36 sec
+      Start 24: nert_cuda_sample
+24/27 Test #24: nert_cuda_sample .................   Passed    0.35 sec
+      Start 25: nert_opset_table
+25/27 Test #25: nert_opset_table .................   Passed    2.06 sec
+      Start 26: nert_cpu_release
+26/27 Test #26: nert_cpu_release .................   Passed    0.01 sec
+      Start 27: nert_cuda_release
+27/27 Test #27: nert_cuda_release ................   Passed    0.41 sec
+
+100% tests passed, 0 tests failed out of 27
+
+Total Test time (real) =  18.90 sec

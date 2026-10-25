@@ -1,5 +1,10 @@
 # AMD Developer Cloud — reproducible HIP validation
 
+> Release-policy update (2026-10-24): full-catalog AMD validation and persistent
+> AMD CI are accepted known missing coverage for 0.2.0, not release blockers.
+> The execution history below is preserved; unrun checks remain unrun. See
+> [the maintainer decision](../2026-10-24-release-gates/known-missing-amd.md).
+
 Date: 2026-10-23. Base commit: `d906f7f`, with the local HIP compute,
 OpenCL parity and AMD CMake changes. This is validation of a working-tree
 snapshot, not a claim that those changes are committed or released.

@@ -1,0 +1,9 @@
+{
+  "ref_kept": 9,
+  "got_kept": 9,
+  "kept_same": true,
+  "labels_kept_mismatch": 0,
+  "label_different_rows": [],
+  "label_different_ref_scores": [],
+  "box_max_abs_kept": 0.0001220703125
+}

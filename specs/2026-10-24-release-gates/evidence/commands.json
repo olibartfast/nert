@@ -1,0 +1,216 @@
+[
+  {
+    "model": "ecdet_s",
+    "device": "cpu",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_cpu",
+      "/tmp/opencode/exports/ecdet_s/ecdet_s.onnx",
+      "cpu",
+      "/tmp/nert-release-gates/ecdet_s/cpu",
+      "images=/tmp/nert-release-gates/ecdet_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecdet_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecdet_s",
+    "device": "cuda",
+    "cwd": "/home/oli/repos/nert",
+    "env": {
+      "LD_LIBRARY_PATH": "/home/oli/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64"
+    },
+    "argv": [
+      "/tmp/nert-release-gates/gate_cuda",
+      "/tmp/opencode/exports/ecdet_s/ecdet_s.onnx",
+      "cuda",
+      "/tmp/nert-release-gates/ecdet_s/cuda",
+      "images=/tmp/nert-release-gates/ecdet_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecdet_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecdet_s",
+    "device": "opencl",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_opencl",
+      "/tmp/opencode/exports/ecdet_s/ecdet_s.onnx",
+      "opencl",
+      "/tmp/nert-release-gates/ecdet_s/opencl",
+      "images=/tmp/nert-release-gates/ecdet_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecdet_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecseg_s",
+    "device": "cpu",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_cpu",
+      "/tmp/opencode/exports/ecseg_s/ecseg_s.onnx",
+      "cpu",
+      "/tmp/nert-release-gates/ecseg_s/cpu",
+      "images=/tmp/nert-release-gates/ecseg_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecseg_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecseg_s",
+    "device": "cuda",
+    "cwd": "/home/oli/repos/nert",
+    "env": {
+      "LD_LIBRARY_PATH": "/home/oli/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64"
+    },
+    "argv": [
+      "/tmp/nert-release-gates/gate_cuda",
+      "/tmp/opencode/exports/ecseg_s/ecseg_s.onnx",
+      "cuda",
+      "/tmp/nert-release-gates/ecseg_s/cuda",
+      "images=/tmp/nert-release-gates/ecseg_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecseg_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecseg_s",
+    "device": "opencl",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_opencl",
+      "/tmp/opencode/exports/ecseg_s/ecseg_s.onnx",
+      "opencl",
+      "/tmp/nert-release-gates/ecseg_s/opencl",
+      "images=/tmp/nert-release-gates/ecseg_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecseg_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecpose_s",
+    "device": "cpu",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_cpu",
+      "/tmp/opencode/exports/ecpose_s/ecpose_s.onnx",
+      "cpu",
+      "/tmp/nert-release-gates/ecpose_s/cpu",
+      "images=/tmp/nert-release-gates/ecpose_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecpose_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecpose_s",
+    "device": "cuda",
+    "cwd": "/home/oli/repos/nert",
+    "env": {
+      "LD_LIBRARY_PATH": "/home/oli/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64"
+    },
+    "argv": [
+      "/tmp/nert-release-gates/gate_cuda",
+      "/tmp/opencode/exports/ecpose_s/ecpose_s.onnx",
+      "cuda",
+      "/tmp/nert-release-gates/ecpose_s/cuda",
+      "images=/tmp/nert-release-gates/ecpose_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecpose_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "ecpose_s",
+    "device": "opencl",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_opencl",
+      "/tmp/opencode/exports/ecpose_s/ecpose_s.onnx",
+      "opencl",
+      "/tmp/nert-release-gates/ecpose_s/opencl",
+      "images=/tmp/nert-release-gates/ecpose_s/images.bin",
+      "orig_target_sizes=/tmp/nert-release-gates/ecpose_s/orig_target_sizes.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_det_small",
+    "device": "cpu",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_cpu",
+      "/tmp/opencode/exports/rfdetr_det_small/rfdetr-small-sim.onnx",
+      "cpu",
+      "/tmp/nert-release-gates/rfdetr_det_small/cpu",
+      "input=/tmp/nert-release-gates/rfdetr_det_small/input.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_det_small",
+    "device": "cuda",
+    "cwd": "/home/oli/repos/nert",
+    "env": {
+      "LD_LIBRARY_PATH": "/home/oli/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64"
+    },
+    "argv": [
+      "/tmp/nert-release-gates/gate_cuda",
+      "/tmp/opencode/exports/rfdetr_det_small/rfdetr-small-sim.onnx",
+      "cuda",
+      "/tmp/nert-release-gates/rfdetr_det_small/cuda",
+      "input=/tmp/nert-release-gates/rfdetr_det_small/input.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_det_small",
+    "device": "opencl",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_opencl",
+      "/tmp/opencode/exports/rfdetr_det_small/rfdetr-small-sim.onnx",
+      "opencl",
+      "/tmp/nert-release-gates/rfdetr_det_small/opencl",
+      "input=/tmp/nert-release-gates/rfdetr_det_small/input.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_seg_medium",
+    "device": "cpu",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_cpu",
+      "/tmp/opencode/exports/rfdetr_seg_medium/rfdetr-seg-medium-sim.onnx",
+      "cpu",
+      "/tmp/nert-release-gates/rfdetr_seg_medium/cpu",
+      "input=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_seg_medium",
+    "device": "cuda",
+    "cwd": "/home/oli/repos/nert",
+    "env": {
+      "LD_LIBRARY_PATH": "/home/oli/.local/lib/python3.12/site-packages/nvidia/cu13/lib:/tmp/opencode/cudnn/lib64"
+    },
+    "argv": [
+      "/tmp/nert-release-gates/gate_cuda",
+      "/tmp/opencode/exports/rfdetr_seg_medium/rfdetr-seg-medium-sim.onnx",
+      "cuda",
+      "/tmp/nert-release-gates/rfdetr_seg_medium/cuda",
+      "input=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin"
+    ]
+  },
+  {
+    "model": "rfdetr_seg_medium",
+    "device": "opencl",
+    "cwd": "/home/oli/repos/nert",
+    "env": {},
+    "argv": [
+      "/tmp/nert-release-gates/gate_opencl",
+      "/tmp/opencode/exports/rfdetr_seg_medium/rfdetr-seg-medium-sim.onnx",
+      "opencl",
+      "/tmp/nert-release-gates/rfdetr_seg_medium/opencl",
+      "input=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin"
+    ]
+  }
+]

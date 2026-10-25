@@ -1,0 +1,19 @@
+{
+  "model": "rfdetr_det_small",
+  "device": "cuda",
+  "threshold": 0.25,
+  "reference_kept": 9,
+  "device_kept": 9,
+  "selection_equal": true,
+  "kept_class_mismatch": 0,
+  "reference_threshold_margin": 0.0004310011863708496,
+  "raw_mismatch": {
+    "dets": 0,
+    "labels": 0
+  },
+  "kept_mismatch": {
+    "dets": 0,
+    "labels": 0
+  },
+  "task_equivalence_pass": true
+}
