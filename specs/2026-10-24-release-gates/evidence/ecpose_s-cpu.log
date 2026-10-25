@@ -1,0 +1,6 @@
+input images dtype=float32 dims=1,3,640,640 file=/tmp/nert-release-gates/ecpose_s/images.bin
+input orig_target_sizes dtype=int64 dims=1,2 file=/tmp/nert-release-gates/ecpose_s/orig_target_sizes.bin
+output keypoints dtype=float32 elems=2040 bytes=8160 file=/tmp/nert-release-gates/ecpose_s/cpu_keypoints.bin
+output labels dtype=int64 elems=60 bytes=480 file=/tmp/nert-release-gates/ecpose_s/cpu_labels.bin
+output scores dtype=float32 elems=60 bytes=240 file=/tmp/nert-release-gates/ecpose_s/cpu_scores.bin
+device=cpu construct_ms=20.4485 run_ms=186988 total_ms=187008 nodes_dispatched=1534

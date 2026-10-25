@@ -1,0 +1,24 @@
+{
+  "seconds": 19.955584437120706,
+  "outputs": {
+    "boxes": {
+      "over_tol": 0,
+      "elements": 1200,
+      "max_abs": 0.004119873046875,
+      "max_ratio": 0.03996206859651883
+    },
+    "labels": {
+      "mismatch": 0,
+      "elements": 300
+    },
+    "scores": {
+      "over_tol": 0,
+      "elements": 300,
+      "max_abs": 1.4413148164749146e-05,
+      "max_ratio": 0.013754789859375921
+    }
+  },
+  "gate_exit": 0,
+  "process_exit": 0,
+  "strict_pass": true
+}

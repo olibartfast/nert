@@ -1,0 +1,143 @@
+Start testing: Oct 24 13:12 CEST
+----------------------------------------------------------
+15/18 Testing: nert_hip_kernels
+15/18 Test: nert_hip_kernels
+Command: "/tmp/opencode/bench-hip/test/nert_hip_kernels_test"
+Directory: /tmp/opencode/bench-hip/test
+"nert_hip_kernels" start time: Oct 24 13:12 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 28 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 28 tests from NertHIPKernels
+[ RUN      ] NertHIPKernels.ReluExact
+[       OK ] NertHIPKernels.ReluExact (237 ms)
+[ RUN      ] NertHIPKernels.AddBroadcastInt64Exact
+[       OK ] NertHIPKernels.AddBroadcastInt64Exact (1 ms)
+[ RUN      ] NertHIPKernels.GemmSmallExact
+[       OK ] NertHIPKernels.GemmSmallExact (1 ms)
+[ RUN      ] NertHIPKernels.GemmTransposedWithBiasWithinTolerance
+[       OK ] NertHIPKernels.GemmTransposedWithBiasWithinTolerance (0 ms)
+[ RUN      ] NertHIPKernels.GemmRejectsMismatch
+[       OK ] NertHIPKernels.GemmRejectsMismatch (0 ms)
+[ RUN      ] NertHIPKernels.MatMulBatchedBroadcast
+[       OK ] NertHIPKernels.MatMulBatchedBroadcast (1 ms)
+[ RUN      ] NertHIPKernels.MatMulPromotedVector
+[       OK ] NertHIPKernels.MatMulPromotedVector (0 ms)
+[ RUN      ] NertHIPKernels.MatMulRejectsMismatch
+[       OK ] NertHIPKernels.MatMulRejectsMismatch (0 ms)
+[ RUN      ] NertHIPKernels.MulBroadcastExact
+[       OK ] NertHIPKernels.MulBroadcastExact (1 ms)
+[ RUN      ] NertHIPKernels.SubInt64Exact
+[       OK ] NertHIPKernels.SubInt64Exact (1 ms)
+[ RUN      ] NertHIPKernels.DivFloatIEEE
+[       OK ] NertHIPKernels.DivFloatIEEE (1 ms)
+[ RUN      ] NertHIPKernels.DivInt64ZeroThrows
+[       OK ] NertHIPKernels.DivInt64ZeroThrows (0 ms)
+[ RUN      ] NertHIPKernels.SigmoidNear
+[       OK ] NertHIPKernels.SigmoidNear (1 ms)
+[ RUN      ] NertHIPKernels.TanhNear
+[       OK ] NertHIPKernels.TanhNear (1 ms)
+[ RUN      ] NertHIPKernels.SoftmaxLastAxis
+[       OK ] NertHIPKernels.SoftmaxLastAxis (1 ms)
+[ RUN      ] NertHIPKernels.SoftmaxAxisZeroStable
+[       OK ] NertHIPKernels.SoftmaxAxisZeroStable (0 ms)
+[ RUN      ] NertHIPKernels.ReshapeFloatPreservesOrder
+[       OK ] NertHIPKernels.ReshapeFloatPreservesOrder (0 ms)
+[ RUN      ] NertHIPKernels.ReshapeZeroAndInferred
+[       OK ] NertHIPKernels.ReshapeZeroAndInferred (0 ms)
+[ RUN      ] NertHIPKernels.ReshapeInt64Copies
+[       OK ] NertHIPKernels.ReshapeInt64Copies (0 ms)
+[ RUN      ] NertHIPKernels.ReshapeRejectsCountMismatch
+[       OK ] NertHIPKernels.ReshapeRejectsCountMismatch (0 ms)
+[ RUN      ] NertHIPKernels.ConvPointwiseNoBias
+[       OK ] NertHIPKernels.ConvPointwiseNoBias (1 ms)
+[ RUN      ] NertHIPKernels.ConvPadded3x3WithBias
+[       OK ] NertHIPKernels.ConvPadded3x3WithBias (0 ms)
+[ RUN      ] NertHIPKernels.ConvDepthwiseWithBias
+[       OK ] NertHIPKernels.ConvDepthwiseWithBias (0 ms)
+[ RUN      ] NertHIPKernels.ConvSameUpperAsymmetricPad
+[       OK ] NertHIPKernels.ConvSameUpperAsymmetricPad (0 ms)
+[ RUN      ] NertHIPKernels.ConvRejectsBadBiasShape
+[       OK ] NertHIPKernels.ConvRejectsBadBiasShape (0 ms)
+[ RUN      ] NertHIPKernels.ConvTransposeStride2NoBias
+[       OK ] NertHIPKernels.ConvTransposeStride2NoBias (1 ms)
+[ RUN      ] NertHIPKernels.ConvTransposePaddedWithBias
+[       OK ] NertHIPKernels.ConvTransposePaddedWithBias (0 ms)
+[ RUN      ] NertHIPKernels.ConvTransposeRejectsOutputShapeMismatch
+[       OK ] NertHIPKernels.ConvTransposeRejectsOutputShapeMismatch (0 ms)
+[----------] 28 tests from NertHIPKernels (261 ms total)
+
+[----------] Global test environment tear-down
+[==========] 28 tests from 1 test suite ran. (261 ms total)
+[  PASSED  ] 28 tests.
+<end of output>
+Test time =   0.38 sec
+----------------------------------------------------------
+Test Passed.
+"nert_hip_kernels" end time: Oct 24 13:12 CEST
+"nert_hip_kernels" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/18 Testing: nert_cpu_release
+16/18 Test: nert_cpu_release
+Command: "/tmp/opencode/bench-hip/test/nert_cpu_release_test"
+Directory: /tmp/opencode/bench-hip/test
+"nert_cpu_release" start time: Oct 24 13:12 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from ReleaseKernels
+[ RUN      ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes
+[       OK ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes (0 ms)
+[ RUN      ] ReleaseKernels.SplitNumOutputsUneven
+[       OK ] ReleaseKernels.SplitNumOutputsUneven (0 ms)
+[ RUN      ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice
+[       OK ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice (0 ms)
+[----------] 3 tests from ReleaseKernels (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 3 tests.
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"nert_cpu_release" end time: Oct 24 13:12 CEST
+"nert_cpu_release" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/18 Testing: nert_hip_release
+17/18 Test: nert_hip_release
+Command: "/tmp/opencode/bench-hip/test/nert_hip_release_test"
+Directory: /tmp/opencode/bench-hip/test
+"nert_hip_release" start time: Oct 24 13:12 CEST
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from ReleaseKernels
+[ RUN      ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes
+[       OK ] ReleaseKernels.SignSpecialValuesAndIntegerExtremes (288 ms)
+[ RUN      ] ReleaseKernels.SplitNumOutputsUneven
+[       OK ] ReleaseKernels.SplitNumOutputsUneven (0 ms)
+[ RUN      ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice
+[       OK ] ReleaseKernels.SplitRejectsNonPositiveFinalChunkInShapesAndDevice (0 ms)
+[----------] 3 tests from ReleaseKernels (289 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (289 ms total)
+[  PASSED  ] 3 tests.
+<end of output>
+Test time =   0.41 sec
+----------------------------------------------------------
+Test Passed.
+"nert_hip_release" end time: Oct 24 13:12 CEST
+"nert_hip_release" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 24 13:12 CEST

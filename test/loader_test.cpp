@@ -2939,14 +2939,13 @@ TEST_F(EngineLoaderNegative, ResizeAxesAtSchemaEighteenRejected)
     EXPECT_NE(message.find("effective schema 18"), std::string::npos) << "message: " << message;
 }
 
-// Split.num_outputs is legal at schema 18 but is not implemented by the
-// source-form Split path.
-TEST_F(EngineLoaderNegative, SplitNumOutputsAtSchemaEighteenRejected)
+// Split.num_outputs must agree with the graph output count.
+TEST_F(EngineLoaderNegative, SplitNumOutputsCountMismatchRejected)
 {
     std::string body;
     put_sub(body, 1, encode_node("split0", "Split", {"x"}, {"y0", "y1"},
                       {encode_attribute_int("axis", 1),
-                          encode_attribute_int("num_outputs", 2)}));
+                          encode_attribute_int("num_outputs", 3)}));
     put_sub(body, 11, encode_value_info("x", 1, {1, 4}));
     put_sub(body, 12, encode_value_info("y0", 1, {1, 2}));
     put_sub(body, 12, encode_value_info("y1", 1, {1, 2}));
@@ -3013,4 +3012,19 @@ TEST_F(EngineLoaderNegative, NewerUnsupportedDtypeRejected)
         << "message: " << message;
     EXPECT_NE(message.find("unsupported element type"), std::string::npos)
         << "message: " << message;
+}
+
+TEST_F(EngineLoaderNegative, SplitNumOutputsOldSchemaAndNonPositiveRejected)
+{
+    for (const auto& form : std::vector<std::pair<int64_t, int64_t>>{{13, 2}, {18, 0}, {18, -1}}) {
+        std::string body;
+        put_sub(body, 1, encode_node("split_bad_form", "Split", {"x"}, {"a", "b"},
+            {encode_attribute_int("num_outputs", form.second)}));
+        put_sub(body, 11, encode_value_info("x", 1, {4}));
+        put_sub(body, 12, encode_value_info("a", 1, {2}));
+        put_sub(body, 12, encode_value_info("b", 1, {2}));
+        const std::string message = load_error_message(encode_model(body, form.first), "split_bad_form.onnx");
+        EXPECT_NE(message.find("split_bad_form"), std::string::npos) << message;
+        EXPECT_NE(message.find("num_outputs"), std::string::npos) << message;
+    }
 }

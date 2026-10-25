@@ -1,0 +1,21 @@
+{
+  "model": "ecpose_s",
+  "device": "opencl",
+  "threshold": 0.25,
+  "reference_kept": 5,
+  "device_kept": 5,
+  "selection_equal": true,
+  "kept_class_mismatch": 0,
+  "reference_threshold_margin": 0.012297719717025757,
+  "raw_mismatch": {
+    "scores": 0,
+    "labels": 0,
+    "keypoints": 0
+  },
+  "kept_mismatch": {
+    "scores": 0,
+    "labels": 0,
+    "keypoints": 0
+  },
+  "task_equivalence_pass": true
+}

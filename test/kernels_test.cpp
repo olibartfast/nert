@@ -5128,3 +5128,37 @@ TEST(NertKernels, UnsqueezeBoolAxes) {
 
     EXPECT_EQ(out, in);
 }
+
+TEST(NertKernels, SplitNumOutputsUnevenAndConflicts) {
+    auto kernel = nert::CpuDevice().kernels().find("Split");
+    nert::Node node = MakeNode("split18", "Split");
+    node.schema_version = 18;
+    node.attributes = {nert::Attribute{"axis", int64_t{-1}}, nert::Attribute{"num_outputs", int64_t{3}}};
+    std::vector<int64_t> x{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, a(4), b(4), c(2);
+    kernel(node, {Int64View(x, {2, 5})}, {Int64View(a, {2, 2}), Int64View(b, {2, 2}), Int64View(c, {2, 1})});
+    EXPECT_EQ(a, (std::vector<int64_t>{0, 1, 5, 6}));
+    EXPECT_EQ(b, (std::vector<int64_t>{2, 3, 7, 8}));
+    EXPECT_EQ(c, (std::vector<int64_t>{4, 9}));
+    std::vector<int64_t> sizes{2, 2, 1};
+    EXPECT_THROW(kernel(node, {Int64View(x, {2, 5}), Int64View(sizes, {3})},
+                        {Int64View(a, {2, 2}), Int64View(b, {2, 2}), Int64View(c, {2, 1})}),
+                 nert::InferenceException);
+    node.schema_version = 13;
+    EXPECT_THROW(
+        kernel(node, {Int64View(x, {2, 5})}, {Int64View(a, {2, 2}), Int64View(b, {2, 2}), Int64View(c, {2, 1})}),
+        nert::InferenceException);
+}
+
+TEST(NertKernels, SignSpecialValuesAndIntegerExtremes) {
+    auto kernel = nert::CpuDevice().kernels().find("Sign");
+    ASSERT_NE(kernel, nullptr);
+    nert::Node node = MakeNode("sign", "Sign");
+    std::vector<float> x{-INFINITY, -2, -0.0f, 0, 3, INFINITY, NAN}, y(7);
+    kernel(node, {FloatView(x, {7})}, {FloatView(y, {7})});
+    EXPECT_EQ(std::vector<float>(y.begin(), y.begin() + 6), (std::vector<float>{-1, -1, 0, 0, 1, 1}));
+    EXPECT_TRUE(std::isnan(y[6]));
+    std::vector<int64_t> ix{INT64_MIN, -1, 0, 1, INT64_MAX}, iy(5);
+    kernel(node, {Int64View(ix, {5})}, {Int64View(iy, {5})});
+    EXPECT_EQ(iy, (std::vector<int64_t>{-1, -1, 0, 1, 1}));
+    EXPECT_THROW(kernel(node, {FloatView(x, {7})}, {FloatView(y, {1, 7})}), nert::InferenceException);
+}

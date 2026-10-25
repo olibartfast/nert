@@ -1,0 +1,5 @@
+input input dtype=float32 dims=1,3,432,432 file=/tmp/nert-release-gates/rfdetr_seg_medium/input.bin
+output dets dtype=float32 elems=800 bytes=3200 file=/tmp/nert-release-gates/rfdetr_seg_medium/opencl_dets.bin
+output labels dtype=float32 elems=18200 bytes=72800 file=/tmp/nert-release-gates/rfdetr_seg_medium/opencl_labels.bin
+output masks dtype=float32 elems=2332800 bytes=9331200 file=/tmp/nert-release-gates/rfdetr_seg_medium/opencl_masks.bin
+device=opencl construct_ms=883.151 run_ms=4884.39 total_ms=5767.54 nodes_dispatched=1069

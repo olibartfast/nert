@@ -1,0 +1,11 @@
+{
+  "ref_kept": 10,
+  "got_kept": 10,
+  "kept_same": true,
+  "labels_kept_mismatch": 0,
+  "label_different_rows": [],
+  "label_different_ref_scores": [],
+  "box_max_abs_kept": 0.0001220703125,
+  "mask_iou_min": 1.0,
+  "mask_iou_kept_min": 1.0
+}

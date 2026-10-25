@@ -42,6 +42,7 @@ void Floor(const Node& node, const std::vector<TensorView>& inputs, const std::v
 void IsNaN(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Neg(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sign(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Pow(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Greater(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 void Less(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
@@ -124,6 +125,7 @@ KernelFn FindCudaKernel(const std::string& op_type) {
         {"IsNaN", &IsNaN},
         {"Abs", &Abs},
         {"Neg", &Neg},
+        {"Sign", &Sign},
         {"Pow", &Pow},
         {"Greater", &Greater},
         {"Less", &Less},

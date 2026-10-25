@@ -111,6 +111,38 @@ inline SplitForm ResolveSplitForm(const Node& node) {
     return resolved;
 }
 
+// Schema 18 splits into ceil(dim / count) chunks, with a smaller last chunk.
+// Shared by shape inference and every backend to keep the partition identical.
+inline std::vector<int64_t> DefaultSplitParts(const Node& node, int64_t dim, size_t count, bool sizes_present,
+                                              const std::string& context) {
+    const Attribute* attr = FindNodeAttribute(node, "num_outputs");
+    if (attr != nullptr) {
+        const int64_t n = NodeAttributeIntOr(node, "num_outputs", 0, context);
+        if ((node.schema_version != 0 && node.schema_version < 18) || sizes_present ||
+            FindNodeAttribute(node, "split") != nullptr || n <= 0 || static_cast<uint64_t>(n) != count) {
+            throw InferenceException(context + ": invalid or conflicting Split num_outputs");
+        }
+        if (dim < 0 || count == 0 || n > dim) {
+            throw InferenceException(context + ": invalid Split dimension or output count");
+        }
+        const int64_t chunk = dim / n + (dim % n != 0);
+        // Avoid a non-positive final chunk when too many full chunks would be emitted.
+        if (n > 1 && chunk > (dim - 1) / (n - 1)) {
+            throw InferenceException(context + ": Split num_outputs produces a non-positive final chunk");
+        }
+        std::vector<int64_t> parts(count, chunk);
+        parts.back() = dim - chunk * (n - 1);
+        return parts;
+    }
+    if (sizes_present) {
+        return {};
+    }
+    if (count == 0 || dim < 0 || dim % static_cast<int64_t>(count) != 0) {
+        throw InferenceException(context + ": Split axis dim is not divisible by the output count");
+    }
+    return std::vector<int64_t>(count, dim / static_cast<int64_t>(count));
+}
+
 // Element count for an axes tensor. Unlike a data-tensor count, a zero
 // dimension is valid here: it is ONNX's present-but-empty axes operand and
 // must reach the noop/empty-axes logic rather than fail as a bad dimension.

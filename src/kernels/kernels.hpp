@@ -146,6 +146,7 @@ void Abs(const Node& node, const std::vector<TensorView>& inputs, const std::vec
 
 // Elementwise negation; float32 or int64.
 void Neg(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
+void Sign(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);
 
 // Elementwise natural exponential; float32.
 void Exp(const Node& node, const std::vector<TensorView>& inputs, const std::vector<TensorView>& outputs);

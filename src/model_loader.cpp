@@ -784,6 +784,7 @@ const std::unordered_map<std::string, AttrSlot>& split_attrs()
 {
     static const std::unordered_map<std::string, AttrSlot> k = {
         { "axis", AttrSlot::Int },
+        { "num_outputs", AttrSlot::Int },
         // Pre-13 form, resolved in place from the effective schema.
         { "split", AttrSlot::IntList },
     };
@@ -979,6 +980,7 @@ allowed_attributes()
             { "Pow", &kNoAttrs },
             { "Abs", &kNoAttrs },
             { "Neg", &kNoAttrs },
+            { "Sign", &kNoAttrs },
             { "Exp", &kNoAttrs },
             { "Log", &kNoAttrs },
             { "Cos", &kNoAttrs },
@@ -1622,6 +1624,15 @@ void validate_split_form(const Node& node, int64_t declared_opset)
     const std::string context = " (declared opset " +
         std::to_string(declared_opset) + ", effective schema " +
         std::to_string(node.schema_version) + ")";
+
+    if (const Attribute* num = FindNodeAttribute(node, "num_outputs")) {
+        const int64_t* n = std::get_if<int64_t>(&num->value);
+        if (node.schema_version < 18 || (node.inputs.size() > 1 && !node.inputs[1].empty()) ||
+            split_attribute != nullptr || n == nullptr || *n <= 0 ||
+            static_cast<uint64_t>(*n) != node.outputs.size()) {
+            throw ModelLoadException(prefix + ": invalid or conflicting num_outputs" + context);
+        }
+    }
 
     if (node.schema_version < kAxesAsInputSchema) {
         if (has_split_input) {

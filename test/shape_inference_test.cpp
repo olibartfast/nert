@@ -2538,3 +2538,24 @@ TEST_F(EngineShapesNegative, ConstantOfShapeStringValueNamesNode) {
     EXPECT_NE(message.find("cos_str"), std::string::npos) << message;
     EXPECT_NE(message.find("ConstantOfShape"), std::string::npos) << message;
 }
+
+TEST_F(EngineShapes, SplitNumOutputsSchema18) {
+    std::string body;
+    put_sub(body, 1, encode_node("split18", "Split", {"x"}, {"a","b","c"},
+        {encode_attribute_int("axis", -1),encode_attribute_int("num_outputs",3)}));
+    put_sub(body, 11, encode_value_info("x", 7, {2,5}));
+    put_sub(body, 12, encode_value_info("a", 7, {2,2}));
+    const auto graph = load_graph("split18.onnx", encode_model(body));
+    const auto shapes = nert::InferShapes(graph, {{"x",{2,5}}});
+    EXPECT_EQ(shapes.tensors.at("a").dims,(std::vector<int64_t>{2,2}));
+    EXPECT_EQ(shapes.tensors.at("c").dims,(std::vector<int64_t>{2,1}));
+}
+
+TEST_F(EngineShapes, SplitUnevenLegacyStillThrowsModelLoadException) {
+    std::string body;
+    put_sub(body, 1, encode_node("legacy_split", "Split", {"x"}, {"a","b"}, {}));
+    put_sub(body, 11, encode_value_info("x", 1, {5}));
+    put_sub(body, 12, encode_value_info("a", 1, {3}));
+    const auto graph = load_graph("legacy_split.onnx", encode_model(body, 13));
+    EXPECT_THROW(nert::InferShapes(graph, {{"x", {5}}}), nert::ModelLoadException);
+}

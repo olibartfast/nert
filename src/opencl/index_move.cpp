@@ -328,6 +328,7 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
         parts = ReadInt64(sizes, count, context);
         parts_supplied = true;
     }
+    const auto default_parts = DefaultSplitParts(node, dim, outputs.size(), parts_supplied, context);
     if (parts_supplied) {
         if (parts.size() != outputs.size()) {
             throw InferenceException(context + ": Split split sizes must match the output count");
@@ -343,10 +344,7 @@ void Split(const Node& node, const std::vector<TensorView>& inputs, const std::v
             throw InferenceException(context + ": Split split sizes must sum to the axis dim");
         }
     } else {
-        if (dim % static_cast<int64_t>(outputs.size()) != 0) {
-            throw InferenceException(context + ": Split axis dim is not divisible by the output count");
-        }
-        parts.assign(outputs.size(), dim / static_cast<int64_t>(outputs.size()));
+        parts = default_parts;
     }
 
     for (std::size_t i = 0; i < outputs.size(); ++i) {

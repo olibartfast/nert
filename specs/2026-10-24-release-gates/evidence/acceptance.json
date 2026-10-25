@@ -1,0 +1,10 @@
+{
+  "packet_accepted": true,
+  "local_model_legs": 15,
+  "strict_raw_passes": 7,
+  "approved_task_deviation_legs": 8,
+  "available_catalog_entries": 29,
+  "deferred_placeholder": 1,
+  "amd_cloud_testing": "excluded; release requirement still open",
+  "release_published": false
+}

@@ -175,21 +175,29 @@ TEST(NertCudaKernels, MicroGraphMatchesCpuWithinTolerance) {
     ExpectNear(got, expected);
 }
 
-// An op with no CUDA row is rejected at Run, naming node + op (dispatch-time
-// rejection, matching the pinned CPU behavior; see N1 validation notes).
-// Probe op is ConvTranspose: CPU-covered with shape inference, and no CUDA
-// row exists except in cuDNN builds — so the probe runs there only when the
-// row is absent, and skips when cuDNN provides it. (InstanceNormalization
-// held this probe until CUDA closure landed every row; ConvTranspose is the
-// last device-conditional row. If it ever gains a first-party row, move the
-// probe to whatever op is still rowless, or revisit.)
+// Exercise a missing dispatch row even when cuDNN supplies every operator.
+// The test device retains real CUDA allocation/transfers and deliberately
+// exposes an empty table; backend completeness must not skip this contract.
 TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     if (!HasCudaDevice()) {
         GTEST_SKIP() << "no CUDA device";
     }
-    if (nert::CudaDevice().kernels().find("ConvTranspose") != nullptr) {
-        GTEST_SKIP() << "ConvTranspose row present (cuDNN build)";
-    }
+    class EmptyTable final : public nert::KernelTable {
+      public:
+        nert::KernelFn find(const std::string&) const override { return nullptr; }
+    };
+    class MissingRowDevice final : public nert::Device {
+      public:
+        const char* name() const override { return "cuda-missing-row-test"; }
+        nert::Allocator& allocator() override { return cuda().allocator(); }
+        nert::Transfer& transfer() override { return cuda().transfer(); }
+        const nert::KernelTable& kernels() const override { return table_; }
+        bool is_host() const override { return false; }
+
+      private:
+        static nert::Device& cuda() { return const_cast<nert::Device&>(nert::CudaDevice()); }
+        EmptyTable table_;
+    } device;
 
     nert::Graph graph;
     graph.inputs = {{"x", {nert::DataType::Float32, {}}}, {"w", {nert::DataType::Float32, {}}}};
@@ -199,7 +207,7 @@ TEST(NertCudaKernels, UnknownOpRejectsNamingNodeAndOp) {
     graph.nodes = {bad};
     graph.outputs = {{"y", {nert::DataType::Float32, {}}}};
 
-    nert::Model cuda(graph, {{"x", {1, 1, 2, 2}}, {"w", {1, 1, 2, 2}}}, nert::CudaDevice());
+    nert::Model cuda(graph, {{"x", {1, 1, 2, 2}}, {"w", {1, 1, 2, 2}}}, device);
     try {
         cuda.Run({{"x", std::vector<float>(4, 1.0F)}, {"w", std::vector<float>(4, 1.0F)}});
         FAIL() << "expected InferenceException for an op with no CUDA kernel";
