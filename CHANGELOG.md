@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-25
 
 ### Known missing coverage
 
@@ -352,7 +352,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Squeeze` copy rows.
 - OpenCL `Resize` no-op-attribute admission, found by the Depth-Anything-V2-Small gate: the row rejected `antialias`/`exclude_outside` on mere presence while the loader admits absent-or-0 and CPU/CUDA enforce nothing, so the loader-admitted graph exited 1 at OpenCL dispatch. Architect-authorized fix confined to `src/opencl/resize.cpp` (presence→value check mirroring the loader: absent accept, non-int reject, int 0 accept, int nonzero incl. negative reject, mode-independent; no ABI or table change, OpenCL stays 68 rows) plus discriminating tests in `test/opencl_resize_test.cpp` and a loader positive in `test/loader_test.cpp` (red pre-fix, green post-fix; full OpenCL-resize suite 10/10). 14 Resize-model OpenCL legs re-ran byte-identical; only `nert_gate_opencl` relinked.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - Development history (unreleased)
 
 ### Added
 - First-party ONNX inference runtime (NERT, the Neuriplo Engine Runtime):

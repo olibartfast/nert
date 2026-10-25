@@ -35,8 +35,8 @@ fallback or ONNX Runtime escape hatch; unsupported semantics fail explicitly.
 
 ## Status
 
-Version 0.2.0 is unreleased; the breaking namespace, header, filename,
-and CTest-suite renames are complete. See [CHANGELOG](CHANGELOG.md).
+Version 0.2.0 includes the breaking namespace, header, filename,
+and CTest-suite renames. See [CHANGELOG](CHANGELOG.md).
 
 CPU, CUDA (with cuDNN), OpenCL and HIP have 73 op rows each. OpenCL now
 includes `Abs`, `Floor`, `GreaterOrEqual`, and `Neg`.
@@ -55,8 +55,8 @@ sizes” placeholder is deferred until upstream provides a distinct model.
 Image understanding (GGUF/llama.cpp) and Gaussian Splatting remain out of scope.
 AMD full-catalog validation and persistent CI remain explicitly unvalidated;
 the latest Sign/Split changes have not been rerun on native AMD. These are
-accepted 0.2.0 limitations. Release preparation still requires committing the
-reviewed work and completing [GitFlow](docs/GITFLOW.md); no release has been published. See the
+accepted 0.2.0 limitations. Release notes preserve these limitations. Releases follow
+[GitFlow](docs/GITFLOW.md). See the
 [coverage matrix](specs/2026-10-17-task-models/coverage.md) and
 [gate evidence](specs/2026-10-24-release-gates/results.md).
 
